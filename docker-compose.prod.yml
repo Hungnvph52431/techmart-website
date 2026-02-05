@@ -1,0 +1,70 @@
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: techmart-mysql-prod
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/src/infrastructure/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./backend/src/infrastructure/database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+    networks:
+      - techmart-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Backend API (Production Build)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: techmart-backend-prod
+    restart: always
+    ports:
+      - "5001:5000"
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=7d
+      - CORS_ORIGIN=${CORS_ORIGIN}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - techmart-network
+
+  # Frontend App (Production Build with Nginx)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: techmart-frontend-prod
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - techmart-network
+
+networks:
+  techmart-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
