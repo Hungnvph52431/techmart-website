@@ -13,10 +13,16 @@ export const HomePage = () => {
   useEffect(() => {
     const fetchFeaturedProducts = async () => {
       try {
+        console.log('Fetching featured products...');
         const data = await productService.getAll({ featured: true });
+        console.log('Fetched products:', data);
         setFeaturedProducts(data.slice(0, 8));
       } catch (error) {
         console.error('Error fetching featured products:', error);
+        // Set empty array on error to prevent crash
+        setFeaturedProducts([]);
+        // Show toast notification
+        console.warn('Backend không hoạt động. Vui lòng kiểm tra backend server.');
       } finally {
         setLoading(false);
       }
@@ -80,11 +86,17 @@ export const HomePage = () => {
             <div className="text-center py-12">
               <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
             </div>
-          ) : (
+          ) : featuredProducts.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {featuredProducts.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-gray-600 text-lg">
+                Không có sản phẩm nổi bật. Vui lòng kiểm tra lại kết nối backend.
+              </p>
             </div>
           )}
         </div>
