@@ -276,11 +276,16 @@ Database đã được seed với dữ liệu mẫu đầy đủ khi chạy Dock
 - ✅ Đặt hàng
 - ✅ Xem lịch sử đơn hàng
 
-### Admin
-- ✅ Quản lý sản phẩm (CRUD)
-- ✅ Quản lý đơn hàng
-- ✅ Quản lý người dùng
-- ✅ Xem thống kê
+### Admin Dashboard 🎛️
+**Truy cập**: `http://localhost:5173/admin`
+
+Đăng nhập bằng tài khoản admin để sử dụng:
+- ✅ **Dashboard**: Thống kê tổng quan (sản phẩm, đơn hàng, doanh thu)
+- ✅ **Quản lý sản phẩm**: Xem, xóa sản phẩm (thêm/sửa đang phát triển)
+- ✅ **Quản lý đơn hàng**: Xem, lọc, cập nhật trạng thái đơn hàng
+- 🔒 **Bảo vệ**: Chỉ admin mới có thể truy cập
+
+Chi tiết xem tại: [frontend/src/features/admin/README.md](frontend/src/features/admin/README.md)
 
 ## 🔧 Docker Commands
 

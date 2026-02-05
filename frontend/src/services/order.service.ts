@@ -7,6 +7,11 @@ export const orderService = {
     return response.data;
   },
 
+  getAll: async (): Promise<Order[]> => {
+    const response = await api.get('/orders');
+    return response.data;
+  },
+
   getById: async (id: string): Promise<Order> => {
     const response = await api.get(`/orders/${id}`);
     return response.data;
@@ -20,6 +25,16 @@ export const orderService = {
     note?: string;
   }): Promise<Order> => {
     const response = await api.post('/orders', orderData);
+    return response.data;
+  },
+
+  updateStatus: async (orderId: number, status: string): Promise<Order> => {
+    const response = await api.patch(`/orders/${orderId}/status`, { status });
+    return response.data;
+  },
+
+  updatePaymentStatus: async (orderId: number, paymentStatus: string): Promise<Order> => {
+    const response = await api.patch(`/orders/${orderId}/payment-status`, { paymentStatus });
     return response.data;
   },
 };
