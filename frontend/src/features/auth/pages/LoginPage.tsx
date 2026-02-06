@@ -20,7 +20,13 @@ export const LoginPage = () => {
       const result = await authService.login(email, password);
       setAuth(result.user, result.token);
       toast.success('Đăng nhập thành công!');
-      navigate('/');
+      
+      // Redirect based on user role
+      if (result.user.role !== 'customer') {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Đăng nhập thất bại');
     } finally {
