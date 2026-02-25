@@ -90,6 +90,16 @@ export const AdminLayout = () => {
             >
               🛒 Đơn hàng
             </Link>
+            <Link
+              to="/admin/users"
+              className={`block px-4 py-3 rounded-lg transition-colors ${
+                isActive('/admin/users')
+                  ? 'bg-blue-500 text-white'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              👥 Người dùng
+            </Link>
           </nav>
         </aside>
 

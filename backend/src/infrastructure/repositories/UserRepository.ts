@@ -110,6 +110,14 @@ export class UserRepository implements IUserRepository {
     return this.findById(user.userId);
   }
 
+  async updatePassword(userId: number, hashedPassword: string): Promise<boolean> {
+    const [result] = await pool.execute<ResultSetHeader>(
+      'UPDATE users SET password = ?, updated_at = ? WHERE user_id = ?',
+      [hashedPassword, new Date(), userId]
+    );
+    return result.affectedRows > 0;
+  }
+
   async delete(userId: number): Promise<boolean> {
     const [result] = await pool.execute<ResultSetHeader>('DELETE FROM users WHERE user_id = ?', [userId]);
     return result.affectedRows > 0;

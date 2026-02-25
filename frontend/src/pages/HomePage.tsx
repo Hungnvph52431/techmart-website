@@ -88,9 +88,10 @@ export const HomePage = () => {
             </div>
           ) : featuredProducts.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {featuredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
+              {featuredProducts.map((product, index) => {
+                const productKey = (product as any).id ?? (product as any).productId ?? product.slug ?? index;
+                return <ProductCard key={String(productKey)} product={product} />;
+              })}
             </div>
           ) : (
             <div className="text-center py-12">

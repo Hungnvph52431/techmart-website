@@ -3,16 +3,23 @@ import { orderService } from '@/services/order.service';
 import toast from 'react-hot-toast';
 
 interface OrderResponse {
-  order_id: number;
-  user_id: number;
-  user_name: string;
-  user_email: string;
-  total_amount: number;
+  orderId?: number;
+  order_id?: number;
+  userId?: number;
+  user_id?: number;
+  userName?: string;
+  user_name?: string;
+  userEmail?: string;
+  user_email?: string;
+  total?: number;
+  total_amount?: number;
   status: string;
   payment_method: string;
   payment_status: string;
-  shipping_address: string;
-  created_at: string;
+  shippingAddress?: string;
+  shipping_address?: string;
+  orderDate?: string;
+  created_at?: string;
 }
 
 export const AdminOrders = () => {
@@ -174,29 +181,36 @@ export const AdminOrders = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredOrders.map((order) => (
-                <tr key={order.order_id} className="hover:bg-gray-50">
+              {filteredOrders.map((order, index) => {
+                const orderId = order.orderId ?? order.order_id;
+                const userName = order.userName ?? order.user_name ?? `User #${order.userId ?? order.user_id ?? 'N/A'}`;
+                const userEmail = order.userEmail ?? order.user_email ?? '-';
+                const totalAmount = order.total ?? order.total_amount ?? 0;
+                const createdAt = order.orderDate ?? order.created_at;
+
+                return (
+                <tr key={String(orderId || index)} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm font-medium text-gray-900">
-                      #{order.order_id}
+                      #{orderId}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">
-                      {order.user_name}
+                      {userName}
                     </div>
                     <div className="text-sm text-gray-500">
-                      {order.user_email}
+                      {userEmail}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm font-medium text-gray-900">
-                      {Number(order.total_amount).toLocaleString('vi-VN')} ₫
+                      {Number(totalAmount).toLocaleString('vi-VN')} ₫
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm text-gray-900">
-                      {new Date(order.created_at).toLocaleDateString('vi-VN')}
+                      {createdAt ? new Date(createdAt).toLocaleDateString('vi-VN') : '-'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -216,10 +230,10 @@ export const AdminOrders = () => {
                     <select
                       value={order.status}
                       onChange={(e) =>
-                        handleUpdateStatus(order.order_id, e.target.value)
+                        orderId && handleUpdateStatus(orderId, e.target.value)
                       }
                       className="border rounded px-2 py-1 text-sm"
-                      disabled={order.status === 'completed' || order.status === 'cancelled'}
+                      disabled={!orderId || order.status === 'completed' || order.status === 'cancelled'}
                     >
                       <option value="pending">Chờ xử lý</option>
                       <option value="processing">Đang xử lý</option>
@@ -229,7 +243,7 @@ export const AdminOrders = () => {
                     </select>
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>
