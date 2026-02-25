@@ -9,10 +9,11 @@ import { AdminLayout } from '@/features/admin/components/AdminLayout';
 import { AdminDashboard } from '@/features/admin/pages/AdminDashboard';
 import { AdminProducts } from '@/features/admin/pages/AdminProducts';
 import { AdminOrders } from '@/features/admin/pages/AdminOrders';
+import { AdminUsers } from '@/features/admin/pages/AdminUsers';
 
 function App() {
   return (
-    <Router>
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Toaster position="top-right" />
       <Routes>
         <Route path="/" element={<HomePage />} />
@@ -26,6 +27,7 @@ function App() {
           <Route index element={<AdminDashboard />} />
           <Route path="products" element={<AdminProducts />} />
           <Route path="orders" element={<AdminOrders />} />
+          <Route path="users" element={<AdminUsers />} />
         </Route>
       </Routes>
     </Router>

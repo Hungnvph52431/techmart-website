@@ -12,16 +12,19 @@ import { OrderRepository } from './infrastructure/repositories/OrderRepository';
 import { AuthUseCase } from './application/use-cases/AuthUseCase';
 import { ProductUseCase } from './application/use-cases/ProductUseCase';
 import { OrderUseCase } from './application/use-cases/OrderUseCase';
+import { UserUseCase } from './application/use-cases/UserUseCase';
 
 // Controllers
 import { AuthController } from './presentation/controllers/AuthController';
 import { ProductController } from './presentation/controllers/ProductController';
 import { OrderController } from './presentation/controllers/OrderController';
+import { UserController } from './presentation/controllers/UserControllers';
 
 // Routes
 import { createAuthRoutes } from './presentation/routes/auth.routes';
 import { createProductRoutes } from './presentation/routes/product.routes';
 import { createOrderRoutes } from './presentation/routes/order.routes';
+import { createUserRoutes } from './presentation/routes/user.routes';
 
 dotenv.config();
 
@@ -44,15 +47,18 @@ const orderRepository = new OrderRepository();
 const authUseCase = new AuthUseCase(userRepository);
 const productUseCase = new ProductUseCase(productRepository);
 const orderUseCase = new OrderUseCase(orderRepository, productRepository);
+const userUseCase = new UserUseCase(userRepository);
 
 const authController = new AuthController(authUseCase);
 const productController = new ProductController(productUseCase);
 const orderController = new OrderController(orderUseCase);
+const userController = new UserController(userUseCase);
 
 // Routes
 app.use('/api/auth', createAuthRoutes(authController));
 app.use('/api/products', createProductRoutes(productController));
 app.use('/api/orders', createOrderRoutes(orderController));
+app.use('/api/users', createUserRoutes(userController));
 
 // Health check
 app.get('/health', (req, res) => {

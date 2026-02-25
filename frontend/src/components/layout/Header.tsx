@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingCart, User, Search } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
@@ -6,8 +7,28 @@ import { useCartStore } from '@/store/cartStore';
 export const Header = () => {
   const { user, isAuthenticated, clearAuth } = useAuthStore();
   const { getTotalItems } = useCartStore();
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!userMenuRef.current) {
+        return;
+      }
+
+      if (!userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const handleLogout = () => {
+    setIsUserMenuOpen(false);
     clearAuth();
     window.location.href = '/';
   };
@@ -45,20 +66,26 @@ export const Header = () => {
             </Link>
 
             {isAuthenticated() ? (
-              <div className="relative group">
-                <button className="flex items-center space-x-2">
+              <div ref={userMenuRef} className="relative">
+                <button
+                  onClick={() => setIsUserMenuOpen((previous) => !previous)}
+                  className="flex items-center space-x-2"
+                >
                   <User className="h-6 w-6 text-gray-700" />
                   <span className="text-sm">{user?.fullName}</span>
                 </button>
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 hidden group-hover:block">
+                {isUserMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1">
                   <Link
                     to="/profile"
+                    onClick={() => setIsUserMenuOpen(false)}
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   >
                     Thông tin cá nhân
                   </Link>
                   <Link
                     to="/orders"
+                    onClick={() => setIsUserMenuOpen(false)}
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   >
                     Đơn hàng của tôi
@@ -69,7 +96,8 @@ export const Header = () => {
                   >
                     Đăng xuất
                   </button>
-                </div>
+                  </div>
+                )}
               </div>
             ) : (
               <Link
