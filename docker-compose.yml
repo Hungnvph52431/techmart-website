@@ -4,6 +4,7 @@ services:
     image: mysql:8.0
     container_name: techmart-mysql
     restart: always
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --init-connect='SET NAMES utf8mb4'
     environment:
       MYSQL_ROOT_PASSWORD: techmart123
       MYSQL_DATABASE: mobile_shop
@@ -18,7 +19,7 @@ services:
     networks:
       - techmart-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
       timeout: 20s
       retries: 10
 

@@ -141,12 +141,18 @@ export const AdminDashboard = () => {
         <h2 className="text-xl font-bold text-gray-800 mb-4">
           Thao tác nhanh
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Link
             to="/admin/products/new"
             className="flex items-center justify-center px-6 py-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
           >
             ➕ Thêm sản phẩm mới
+          </Link>
+          <Link
+            to="/admin/categories"
+            className="flex items-center justify-center px-6 py-4 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+          >
+            📁 Quản lý danh mục
           </Link>
           <Link
             to="/admin/orders"
