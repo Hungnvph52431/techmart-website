@@ -11,6 +11,6 @@ export const createOrderRoutes = (orderController: OrderController) => {
   router.post('/', authMiddleware, orderController.create);
   router.patch('/:id/status', authMiddleware, adminMiddleware, orderController.updateStatus);
   router.patch('/:id/payment-status', authMiddleware, adminMiddleware, orderController.updatePaymentStatus);
-
+  router.get('/:id/details', authMiddleware, adminMiddleware, orderController.getOrderDetails);  
   return router;
 };
