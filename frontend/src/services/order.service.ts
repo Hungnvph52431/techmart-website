@@ -1,40 +1,49 @@
-import api from './api';
-import { Order, ShippingAddress, OrderItem } from '@/types';
+import axios from 'axios';
+import { Order, OrderDetail, OrderStatus, PaymentStatus } from '@/types/order';
+
+const API_BASE = import.meta.env.VITE_API_URL;
+
+const orderApi = axios.create({
+  baseURL: `${API_BASE}/orders`,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+orderApi.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 export const orderService = {
+  getAllOrders: async (): Promise<Order[]> => {
+    const res = await orderApi.get('/');
+    return res.data;
+  },
+
+  getOrderById: async (id: number): Promise<Order> => {
+    const res = await orderApi.get(`/${id}`);
+    return res.data;
+  },
+
+  getOrderDetails: async (orderId: number): Promise<OrderDetail[]> => {
+    const res = await orderApi.get(`/${orderId}/details`); 
+    return res.data;
+  },
+
+  updateOrderStatus: async (orderId: number, status: OrderStatus) => {
+    const res = await orderApi.patch(`/${orderId}/status`, { status });
+    return res.data;
+  },
+
+  updatePaymentStatus: async (orderId: number, status: PaymentStatus) => {
+    const res = await orderApi.patch(`/${orderId}/payment-status`, { status });
+    return res.data;
+  },
+
   getMyOrders: async (): Promise<Order[]> => {
-    const response = await api.get('/orders/my-orders');
-    return response.data;
-  },
-
-  getAll: async (): Promise<Order[]> => {
-    const response = await api.get('/orders');
-    return response.data;
-  },
-
-  getById: async (id: string): Promise<Order> => {
-    const response = await api.get(`/orders/${id}`);
-    return response.data;
-  },
-
-  create: async (orderData: {
-    items: OrderItem[];
-    totalAmount: number;
-    shippingAddress: ShippingAddress;
-    paymentMethod: 'cod' | 'online';
-    note?: string;
-  }): Promise<Order> => {
-    const response = await api.post('/orders', orderData);
-    return response.data;
-  },
-
-  updateStatus: async (orderId: number, status: string): Promise<Order> => {
-    const response = await api.patch(`/orders/${orderId}/status`, { status });
-    return response.data;
-  },
-
-  updatePaymentStatus: async (orderId: number, paymentStatus: string): Promise<Order> => {
-    const response = await api.patch(`/orders/${orderId}/payment-status`, { paymentStatus });
-    return response.data;
+    const res = await orderApi.get('/my-orders');
+    return res.data;
   },
 };
