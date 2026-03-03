@@ -1,21 +1,26 @@
-import { IUserRepository } from '../../domain/repositories/IUserRepository';
-import { UserLoginDTO } from '../../domain/entities/User';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import { IUserRepository } from "../../domain/repositories/IUserRepository";
+import { UserLoginDTO } from "../../domain/entities/User";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 
-const JWT_SECRET: string = process.env.JWT_SECRET || 'secret';
-const JWT_EXPIRES: string = process.env.JWT_EXPIRES_IN || '7d';
+const JWT_SECRET: string = process.env.JWT_SECRET || "secret";
+const JWT_EXPIRES: string = process.env.JWT_EXPIRES_IN || "7d";
 
 export class AuthUseCase {
   constructor(private userRepository: IUserRepository) {}
 
-  async login(loginData: UserLoginDTO): Promise<{ token: string; user: any } | null> {
+  async login(
+    loginData: UserLoginDTO,
+  ): Promise<{ token: string; user: any } | null> {
     const user = await this.userRepository.findByEmail(loginData.email);
     if (!user) {
       return null;
     }
 
-    const isPasswordValid = await bcrypt.compare(loginData.password, user.password);
+    const isPasswordValid = await bcrypt.compare(
+      loginData.password,
+      (user as any).password,
+    );
     if (!isPasswordValid) {
       return null;
     }
@@ -24,10 +29,10 @@ export class AuthUseCase {
     const token = jwt.sign(
       { userId: user.userId, email: user.email, role: user.role },
       JWT_SECRET,
-      { expiresIn: JWT_EXPIRES }
+      { expiresIn: JWT_EXPIRES },
     );
 
-    const { password, ...userWithoutPassword } = user;
+    const { password, ...userWithoutPassword } = user as any;
 
     return {
       token,
@@ -38,17 +43,17 @@ export class AuthUseCase {
   async register(userData: any) {
     const existingUser = await this.userRepository.findByEmail(userData.email);
     if (existingUser) {
-      throw new Error('Email already exists');
+      throw new Error("Email already exists");
     }
 
     const user = await this.userRepository.create(userData);
-    const { password, ...userWithoutPassword } = user;
+    const { password, ...userWithoutPassword } = user as any;
 
     // @ts-ignore
     const token = jwt.sign(
       { userId: user.userId, email: user.email, role: user.role },
       JWT_SECRET,
-      { expiresIn: JWT_EXPIRES }
+      { expiresIn: JWT_EXPIRES },
     );
 
     return {
