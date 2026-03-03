@@ -12,6 +12,7 @@
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "axios": "^1.6.5",
+    "bcrypt": "^6.0.0",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.303.0",
     "react": "^18.2.0",

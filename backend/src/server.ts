@@ -1,31 +1,34 @@
-import express, { Application } from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import { testConnection } from './infrastructure/database/connection';
+import express, { Application } from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import { testConnection } from "./infrastructure/database/connection";
 
 // Repositories
-import { UserRepository } from './infrastructure/repositories/UserRepository';
-import { ProductRepository } from './infrastructure/repositories/ProductRepository';
-import { OrderRepository } from './infrastructure/repositories/OrderRepository';
-import { CategoryRepository } from './infrastructure/repositories/CategoryRepository';
+import { UserRepository } from "./infrastructure/repositories/UserRepository";
+import { ProductRepository } from "./infrastructure/repositories/ProductRepository";
+import { OrderRepository } from "./infrastructure/repositories/OrderRepository";
+import { CategoryRepository } from "./infrastructure/repositories/CategoryRepository";
 
 // Use Cases
-import { AuthUseCase } from './application/use-cases/AuthUseCase';
-import { ProductUseCase } from './application/use-cases/ProductUseCase';
-import { OrderUseCase } from './application/use-cases/OrderUseCase';
-import { CategoryUseCase } from './application/use-cases/CategoryUseCase';
+import { AuthUseCase } from "./application/use-cases/AuthUseCase";
+import { ProductUseCase } from "./application/use-cases/ProductUseCase";
+import { OrderUseCase } from "./application/use-cases/OrderUseCase";
+import { CategoryUseCase } from "./application/use-cases/CategoryUseCase";
+import { UserUseCase } from "./application/use-cases/UserUseCase";
 
 // Controllers
-import { AuthController } from './presentation/controllers/AuthController';
-import { ProductController } from './presentation/controllers/ProductController';
-import { OrderController } from './presentation/controllers/OrderController';
-import { CategoryController } from './presentation/controllers/CategoryController';
+import { AuthController } from "./presentation/controllers/AuthController";
+import { ProductController } from "./presentation/controllers/ProductController";
+import { OrderController } from "./presentation/controllers/OrderController";
+import { CategoryController } from "./presentation/controllers/CategoryController";
+import { UserController } from "./presentation/controllers/UserController";
 
 // Routes
-import { createAuthRoutes } from './presentation/routes/auth.routes';
-import { createProductRoutes } from './presentation/routes/product.routes';
-import { createOrderRoutes } from './presentation/routes/order.routes';
-import { createCategoryRoutes } from './presentation/routes/category.routes';
+import { createAuthRoutes } from "./presentation/routes/auth.routes";
+import { createProductRoutes } from "./presentation/routes/product.routes";
+import { createOrderRoutes } from "./presentation/routes/order.routes";
+import { createCategoryRoutes } from "./presentation/routes/category.routes";
+import { createUserRoutes } from "./presentation/routes/user.routes";
 
 dotenv.config();
 
@@ -33,10 +36,12 @@ const app: Application = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
+    credentials: true,
+  }),
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -50,21 +55,24 @@ const authUseCase = new AuthUseCase(userRepository);
 const productUseCase = new ProductUseCase(productRepository);
 const orderUseCase = new OrderUseCase(orderRepository, productRepository);
 const categoryUseCase = new CategoryUseCase(categoryRepository);
+const userUseCase = new UserUseCase(userRepository); 
 
 const authController = new AuthController(authUseCase);
 const productController = new ProductController(productUseCase);
 const orderController = new OrderController(orderUseCase);
 const categoryController = new CategoryController(categoryUseCase);
+const userController = new UserController(userUseCase); 
 
 // Routes
-app.use('/api/auth', createAuthRoutes(authController));
-app.use('/api/products', createProductRoutes(productController));
-app.use('/api/orders', createOrderRoutes(orderController));
-app.use('/api/categories', createCategoryRoutes(categoryController));
+app.use("/api/auth", createAuthRoutes(authController));
+app.use("/api/products", createProductRoutes(productController));
+app.use("/api/orders", createOrderRoutes(orderController));
+app.use("/api/categories", createCategoryRoutes(categoryController));
+app.use("/api/users", createUserRoutes(userController)); 
 
 // Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', message: 'TechMart API is running' });
+app.get("/health", (req, res) => {
+  res.json({ status: "OK", message: "TechMart API is running" });
 });
 
 // Start server
@@ -73,10 +81,10 @@ const startServer = async () => {
     await testConnection();
     app.listen(PORT, () => {
       console.log(`🚀 Server is running on port ${PORT}`);
-      console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`📝 Environment: ${process.env.NODE_ENV || "development"}`);
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    console.error("Failed to start server:", error);
     process.exit(1);
   }
 };
