@@ -11,6 +11,8 @@ import { AdminProducts } from "@/features/admin/pages/AdminProducts";
 import AdminOrders from "@/features/admin/pages/AdminOrders";
 import { AdminCategories } from "@/features/admin/pages/AdminCategories";
 import OrderDetailPage from "./features/admin/pages/OrderDetailPage";
+import AdminUser from "./features/admin/pages/AdminUser";
+import UserDetailPage from "./features/admin/pages/UserDetailPage";
 
 function App() {
   return (
@@ -30,6 +32,8 @@ function App() {
           <Route path="orders" element={<AdminOrders />} />
           <Route path="orders/:orderId" element={<OrderDetailPage/>}></Route>
           <Route path="categories" element={<AdminCategories />} />
+          <Route path="users" element={<AdminUser/>}></Route>
+          <Route path="users/:userId" element={<UserDetailPage />} />
         </Route>
       </Routes>
     </Router>
