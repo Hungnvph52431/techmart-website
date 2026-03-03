@@ -137,3 +137,13 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Docker
+.env
+.env.production
+*.sql
+backup_*.sql
+
+# OS
+.DS_Store
+Thumbs.db
