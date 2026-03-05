@@ -50,6 +50,10 @@ export interface UserStats {
   usersByMembership: Record<string, number>;
 }
 
+export interface DeleteUserResponse {
+  action: 'deleted' | 'deactivated';
+}
+
 type ApiEnvelope<T> = {
   success?: boolean;
   data?: T;
@@ -100,8 +104,9 @@ export const userService = {
     return unwrapData<User>(response.data);
   },
 
-  deleteUser: async (userId: number): Promise<void> => {
-    await api.delete(`/users/${userId}`);
+  deleteUser: async (userId: number): Promise<DeleteUserResponse> => {
+    const response = await api.delete(`/users/${userId}`);
+    return unwrapData<DeleteUserResponse>(response.data);
   },
 
   async updateUserStatus(userId: number, status: 'active' | 'inactive' | 'banned'): Promise<User> {

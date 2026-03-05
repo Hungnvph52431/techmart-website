@@ -85,8 +85,14 @@ export const AdminUsers = () => {
 
         try {
             setDeleteLoading(userId);
-            await userService.deleteUser(userId);
-            toast.success('Xóa người dùng thành công');
+            const result = await userService.deleteUser(userId);
+
+            if (result.action === 'deleted') {
+                toast.success('Xóa người dùng thành công');
+            } else {
+                toast.success('Người dùng có đơn hàng liên quan, đã được chuyển sang trạng thái không hoạt động');
+            }
+
             await fetchUsers();
         } catch (error: unknown) {
             console.error('Failed to delete user:', error);
