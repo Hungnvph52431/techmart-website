@@ -131,17 +131,17 @@ export class UserController {
                 });
             }
 
-            const deleted = await this.userUseCase.deleteUser(userId);
-            if (!deleted) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'User not found',
-                });
-            }
+            const result = await this.userUseCase.deleteUser(userId);
+
+            const message =
+                result.action === 'deleted'
+                    ? 'User deleted successfully'
+                    : 'User has related orders, so the account was deactivated instead of deleted';
 
             res.json({
                 success: true,
-                message: 'User deleted successfully',
+                message,
+                data: result,
             });
         } catch (error: any) {
             res.status(400).json({

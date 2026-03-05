@@ -10,6 +10,10 @@ export interface UserFilters {
     membershipLevel?: 'bronze' | 'silver' | 'gold' | 'platinum';
 }
 
+export type DeleteUserResult = {
+    action: 'deleted' | 'deactivated';
+};
+
 export class UserUseCase {
     constructor(private userRepository: IUserRepository) { }
 
@@ -110,7 +114,7 @@ export class UserUseCase {
         const { password, ...userWithoutPassword } = updatedUser;
         return userWithoutPassword;
     }
-    async deleteUser(userId: number): Promise<boolean> {
+    async deleteUser(userId: number): Promise<DeleteUserResult> {
         const existingUser = await this.userRepository.findById(userId);
         if (!existingUser) {
             throw new Error('User not found');
@@ -121,7 +125,14 @@ export class UserUseCase {
         }
 
         try {
-            return await this.userRepository.delete(userId);
+            const deleted = await this.userRepository.delete(userId);
+            if (!deleted) {
+                throw new Error('User not found');
+            }
+
+            return {
+                action: 'deleted',
+            };
         } catch (error: any) {
             const dbErrorCode = error?.code;
             if (dbErrorCode === 'ER_ROW_IS_REFERENCED_2' || dbErrorCode === 'ER_ROW_IS_REFERENCED') {
@@ -129,7 +140,13 @@ export class UserUseCase {
                     userId,
                     status: 'inactive',
                 });
-                return !!deactivatedUser;
+                if (!deactivatedUser) {
+                    throw new Error('User not found');
+                }
+
+                return {
+                    action: 'deactivated',
+                };
             }
             throw error;
         }
