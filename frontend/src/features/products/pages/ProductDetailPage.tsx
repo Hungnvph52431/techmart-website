@@ -11,7 +11,6 @@ export const ProductDetailPage = () => {
   const { slug } = useParams<{ slug: string }>();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const { addItem } = useCartStore();
 
@@ -67,34 +66,21 @@ export const ProductDetailPage = () => {
           <div>
             <div className="mb-4">
               <img
-                src={product.images[selectedImage] || '/placeholder.jpg'}
+                src={product.mainImage || '/placeholder.jpg'}
                 alt={product.name}
                 className="w-full h-96 object-cover rounded-lg"
               />
-            </div>
-            <div className="grid grid-cols-4 gap-2">
-              {product.images.map((image, index) => (
-                <img
-                  key={index}
-                  src={image}
-                  alt={`${product.name} ${index + 1}`}
-                  className={`w-full h-24 object-cover rounded-lg cursor-pointer border-2 ${
-                    selectedImage === index ? 'border-primary-600' : 'border-gray-200'
-                  }`}
-                  onClick={() => setSelectedImage(index)}
-                />
-              ))}
             </div>
           </div>
 
           {/* Details */}
           <div>
             <h1 className="text-3xl font-bold mb-4">{product.name}</h1>
-            
+
             <div className="flex items-center mb-4">
               <div className="flex items-center">
                 <Star className="h-5 w-5 text-yellow-400 fill-current" />
-                <span className="ml-1 text-lg">{product.rating}</span>
+                <span className="ml-1 text-lg">{product.ratingAvg || 0}</span>
               </div>
               <span className="mx-3 text-gray-400">|</span>
               <span className="text-gray-600">{product.reviewCount} đánh giá</span>
@@ -102,17 +88,17 @@ export const ProductDetailPage = () => {
 
             <div className="bg-gray-50 p-6 rounded-lg mb-6">
               <div className="text-3xl font-bold text-red-600 mb-2">
-                {product.price.toLocaleString('vi-VN')}₫
+                {(product.salePrice || product.price).toLocaleString('vi-VN')}₫
               </div>
-              {product.originalPrice > product.price && (
+              {product.salePrice && product.price > product.salePrice && (
                 <div className="flex items-center space-x-2">
                   <span className="text-lg text-gray-400 line-through">
-                    {product.originalPrice.toLocaleString('vi-VN')}₫
+                    {product.price.toLocaleString('vi-VN')}₫
                   </span>
                   <span className="bg-red-500 text-white px-2 py-1 rounded text-sm">
                     -
                     {Math.round(
-                      ((product.originalPrice - product.price) / product.originalPrice) * 100
+                      ((product.price - product.salePrice) / product.price) * 100
                     )}
                     %
                   </span>
@@ -131,20 +117,20 @@ export const ProductDetailPage = () => {
                 </button>
                 <span className="px-4 py-2 border border-gray-300 rounded">{quantity}</span>
                 <button
-                  onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
+                  onClick={() => setQuantity(Math.min(product.stockQuantity, quantity + 1))}
                   className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100"
                 >
                   +
                 </button>
                 <span className="text-gray-500 ml-4">
-                  Còn {product.stock} sản phẩm
+                  Còn {product.stockQuantity} sản phẩm
                 </span>
               </div>
             </div>
 
             <button
               onClick={handleAddToCart}
-              disabled={product.stock === 0}
+              disabled={product.stockQuantity === 0}
               className="w-full bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 transition-colors flex items-center justify-center space-x-2 mb-6 disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
               <ShoppingCart className="h-5 w-5" />
@@ -169,7 +155,7 @@ export const ProductDetailPage = () => {
             <div className="border-t pt-6">
               <h3 className="font-semibold mb-3">Thông số kỹ thuật:</h3>
               <div className="space-y-2">
-                {Object.entries(product.specifications).map(([key, value]) => (
+                {product.specifications && Object.entries(product.specifications).map(([key, value]) => (
                   <div key={key} className="flex">
                     <span className="w-1/3 text-gray-600 capitalize">{key}:</span>
                     <span className="w-2/3 font-medium">{value}</span>

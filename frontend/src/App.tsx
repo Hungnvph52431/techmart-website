@@ -7,6 +7,8 @@ import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { CartPage } from '@/features/cart/components/CartPage';
 import { AdminLayout } from '@/features/admin/components/AdminLayout';
 import { AdminDashboard } from '@/features/admin/pages/AdminDashboard';
+import { AdminCategories } from '@/features/admin/pages/AdminCategories';
+import { AdminBrands } from '@/features/admin/pages/AdminBrands';
 import { AdminProducts } from '@/features/admin/pages/AdminProducts';
 import { AdminOrders } from '@/features/admin/pages/AdminOrders';
 
@@ -24,6 +26,8 @@ function App() {
         {/* Admin Routes */}
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
+          <Route path="categories" element={<AdminCategories />} />
+          <Route path="brands" element={<AdminBrands />} />
           <Route path="products" element={<AdminProducts />} />
           <Route path="orders" element={<AdminOrders />} />
         </Route>

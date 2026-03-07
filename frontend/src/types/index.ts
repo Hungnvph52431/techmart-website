@@ -1,27 +1,28 @@
 export interface Product {
-  id: string;
+  productId: number;
   name: string;
   slug: string;
-  description: string;
+  sku: string;
+  categoryId: number;
+  brandId?: number;
   price: number;
-  originalPrice: number;
-  brand: string;
-  category: string;
-  stock: number;
-  images: string[];
-  specifications: {
-    screen?: string;
-    os?: string;
-    camera?: string;
-    processor?: string;
-    ram?: string;
-    storage?: string;
-    battery?: string;
-    [key: string]: string | undefined;
-  };
-  featured: boolean;
-  rating: number;
+  salePrice?: number;
+  costPrice?: number;
+  description?: string;
+  specifications?: Record<string, any>;
+  mainImage?: string;
+  stockQuantity: number;
+  soldQuantity: number;
+  viewCount: number;
+  ratingAvg: number;
   reviewCount: number;
+  isFeatured: boolean;
+  isNew: boolean;
+  isBestseller: boolean;
+  status: string;
+  metaTitle?: string;
+  metaDescription?: string;
+  metaKeywords?: string;
   createdAt: string;
   updatedAt: string;
 }
