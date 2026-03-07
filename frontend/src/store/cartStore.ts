@@ -5,8 +5,8 @@ import { Product, CartItem } from '@/types';
 interface CartState {
   items: CartItem[];
   addItem: (product: Product, quantity?: number) => void;
-  removeItem: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
+  removeItem: (productId: number) => void;
+  updateQuantity: (productId: number, quantity: number) => void;
   clearCart: () => void;
   getTotalItems: () => number;
   getTotalPrice: () => number;
@@ -16,15 +16,15 @@ export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
       items: [],
-      
+
       addItem: (product, quantity = 1) => {
         const items = get().items;
-        const existingItem = items.find((item) => item.product.id === product.id);
+        const existingItem = items.find((item) => item.product.productId === product.productId);
 
         if (existingItem) {
           set({
             items: items.map((item) =>
-              item.product.id === product.id
+              item.product.productId === product.productId
                 ? { ...item, quantity: item.quantity + quantity }
                 : item
             ),
@@ -36,7 +36,7 @@ export const useCartStore = create<CartState>()(
 
       removeItem: (productId) => {
         set({
-          items: get().items.filter((item) => item.product.id !== productId),
+          items: get().items.filter((item) => item.product.productId !== productId),
         });
       },
 
@@ -46,7 +46,7 @@ export const useCartStore = create<CartState>()(
         } else {
           set({
             items: get().items.map((item) =>
-              item.product.id === productId ? { ...item, quantity } : item
+              item.product.productId === productId ? { ...item, quantity } : item
             ),
           });
         }
@@ -62,7 +62,7 @@ export const useCartStore = create<CartState>()(
 
       getTotalPrice: () => {
         return get().items.reduce(
-          (total, item) => total + item.product.price * item.quantity,
+          (total, item) => total + (item.product.salePrice || item.product.price) * item.quantity,
           0
         );
       },

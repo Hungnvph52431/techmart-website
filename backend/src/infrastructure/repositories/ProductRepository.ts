@@ -1,80 +1,201 @@
-import { IProductRepository } from '../../domain/repositories/IProductRepository';
+import { IProductRepository, ProductFilters, PaginatedResult } from '../../domain/repositories/IProductRepository';
 import { Product, CreateProductDTO, UpdateProductDTO } from '../../domain/entities/Product';
+import { ProductImage, CreateProductImageDTO } from '../../domain/entities/ProductImage';
+import { ProductVariant, CreateProductVariantDTO, UpdateProductVariantDTO } from '../../domain/entities/ProductVariant';
 import pool from '../database/connection';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 export class ProductRepository implements IProductRepository {
-  async findAll(filters?: {
-    categoryId?: number;
-    brandId?: number;
-    minPrice?: number;
-    maxPrice?: number;
-    search?: string;
-    isFeatured?: boolean;
-    isNew?: boolean;
-    isBestseller?: boolean;
-    status?: string;
-  }): Promise<Product[]> {
-    let query = 'SELECT * FROM products WHERE 1=1';
+  async findAll(filters?: ProductFilters): Promise<any[]> {
+    let query = `
+      SELECT 
+        p.*,
+        c.name as category_name,
+        b.name as brand_name
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.category_id
+      LEFT JOIN brands b ON p.brand_id = b.brand_id
+      WHERE 1=1
+    `;
     const params: any[] = [];
 
     if (filters?.categoryId) {
-      query += ' AND category_id = ?';
+      query += ' AND p.category_id = ?';
       params.push(filters.categoryId);
     }
     if (filters?.brandId) {
-      query += ' AND brand_id = ?';
+      query += ' AND p.brand_id = ?';
       params.push(filters.brandId);
     }
     if (filters?.minPrice) {
-      query += ' AND price >= ?';
+      query += ' AND p.price >= ?';
       params.push(filters.minPrice);
     }
     if (filters?.maxPrice) {
-      query += ' AND price <= ?';
+      query += ' AND p.price <= ?';
       params.push(filters.maxPrice);
     }
     if (filters?.search) {
-      query += ' AND (name LIKE ? OR description LIKE ?)';
+      query += ' AND (p.name LIKE ? OR p.description LIKE ?)';
       params.push(`%${filters.search}%`, `%${filters.search}%`);
     }
     if (filters?.isFeatured !== undefined) {
-      query += ' AND is_featured = ?';
+      query += ' AND p.is_featured = ?';
       params.push(filters.isFeatured ? 1 : 0);
     }
     if (filters?.isNew !== undefined) {
-      query += ' AND is_new = ?';
+      query += ' AND p.is_new = ?';
       params.push(filters.isNew ? 1 : 0);
     }
     if (filters?.isBestseller !== undefined) {
-      query += ' AND is_bestseller = ?';
+      query += ' AND p.is_bestseller = ?';
       params.push(filters.isBestseller ? 1 : 0);
     }
     if (filters?.status) {
-      query += ' AND status = ?';
+      query += ' AND p.status = ?';
       params.push(filters.status);
     }
 
-    query += ' ORDER BY created_at DESC';
+    query += ' ORDER BY p.created_at DESC';
 
     const [rows] = await pool.execute<RowDataPacket[]>(query, params);
-    return rows.map(this.mapRowToProduct);
+    return rows.map((row: any) => ({
+      ...this.mapRowToProduct(row),
+      category_name: row.category_name,
+      brand_name: row.brand_name,
+    }));
   }
 
-  async findById(productId: number): Promise<Product | null> {
+  async findAllPaginated(filters: ProductFilters, page: number, limit: number): Promise<PaginatedResult<Product>> {
+    let baseQuery = `
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.category_id
+      LEFT JOIN brands b ON p.brand_id = b.brand_id
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+
+    if (filters?.categoryId) {
+      baseQuery += ' AND p.category_id = ?';
+      params.push(filters.categoryId);
+    }
+    if (filters?.brandId) {
+      baseQuery += ' AND p.brand_id = ?';
+      params.push(filters.brandId);
+    }
+    if (filters?.minPrice) {
+      baseQuery += ' AND p.price >= ?';
+      params.push(filters.minPrice);
+    }
+    if (filters?.maxPrice) {
+      baseQuery += ' AND p.price <= ?';
+      params.push(filters.maxPrice);
+    }
+    if (filters?.search) {
+      baseQuery += ' AND (p.name LIKE ? OR p.description LIKE ?)';
+      params.push(`%${filters.search}%`, `%${filters.search}%`);
+    }
+    if (filters?.isFeatured !== undefined) {
+      baseQuery += ' AND p.is_featured = ?';
+      params.push(filters.isFeatured ? 1 : 0);
+    }
+    if (filters?.isNew !== undefined) {
+      baseQuery += ' AND p.is_new = ?';
+      params.push(filters.isNew ? 1 : 0);
+    }
+    if (filters?.isBestseller !== undefined) {
+      baseQuery += ' AND p.is_bestseller = ?';
+      params.push(filters.isBestseller ? 1 : 0);
+    }
+    if (filters?.status) {
+      baseQuery += ' AND p.status = ?';
+      params.push(filters.status);
+    }
+
+    // Count total
+    const countQuery = `SELECT COUNT(*) as total ${baseQuery}`;
+    const [countRows] = await pool.execute<RowDataPacket[]>(countQuery, params);
+    const total = countRows[0].total;
+
+    // Get paginated data
+    const offset = (page - 1) * limit;
+    const dataQuery = `SELECT p.*, c.name as category_name, b.name as brand_name ${baseQuery} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`;
+    const dataParams = [...params, limit, offset];
+    const [rows] = await pool.execute<RowDataPacket[]>(dataQuery, dataParams);
+
+    const data = rows.map((row: any) => ({
+      ...this.mapRowToProduct(row),
+      category_name: row.category_name,
+      brand_name: row.brand_name,
+    }));
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async findById(productId: number): Promise<any | null> {
     const [rows] = await pool.execute<RowDataPacket[]>(
-      'SELECT * FROM products WHERE product_id = ?',
+      `
+      SELECT 
+        p.*,
+        c.name as category_name,
+        b.name as brand_name
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.category_id
+      LEFT JOIN brands b ON p.brand_id = b.brand_id
+      WHERE p.product_id = ?
+      `,
       [productId]
     );
-    return rows.length > 0 ? this.mapRowToProduct(rows[0]) : null;
+    if (rows.length === 0) return null;
+
+    const row = rows[0] as any;
+    const product = {
+      ...this.mapRowToProduct(row),
+      category_name: row.category_name,
+      brand_name: row.brand_name,
+    };
+
+    // Attach images and variants
+    const images = await this.findImages(productId);
+    const variants = await this.findVariants(productId);
+
+    return { ...product, images, variants };
   }
 
-  async findBySlug(slug: string): Promise<Product | null> {
+  async findBySlug(slug: string): Promise<any | null> {
     const [rows] = await pool.execute<RowDataPacket[]>(
-      'SELECT * FROM products WHERE slug = ?',
+      `
+      SELECT 
+        p.*,
+        c.name as category_name,
+        b.name as brand_name
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.category_id
+      LEFT JOIN brands b ON p.brand_id = b.brand_id
+      WHERE p.slug = ?
+      `,
       [slug]
     );
-    return rows.length > 0 ? this.mapRowToProduct(rows[0]) : null;
+    if (rows.length === 0) return null;
+
+    const row = rows[0] as any;
+    const product = {
+      ...this.mapRowToProduct(row),
+      category_name: row.category_name,
+      brand_name: row.brand_name,
+    };
+
+    // Attach images and variants
+    const images = await this.findImages(row.product_id);
+    const variants = await this.findVariants(row.product_id);
+
+    return { ...product, images, variants };
   }
 
   async create(product: CreateProductDTO): Promise<Product> {
@@ -252,6 +373,166 @@ export class ProductRepository implements IProductRepository {
     return result.affectedRows > 0;
   }
 
+  // ==========================================
+  // Product Images
+  // ==========================================
+
+  async findImages(productId: number): Promise<ProductImage[]> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      'SELECT * FROM product_images WHERE product_id = ? ORDER BY display_order ASC',
+      [productId]
+    );
+    return rows.map(this.mapRowToProductImage);
+  }
+
+  async addImage(image: CreateProductImageDTO): Promise<ProductImage> {
+    const [result] = await pool.execute<ResultSetHeader>(
+      `INSERT INTO product_images (product_id, image_url, alt_text, display_order, is_primary, created_at) 
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        image.productId,
+        image.imageUrl,
+        image.altText || null,
+        image.displayOrder || 0,
+        image.isPrimary || false,
+        new Date(),
+      ]
+    );
+
+    return {
+      imageId: result.insertId,
+      productId: image.productId,
+      imageUrl: image.imageUrl,
+      altText: image.altText,
+      displayOrder: image.displayOrder || 0,
+      isPrimary: image.isPrimary || false,
+      createdAt: new Date(),
+    };
+  }
+
+  async deleteImage(imageId: number): Promise<boolean> {
+    const [result] = await pool.execute<ResultSetHeader>(
+      'DELETE FROM product_images WHERE image_id = ?',
+      [imageId]
+    );
+    return result.affectedRows > 0;
+  }
+
+  // ==========================================
+  // Product Variants
+  // ==========================================
+
+  async findVariants(productId: number): Promise<ProductVariant[]> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      'SELECT * FROM product_variants WHERE product_id = ? ORDER BY variant_name ASC',
+      [productId]
+    );
+    return rows.map(this.mapRowToProductVariant);
+  }
+
+  async addVariant(variant: CreateProductVariantDTO): Promise<ProductVariant> {
+    const now = new Date();
+    const [result] = await pool.execute<ResultSetHeader>(
+      `INSERT INTO product_variants (product_id, variant_name, sku, attributes, price_adjustment, stock_quantity, image_url, is_active, created_at, updated_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        variant.productId,
+        variant.variantName,
+        variant.sku || null,
+        variant.attributes ? JSON.stringify(variant.attributes) : null,
+        variant.priceAdjustment || 0,
+        variant.stockQuantity || 0,
+        variant.imageUrl || null,
+        variant.isActive !== undefined ? variant.isActive : true,
+        now,
+        now,
+      ]
+    );
+
+    return {
+      variantId: result.insertId,
+      productId: variant.productId,
+      variantName: variant.variantName,
+      sku: variant.sku,
+      attributes: variant.attributes,
+      priceAdjustment: variant.priceAdjustment || 0,
+      stockQuantity: variant.stockQuantity || 0,
+      imageUrl: variant.imageUrl,
+      isActive: variant.isActive !== undefined ? variant.isActive : true,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
+  async updateVariant(variant: UpdateProductVariantDTO): Promise<ProductVariant | null> {
+    const [existingRows] = await pool.execute<RowDataPacket[]>(
+      'SELECT * FROM product_variants WHERE variant_id = ?',
+      [variant.variantId]
+    );
+    if (existingRows.length === 0) return null;
+
+    const updates: string[] = [];
+    const params: any[] = [];
+
+    if (variant.variantName) {
+      updates.push('variant_name = ?');
+      params.push(variant.variantName);
+    }
+    if (variant.sku !== undefined) {
+      updates.push('sku = ?');
+      params.push(variant.sku);
+    }
+    if (variant.attributes) {
+      updates.push('attributes = ?');
+      params.push(JSON.stringify(variant.attributes));
+    }
+    if (variant.priceAdjustment !== undefined) {
+      updates.push('price_adjustment = ?');
+      params.push(variant.priceAdjustment);
+    }
+    if (variant.stockQuantity !== undefined) {
+      updates.push('stock_quantity = ?');
+      params.push(variant.stockQuantity);
+    }
+    if (variant.imageUrl !== undefined) {
+      updates.push('image_url = ?');
+      params.push(variant.imageUrl);
+    }
+    if (variant.isActive !== undefined) {
+      updates.push('is_active = ?');
+      params.push(variant.isActive);
+    }
+
+    updates.push('updated_at = ?');
+    params.push(new Date());
+    params.push(variant.variantId);
+
+    await pool.execute(
+      `UPDATE product_variants SET ${updates.join(', ')} WHERE variant_id = ?`,
+      params
+    );
+
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      'SELECT * FROM product_variants WHERE variant_id = ?',
+      [variant.variantId]
+    );
+    return rows.length > 0 ? this.mapRowToProductVariant(rows[0]) : null;
+  }
+
+  async deleteVariant(variantId: number): Promise<boolean> {
+    const [result] = await pool.execute<ResultSetHeader>(
+      'DELETE FROM product_variants WHERE variant_id = ?',
+      [variantId]
+    );
+    return result.affectedRows > 0;
+  }
+
+  // ==========================================
+  // Private mappers
+  // ==========================================
+
+
+
   private mapRowToProduct(row: any): Product {
     return {
       productId: row.product_id,
@@ -264,8 +545,8 @@ export class ProductRepository implements IProductRepository {
       salePrice: row.sale_price ? parseFloat(row.sale_price) : undefined,
       costPrice: row.cost_price ? parseFloat(row.cost_price) : undefined,
       description: row.description,
-      specifications: typeof row.specifications === 'string' 
-        ? JSON.parse(row.specifications) 
+      specifications: typeof row.specifications === 'string'
+        ? JSON.parse(row.specifications)
         : row.specifications,
       mainImage: row.main_image,
       stockQuantity: row.stock_quantity,
@@ -280,6 +561,36 @@ export class ProductRepository implements IProductRepository {
       metaTitle: row.meta_title,
       metaDescription: row.meta_description,
       metaKeywords: row.meta_keywords,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  private mapRowToProductImage(row: any): ProductImage {
+    return {
+      imageId: row.image_id,
+      productId: row.product_id,
+      imageUrl: row.image_url,
+      altText: row.alt_text,
+      displayOrder: row.display_order,
+      isPrimary: Boolean(row.is_primary),
+      createdAt: row.created_at,
+    };
+  }
+
+  private mapRowToProductVariant(row: any): ProductVariant {
+    return {
+      variantId: row.variant_id,
+      productId: row.product_id,
+      variantName: row.variant_name,
+      sku: row.sku,
+      attributes: typeof row.attributes === 'string'
+        ? JSON.parse(row.attributes)
+        : row.attributes,
+      priceAdjustment: row.price_adjustment ? parseFloat(row.price_adjustment) : 0,
+      stockQuantity: row.stock_quantity,
+      imageUrl: row.image_url,
+      isActive: Boolean(row.is_active),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };

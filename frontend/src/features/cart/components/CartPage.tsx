@@ -33,11 +33,11 @@ export const CartPage = () => {
             <div className="bg-white rounded-lg shadow-md">
               {items.map((item) => (
                 <div
-                  key={item.product.id}
+                  key={item.product.productId}
                   className="flex items-center gap-4 p-4 border-b last:border-b-0"
                 >
                   <img
-                    src={item.product.images[0] || '/placeholder.jpg'}
+                    src={item.product.mainImage || '/placeholder.jpg'}
                     alt={item.product.name}
                     className="w-24 h-24 object-cover rounded"
                   />
@@ -50,22 +50,22 @@ export const CartPage = () => {
                       {item.product.name}
                     </Link>
                     <p className="text-red-600 font-bold mt-1">
-                      {item.product.price.toLocaleString('vi-VN')}₫
+                      {(item.product.salePrice || item.product.price).toLocaleString('vi-VN')}₫
                     </p>
                   </div>
 
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                      onClick={() => updateQuantity(item.product.productId, item.quantity - 1)}
                       className="p-1 border border-gray-300 rounded hover:bg-gray-100"
                     >
                       <Minus className="h-4 w-4" />
                     </button>
                     <span className="w-12 text-center">{item.quantity}</span>
                     <button
-                      onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                      onClick={() => updateQuantity(item.product.productId, item.quantity + 1)}
                       className="p-1 border border-gray-300 rounded hover:bg-gray-100"
-                      disabled={item.quantity >= item.product.stock}
+                      disabled={item.quantity >= item.product.stockQuantity}
                     >
                       <Plus className="h-4 w-4" />
                     </button>
@@ -73,12 +73,12 @@ export const CartPage = () => {
 
                   <div className="text-right min-w-[100px]">
                     <p className="font-bold text-lg">
-                      {(item.product.price * item.quantity).toLocaleString('vi-VN')}₫
+                      {((item.product.salePrice || item.product.price) * item.quantity).toLocaleString('vi-VN')}₫
                     </p>
                   </div>
 
                   <button
-                    onClick={() => removeItem(item.product.id)}
+                    onClick={() => removeItem(item.product.productId)}
                     className="p-2 text-red-500 hover:bg-red-50 rounded"
                   >
                     <Trash2 className="h-5 w-5" />

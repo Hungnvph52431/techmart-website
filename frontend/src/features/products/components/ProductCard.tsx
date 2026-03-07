@@ -17,8 +17,10 @@ export const ProductCard = ({ product }: ProductCardProps) => {
     toast.success('Đã thêm vào giỏ hàng!');
   };
 
-  const discount = product.originalPrice && product.price 
-    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+  const displayPrice = product.salePrice || product.price;
+  const originalPrice = product.salePrice ? product.price : undefined;
+  const discount = originalPrice
+    ? Math.round(((originalPrice - displayPrice) / originalPrice) * 100)
     : 0;
 
   return (
@@ -28,7 +30,7 @@ export const ProductCard = ({ product }: ProductCardProps) => {
     >
       <div className="relative overflow-hidden">
         <img
-          src={product.images?.[0] || '/placeholder.jpg'}
+          src={product.mainImage || '/placeholder.jpg'}
           alt={product.name}
           className="w-full h-64 object-cover group-hover:scale-110 transition-transform duration-300"
         />
@@ -37,7 +39,7 @@ export const ProductCard = ({ product }: ProductCardProps) => {
             -{discount}%
           </div>
         )}
-        {product.featured && (
+        {product.isFeatured && (
           <div className="absolute top-2 left-2 bg-yellow-500 text-white px-2 py-1 rounded-md text-xs font-semibold">
             Nổi bật
           </div>
@@ -52,20 +54,20 @@ export const ProductCard = ({ product }: ProductCardProps) => {
         <div className="flex items-center mb-2">
           <div className="flex items-center">
             <Star className="h-4 w-4 text-yellow-400 fill-current" />
-            <span className="ml-1 text-sm text-gray-600">{product.rating || 0}</span>
+            <span className="ml-1 text-sm text-gray-600">{product.ratingAvg || 0}</span>
           </div>
           <span className="mx-2 text-gray-400">|</span>
-          <span className="text-sm text-gray-600">Đã bán {product.reviewCount || 0}</span>
+          <span className="text-sm text-gray-600">Đã bán {product.soldQuantity || 0}</span>
         </div>
 
         <div className="flex items-center justify-between mb-3">
           <div>
             <div className="text-xl font-bold text-red-600">
-              {(product.price || 0).toLocaleString('vi-VN')}₫
+              {(displayPrice || 0).toLocaleString('vi-VN')}₫
             </div>
-            {product.originalPrice && product.originalPrice > product.price && (
+            {originalPrice && originalPrice > displayPrice && (
               <div className="text-sm text-gray-400 line-through">
-                {product.originalPrice.toLocaleString('vi-VN')}₫
+                {originalPrice.toLocaleString('vi-VN')}₫
               </div>
             )}
           </div>
@@ -82,3 +84,4 @@ export const ProductCard = ({ product }: ProductCardProps) => {
     </Link>
   );
 };
+

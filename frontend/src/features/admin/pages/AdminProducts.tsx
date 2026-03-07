@@ -107,30 +107,33 @@ export const AdminProducts = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <img
-                        src={product.main_image}
+                        src={product.main_image || '/placeholder.png'}
                         alt={product.name}
-                        className="w-12 h-12 object-cover rounded"
+                        className="w-12 h-12 object-cover rounded bg-gray-100"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/placeholder.png';
+                        }}
                       />
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">
                           {product.name}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {product.brand_name}
+                          {product.brand_name || 'N/A'}
                         </div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm text-gray-900">
-                      {product.category_name}
+                      {product.category_name || 'N/A'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
-                      {product.price.toLocaleString('vi-VN')} ₫
+                      {(product.price || 0).toLocaleString('vi-VN')} ₫
                     </div>
-                    {product.original_price && product.original_price > product.price && (
+                    {product.original_price && product.original_price > (product.price || 0) && (
                       <div className="text-xs text-gray-500 line-through">
                         {product.original_price.toLocaleString('vi-VN')} ₫
                       </div>
