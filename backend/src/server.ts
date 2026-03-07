@@ -9,6 +9,7 @@ import { ProductRepository } from './infrastructure/repositories/ProductReposito
 import { OrderRepository } from './infrastructure/repositories/OrderRepository';
 import { CategoryRepository } from './infrastructure/repositories/CategoryRepository';
 import { BrandRepository } from './infrastructure/repositories/BrandRepository';
+import { CouponRepository } from './infrastructure/repositories/CouponRepository';
 
 // Use Cases
 import { AuthUseCase } from './application/use-cases/AuthUseCase';
@@ -16,6 +17,7 @@ import { ProductUseCase } from './application/use-cases/ProductUseCase';
 import { OrderUseCase } from './application/use-cases/OrderUseCase';
 import { CategoryUseCase } from './application/use-cases/CategoryUseCase';
 import { BrandUseCase } from './application/use-cases/BrandUseCase';
+import { CouponUseCase } from './application/use-cases/CouponUseCase';
 
 // Controllers
 import { AuthController } from './presentation/controllers/AuthController';
@@ -23,6 +25,7 @@ import { ProductController } from './presentation/controllers/ProductController'
 import { OrderController } from './presentation/controllers/OrderController';
 import { CategoryController } from './presentation/controllers/CategoryController';
 import { BrandController } from './presentation/controllers/BrandController';
+import { CouponController } from './presentation/controllers/CouponController';
 
 // Routes
 import { createAuthRoutes } from './presentation/routes/auth.routes';
@@ -30,6 +33,7 @@ import { createProductRoutes } from './presentation/routes/product.routes';
 import { createOrderRoutes } from './presentation/routes/order.routes';
 import { createBrandRoutes } from './presentation/routes/brand.routes';
 import { createCategoryRoutes } from './presentation/routes/category.routes';
+import { createCouponRoutes } from './presentation/routes/coupon.routes';
 
 dotenv.config();
 
@@ -50,18 +54,21 @@ const productRepository = new ProductRepository();
 const orderRepository = new OrderRepository();
 const categoryRepository = new CategoryRepository();
 const brandRepository = new BrandRepository();
+const couponRepository = new CouponRepository();
 
 const authUseCase = new AuthUseCase(userRepository);
 const productUseCase = new ProductUseCase(productRepository);
 const orderUseCase = new OrderUseCase(orderRepository, productRepository);
 const categoryUseCase = new CategoryUseCase(categoryRepository);
 const brandUseCase = new BrandUseCase(brandRepository);
+const couponUseCase = new CouponUseCase(couponRepository);
 
 const authController = new AuthController(authUseCase);
 const productController = new ProductController(productUseCase);
 const orderController = new OrderController(orderUseCase);
 const categoryController = new CategoryController(categoryUseCase);
 const brandController = new BrandController(brandUseCase);
+const couponController = new CouponController(couponUseCase);
 
 // Routes
 app.use('/api/auth', createAuthRoutes(authController));
@@ -69,6 +76,7 @@ app.use('/api/products', createProductRoutes(productController));
 app.use('/api/orders', createOrderRoutes(orderController));
 app.use('/api/categories', createCategoryRoutes(categoryController));
 app.use('/api/brands', createBrandRoutes(brandController));
+app.use('/api/coupons', createCouponRoutes(couponController));
 
 // Health check
 app.get('/health', (req, res) => {
