@@ -4,15 +4,15 @@ import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
 
 interface ProductResponse {
-  product_id: number;
+  productId: number;
   name: string;
   slug: string;
   category_name: string;
   price: number;
-  original_price?: number;
-  stock_quantity: number;
-  main_image: string;
-  is_active: boolean;
+  salePrice?: number;
+  stockQuantity: number;
+  mainImage: string;
+  status: string;
 }
 
 export const AdminProducts = () => {
@@ -102,11 +102,11 @@ export const AdminProducts = () => {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {products.map((product) => (
-                <tr key={product.product_id} className="hover:bg-gray-50">
+                <tr key={product.productId} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <img
-                        src={product.main_image || '/placeholder.png'}
+                        src={product.mainImage || '/placeholder.png'}
                         alt={product.name}
                         className="w-12 h-12 object-cover rounded bg-gray-100"
                         onError={(e) => {
@@ -132,47 +132,47 @@ export const AdminProducts = () => {
                     <div className="text-sm text-gray-900">
                       {(product.price || 0).toLocaleString('vi-VN')} ₫
                     </div>
-                    {product.original_price && product.original_price > (product.price || 0) && (
-                      <div className="text-xs text-gray-500 line-through">
-                        {product.original_price.toLocaleString('vi-VN')} ₫
+                    {product.salePrice && product.salePrice < (product.price || 0) && (
+                      <div className="text-xs text-green-600 font-medium">
+                        KM: {product.salePrice.toLocaleString('vi-VN')} ₫
                       </div>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
-                      className={`text-sm font-medium ${product.stock_quantity > 10
+                      className={`text-sm font-medium ${product.stockQuantity > 10
                         ? 'text-green-600'
-                        : product.stock_quantity > 0
+                        : product.stockQuantity > 0
                           ? 'text-orange-600'
                           : 'text-red-600'
                         }`}
                     >
-                      {product.stock_quantity}
+                      {product.stockQuantity}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
-                      className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${product.is_active
+                      className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${product.status === 'active'
                         ? 'bg-green-100 text-green-800'
                         : 'bg-red-100 text-red-800'
                         }`}
                     >
-                      {product.is_active ? 'Hoạt động' : 'Tạm ngưng'}
+                      {product.status === 'active' ? 'Hoạt động' : 'Tạm ngưng'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <Link
-                      to={`/admin/products/edit/${product.product_id}`}
+                      to={`/admin/products/edit/${product.productId}`}
                       className="text-blue-600 hover:text-blue-900 mr-4"
                     >
                       ✏️ Sửa
                     </Link>
                     <button
-                      onClick={() => handleDelete(product.product_id, product.name)}
-                      disabled={deleteLoading === product.product_id}
+                      onClick={() => handleDelete(product.productId, product.name)}
+                      disabled={deleteLoading === product.productId}
                       className="text-red-600 hover:text-red-900 disabled:opacity-50"
                     >
-                      {deleteLoading === product.product_id ? '⏳' : '🗑️'} Xóa
+                      {deleteLoading === product.productId ? '⏳' : '🗑️'} Xóa
                     </button>
                   </td>
                 </tr>
