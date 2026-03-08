@@ -6,6 +6,7 @@ export const createOrderRoutes = (orderController: OrderController) => {
   const router = Router();
 
   router.get('/', authMiddleware, adminMiddleware, orderController.getAll);
+  router.get('/stats', authMiddleware, adminMiddleware, orderController.getStats);
   router.get('/my-orders', authMiddleware, orderController.getByUser);
   router.get('/:id', authMiddleware, orderController.getById);
   router.post('/', authMiddleware, orderController.create);

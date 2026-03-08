@@ -1,6 +1,26 @@
 import api from './api';
 import { Product } from '@/types';
 
+export interface ProductStats {
+  totalProducts: number;
+  activeProducts: number;
+  inactiveProducts: number;
+  outOfStockCount: number;
+  lowStockCount: number;
+  topSellingProducts: Array<{
+    productId: number;
+    name: string;
+    soldQuantity: number;
+    stockQuantity: number;
+    mainImage: string | null;
+  }>;
+  lowStockProducts: Array<{
+    productId: number;
+    name: string;
+    stockQuantity: number;
+  }>;
+}
+
 export const productService = {
   getAll: async (filters?: {
     category?: string;
@@ -49,5 +69,10 @@ export const productService = {
 
   deleteProduct: async (id: number): Promise<void> => {
     await api.delete(`/products/${id}`);
+  },
+
+  getStats: async (): Promise<ProductStats> => {
+    const response = await api.get('/products/stats');
+    return response.data.data;
   },
 };
