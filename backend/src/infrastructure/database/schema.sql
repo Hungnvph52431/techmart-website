@@ -107,7 +107,7 @@ CREATE TABLE products (
     is_featured BOOLEAN DEFAULT FALSE,
     is_new BOOLEAN DEFAULT FALSE,
     is_bestseller BOOLEAN DEFAULT FALSE,
-    status ENUM('active', 'inactive', 'out_of_stock', 'pre_order') DEFAULT 'active',
+    status ENUM('draft', 'active', 'inactive', 'out_of_stock', 'pre_order', 'archived') DEFAULT 'draft',
     meta_title VARCHAR(255),
     meta_description VARCHAR(500),
     meta_keywords VARCHAR(500),
@@ -163,7 +163,63 @@ CREATE TABLE product_images (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
--- 8. BẢNG REVIEWS - Đánh giá sản phẩm
+-- 8. BẢNG PRODUCT_ATTRIBUTES - Metadata thuộc tính
+-- ==================================================
+CREATE TABLE product_attributes (
+    attribute_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    code VARCHAR(100) NOT NULL UNIQUE,
+    input_type ENUM('text', 'textarea', 'number', 'boolean', 'select', 'multi_select', 'color') NOT NULL,
+    scope ENUM('product', 'variant') NOT NULL DEFAULT 'product',
+    is_required BOOLEAN DEFAULT FALSE,
+    is_filterable BOOLEAN DEFAULT FALSE,
+    is_variant_axis BOOLEAN DEFAULT FALSE,
+    display_order INT DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_scope (scope),
+    INDEX idx_active (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==================================================
+-- 9. BẢNG PRODUCT_ATTRIBUTE_OPTIONS - Lựa chọn thuộc tính
+-- ==================================================
+CREATE TABLE product_attribute_options (
+    option_id INT AUTO_INCREMENT PRIMARY KEY,
+    attribute_id INT NOT NULL,
+    label VARCHAR(255) NOT NULL,
+    value VARCHAR(255) NOT NULL,
+    color_hex VARCHAR(20),
+    display_order INT DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (attribute_id) REFERENCES product_attributes(attribute_id) ON DELETE CASCADE,
+    INDEX idx_attribute (attribute_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==================================================
+-- 10. BẢNG CATEGORY_ATTRIBUTES - Gán thuộc tính cho danh mục
+-- ==================================================
+CREATE TABLE category_attributes (
+    category_attribute_id INT AUTO_INCREMENT PRIMARY KEY,
+    category_id INT NOT NULL,
+    attribute_id INT NOT NULL,
+    is_required BOOLEAN DEFAULT FALSE,
+    is_variant_axis BOOLEAN DEFAULT FALSE,
+    display_order INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (category_id) REFERENCES categories(category_id) ON DELETE CASCADE,
+    FOREIGN KEY (attribute_id) REFERENCES product_attributes(attribute_id) ON DELETE CASCADE,
+    UNIQUE KEY uniq_category_attribute (category_id, attribute_id),
+    INDEX idx_category (category_id),
+    INDEX idx_attribute (attribute_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==================================================
+-- 11. BẢNG REVIEWS - Đánh giá sản phẩm
 -- ==================================================
 CREATE TABLE reviews (
     review_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -188,7 +244,7 @@ CREATE TABLE reviews (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
--- 9. BẢNG COUPONS - Mã giảm giá
+-- 12. BẢNG COUPONS - Mã giảm giá
 -- ==================================================
 CREATE TABLE coupons (
     coupon_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -211,7 +267,7 @@ CREATE TABLE coupons (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
--- 10. BẢNG CART - Giỏ hàng
+-- 13. BẢNG CART - Giỏ hàng
 -- ==================================================
 CREATE TABLE cart (
     cart_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -230,7 +286,7 @@ CREATE TABLE cart (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
--- 11. BẢNG ORDERS - Đơn hàng
+-- 14. BẢNG ORDERS - Đơn hàng
 -- ==================================================
 CREATE TABLE orders (
     order_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -286,7 +342,7 @@ CREATE TABLE orders (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
--- 12. BẢNG ORDER_DETAILS - Chi tiết đơn hàng
+-- 15. BẢNG ORDER_DETAILS - Chi tiết đơn hàng
 -- ==================================================
 CREATE TABLE order_details (
     order_detail_id INT AUTO_INCREMENT PRIMARY KEY,

@@ -31,7 +31,16 @@ export class OrderUseCase {
       if (!product) {
         throw new Error(`Product ${item.productId} not found`);
       }
-      if (product.stockQuantity < item.quantity) {
+
+      if (item.variantId) {
+        const variant = await this.productRepository.findVariantById(item.variantId);
+        if (!variant || variant.productId !== item.productId || !variant.isActive) {
+          throw new Error(`Variant ${item.variantId} not found`);
+        }
+        if (variant.stockQuantity < item.quantity) {
+          throw new Error(`Insufficient stock for variant ${variant.variantName}`);
+        }
+      } else if (product.stockQuantity < item.quantity) {
         throw new Error(`Insufficient stock for product ${product.name}`);
       }
     }
@@ -41,6 +50,9 @@ export class OrderUseCase {
 
     // Update product stock
     for (const item of orderData.items) {
+      if (item.variantId) {
+        await this.productRepository.updateVariantStock(item.variantId, -item.quantity);
+      }
       await this.productRepository.updateStock(item.productId, -item.quantity);
     }
 

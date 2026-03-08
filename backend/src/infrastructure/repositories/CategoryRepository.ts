@@ -35,6 +35,25 @@ export class CategoryRepository implements ICategoryRepository {
     return rows.map(this.mapRowToCategory);
   }
 
+  async hasChildren(categoryId: number): Promise<boolean> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      'SELECT category_id FROM categories WHERE parent_id = ? LIMIT 1',
+      [categoryId]
+    );
+    return rows.length > 0;
+  }
+
+  async hasProducts(categoryId: number): Promise<boolean> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT product_id
+       FROM products
+       WHERE category_id = ? AND status <> 'archived'
+       LIMIT 1`,
+      [categoryId]
+    );
+    return rows.length > 0;
+  }
+
   async create(categoryData: CreateCategoryDTO): Promise<Category> {
     const now = new Date();
 
