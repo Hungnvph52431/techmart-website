@@ -62,51 +62,38 @@ export const AdminLayout = () => {
           <nav className="space-y-2">
             <Link
               to="/admin"
-              className={`block px-4 py-3 rounded-lg transition-colors ${
-                location.pathname === '/admin'
+              className={`block px-4 py-3 rounded-lg transition-colors ${location.pathname === '/admin'
                   ? 'bg-blue-500 text-white'
                   : 'text-gray-700 hover:bg-gray-100'
-              }`}
+                }`}
             >
               📊 Dashboard
             </Link>
             <Link
               to="/admin/categories"
-              className={`block px-4 py-3 rounded-lg transition-colors ${
-                isActive('/admin/categories')
+              className={`block px-4 py-3 rounded-lg transition-colors ${isActive('/admin/categories')
                   ? 'bg-blue-500 text-white'
                   : 'text-gray-700 hover:bg-gray-100'
-              }`}
+                }`}
             >
               🏷️ Danh mục
             </Link>
-            <Link
-              to="/admin/brands"
-              className={`block px-4 py-3 rounded-lg transition-colors ${
-                isActive('/admin/brands')
-                  ? 'bg-blue-500 text-white'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              🏢 Thương hiệu
-            </Link>
+
             <Link
               to="/admin/products"
-              className={`block px-4 py-3 rounded-lg transition-colors ${
-                isActive('/admin/products')
+              className={`block px-4 py-3 rounded-lg transition-colors ${isActive('/admin/products')
                   ? 'bg-blue-500 text-white'
                   : 'text-gray-700 hover:bg-gray-100'
-              }`}
+                }`}
             >
               📦 Sản phẩm
             </Link>
             <Link
               to="/admin/orders"
-              className={`block px-4 py-3 rounded-lg transition-colors ${
-                isActive('/admin/orders')
+              className={`block px-4 py-3 rounded-lg transition-colors ${isActive('/admin/orders')
                   ? 'bg-blue-500 text-white'
                   : 'text-gray-700 hover:bg-gray-100'
-              }`}
+                }`}
             >
               🛒 Đơn hàng
             </Link>
