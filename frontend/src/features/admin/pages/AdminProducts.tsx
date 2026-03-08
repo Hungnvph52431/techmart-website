@@ -7,7 +7,6 @@ interface ProductResponse {
   product_id: number;
   name: string;
   slug: string;
-  brand_name: string;
   category_name: string;
   price: number;
   original_price?: number;
@@ -119,7 +118,7 @@ export const AdminProducts = () => {
                           {product.name}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {product.brand_name || 'N/A'}
+                          {product.slug}
                         </div>
                       </div>
                     </div>
@@ -141,24 +140,22 @@ export const AdminProducts = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
-                      className={`text-sm font-medium ${
-                        product.stock_quantity > 10
-                          ? 'text-green-600'
-                          : product.stock_quantity > 0
+                      className={`text-sm font-medium ${product.stock_quantity > 10
+                        ? 'text-green-600'
+                        : product.stock_quantity > 0
                           ? 'text-orange-600'
                           : 'text-red-600'
-                      }`}
+                        }`}
                     >
                       {product.stock_quantity}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
-                      className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        product.is_active
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}
+                      className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${product.is_active
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                        }`}
                     >
                       {product.is_active ? 'Hoạt động' : 'Tạm ngưng'}
                     </span>
