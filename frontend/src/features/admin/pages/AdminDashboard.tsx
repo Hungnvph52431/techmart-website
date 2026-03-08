@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { productService } from '@/services/product.service';
+import { adminProductService } from '@/services/admin/product.service';
 import { orderService } from '@/services/order.service';
 import { Link } from 'react-router-dom';
 
@@ -27,7 +27,7 @@ export const AdminDashboard = () => {
     try {
       setLoading(true);
       const [products, orders] = await Promise.all([
-        productService.getProducts(),
+        adminProductService.getAll(),
         orderService.getAll(),
       ]);
 
@@ -36,8 +36,8 @@ export const AdminDashboard = () => {
       ).length;
 
       const revenue = orders
-        .filter((order: any) => order.status === 'completed')
-        .reduce((sum: number, order: any) => sum + Number(order.total_amount), 0);
+        .filter((order: any) => order.status === 'delivered')
+        .reduce((sum: number, order: any) => sum + Number(order.total || order.total_amount || 0), 0);
 
       setStats({
         totalProducts: products.length,
@@ -141,12 +141,24 @@ export const AdminDashboard = () => {
         <h2 className="text-xl font-bold text-gray-800 mb-4">
           Thao tác nhanh
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <Link
             to="/admin/products/new"
             className="flex items-center justify-center px-6 py-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
           >
             ➕ Thêm sản phẩm mới
+          </Link>
+          <Link
+            to="/admin/categories"
+            className="flex items-center justify-center px-6 py-4 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"
+          >
+            🗂️ Quản lý danh mục
+          </Link>
+          <Link
+            to="/admin/attributes"
+            className="flex items-center justify-center px-6 py-4 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+          >
+            🧩 Quản lý thuộc tính
           </Link>
           <Link
             to="/admin/orders"
@@ -156,7 +168,7 @@ export const AdminDashboard = () => {
           </Link>
           <Link
             to="/admin/products"
-            className="flex items-center justify-center px-6 py-4 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+            className="flex items-center justify-center px-6 py-4 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors"
           >
             📦 Quản lý sản phẩm
           </Link>

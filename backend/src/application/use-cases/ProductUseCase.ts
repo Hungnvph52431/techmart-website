@@ -1,5 +1,10 @@
 import { IProductRepository } from '../../domain/repositories/IProductRepository';
-import { CreateProductDTO, UpdateProductDTO } from '../../domain/entities/Product';
+import {
+  CreateProductDTO,
+  ProductStatus,
+  SaveProductPayload,
+  UpdateProductDTO,
+} from '../../domain/entities/Product';
 
 export class ProductUseCase {
   constructor(private productRepository: IProductRepository) {}
@@ -30,5 +35,29 @@ export class ProductUseCase {
 
   async updateStock(id: number, quantity: number) {
     return this.productRepository.updateStock(id, quantity);
+  }
+
+  async getAdminProducts(filters?: {
+    search?: string;
+    categoryId?: number;
+    status?: ProductStatus | 'all';
+  }) {
+    return this.productRepository.findAdminList(filters);
+  }
+
+  async getAdminProductById(id: number) {
+    return this.productRepository.findAdminById(id);
+  }
+
+  async saveProduct(payload: SaveProductPayload, productId?: number) {
+    return this.productRepository.save(payload, productId);
+  }
+
+  async archiveProduct(id: number) {
+    return this.productRepository.archive(id);
+  }
+
+  async getVariantById(id: number) {
+    return this.productRepository.findVariantById(id);
   }
 }

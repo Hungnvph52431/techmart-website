@@ -36,18 +36,4 @@ export const productService = {
     const response = await api.get(`/products/slug/${slug}`);
     return response.data;
   },
-
-  createProduct: async (productData: any): Promise<Product> => {
-    const response = await api.post('/products', productData);
-    return response.data;
-  },
-
-  updateProduct: async (id: number, productData: any): Promise<Product> => {
-    const response = await api.put(`/products/${id}`, productData);
-    return response.data;
-  },
-
-  deleteProduct: async (id: number): Promise<void> => {
-    await api.delete(`/products/${id}`);
-  },
 };

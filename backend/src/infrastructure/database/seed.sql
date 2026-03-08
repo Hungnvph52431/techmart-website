@@ -188,7 +188,59 @@ INSERT INTO product_images (product_id, image_url, alt_text, display_order, is_p
 (11, '/images/products/macbook-air-m2-2.jpg', 'MacBook Air M2 thiết kế', 2, FALSE);
 
 -- ==================================================
--- 8. COUPONS - Mã giảm giá
+-- 8. PRODUCT_ATTRIBUTES - Metadata thuộc tính
+-- ==================================================
+INSERT INTO product_attributes (name, code, input_type, scope, is_required, is_filterable, is_variant_axis, display_order, is_active) VALUES
+('Màu sắc', 'color', 'color', 'variant', TRUE, TRUE, TRUE, 1, TRUE),
+('Dung lượng', 'storage', 'select', 'variant', TRUE, TRUE, TRUE, 2, TRUE),
+('Màn hình', 'screen', 'text', 'product', TRUE, TRUE, FALSE, 3, TRUE),
+('Chip xử lý', 'chip', 'text', 'product', TRUE, TRUE, FALSE, 4, TRUE),
+('RAM', 'ram', 'select', 'product', TRUE, TRUE, FALSE, 5, TRUE),
+('Pin', 'battery', 'text', 'product', FALSE, FALSE, FALSE, 6, TRUE);
+
+INSERT INTO product_attribute_options (attribute_id, label, value, color_hex, display_order, is_active) VALUES
+(1, 'Titan Tự Nhiên', 'Titan Tự Nhiên', '#928d86', 1, TRUE),
+(1, 'Titan Trắng', 'Titan Trắng', '#f4f4f2', 2, TRUE),
+(1, 'Đen', 'Đen', '#111111', 3, TRUE),
+(1, 'Tím', 'Tím', '#7b61ff', 4, TRUE),
+(1, 'Titan Xám', 'Titan Xám', '#6b7280', 5, TRUE),
+(2, '128GB', '128GB', NULL, 1, TRUE),
+(2, '256GB', '256GB', NULL, 2, TRUE),
+(2, '512GB', '512GB', NULL, 3, TRUE),
+(2, '1TB', '1TB', NULL, 4, TRUE),
+(5, '4GB', '4GB', NULL, 1, TRUE),
+(5, '6GB', '6GB', NULL, 2, TRUE),
+(5, '8GB', '8GB', NULL, 3, TRUE),
+(5, '12GB', '12GB', NULL, 4, TRUE);
+
+INSERT INTO category_attributes (category_id, attribute_id, is_required, is_variant_axis, display_order) VALUES
+(6, 1, TRUE, TRUE, 1),
+(6, 2, TRUE, TRUE, 2),
+(6, 3, TRUE, FALSE, 3),
+(6, 4, TRUE, FALSE, 4),
+(6, 5, TRUE, FALSE, 5),
+(6, 6, FALSE, FALSE, 6),
+(7, 1, TRUE, TRUE, 1),
+(7, 2, TRUE, TRUE, 2),
+(7, 3, TRUE, FALSE, 3),
+(7, 4, TRUE, FALSE, 4),
+(7, 5, TRUE, FALSE, 5),
+(7, 6, FALSE, FALSE, 6),
+(8, 1, TRUE, TRUE, 1),
+(8, 2, TRUE, TRUE, 2),
+(8, 3, TRUE, FALSE, 3),
+(8, 4, TRUE, FALSE, 4),
+(8, 5, TRUE, FALSE, 5),
+(8, 6, FALSE, FALSE, 6),
+(9, 1, TRUE, TRUE, 1),
+(9, 2, TRUE, TRUE, 2),
+(9, 3, TRUE, FALSE, 3),
+(9, 4, TRUE, FALSE, 4),
+(9, 5, TRUE, FALSE, 5),
+(9, 6, FALSE, FALSE, 6);
+
+-- ==================================================
+-- 9. COUPONS - Mã giảm giá
 -- ==================================================
 INSERT INTO coupons (code, description, discount_type, discount_value, min_order_value, max_discount_amount, usage_limit, valid_from, valid_to, is_active) VALUES
 ('WELCOME2024', 'Giảm 10% cho đơn hàng đầu tiên', 'percentage', 10, 5000000, 500000, 1000, NOW(), DATE_ADD(NOW(), INTERVAL 90 DAY), TRUE),
@@ -197,7 +249,7 @@ INSERT INTO coupons (code, description, discount_type, discount_value, min_order
 ('NEWYEAR15', 'Tết 2024 giảm 15%', 'percentage', 15, 3000000, 1000000, 10000, NOW(), DATE_ADD(NOW(), INTERVAL 60 DAY), TRUE);
 
 -- ==================================================
--- 9. PROMOTIONS - Chương trình khuyến mãi
+-- 10. PROMOTIONS - Chương trình khuyến mãi
 -- ==================================================
 INSERT INTO promotions (name, description, promotion_type, discount_type, discount_value, applicable_to, valid_from, valid_to, is_active) VALUES
 ('Flash Sale Cuối Tuần', 'Giảm giá sốc các sản phẩm hot', 'flash_sale', 'percentage', 20, 'product', NOW(), DATE_ADD(NOW(), INTERVAL 3 DAY), TRUE),
@@ -205,14 +257,14 @@ INSERT INTO promotions (name, description, promotion_type, discount_type, discou
 ('Mua Laptop Tặng Phụ Kiện', 'Mua laptop tặng chuột + túi xách', 'gift', 'fixed_amount', 0, 'category', NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), TRUE);
 
 -- ==================================================
--- 10. PROMOTION_PRODUCTS - Sản phẩm khuyến mãi
+-- 11. PROMOTION_PRODUCTS - Sản phẩm khuyến mãi
 -- ==================================================
 INSERT INTO promotion_products (promotion_id, product_id) VALUES
 (1, 3), (1, 5), (1, 8), (1, 10),
 (2, 1), (2, 2), (2, 3);
 
 -- ==================================================
--- 11. BANNERS - Banner quảng cáo
+-- 12. BANNERS - Banner quảng cáo
 -- ==================================================
 INSERT INTO banners (title, image_url, link_url, position, display_order, is_active, valid_from, valid_to) VALUES
 ('iPhone 15 Pro Max - Ra Mắt', '/images/banners/iphone-15-banner.jpg', '/products/iphone-15-pro-max', 'home_slider', 1, TRUE, NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY)),
@@ -221,7 +273,7 @@ INSERT INTO banners (title, image_url, link_url, position, display_order, is_act
 ('Giảm giá phụ kiện', '/images/banners/phu-kien-banner.jpg', '/categories/phu-kien', 'home_middle', 1, TRUE, NOW(), DATE_ADD(NOW(), INTERVAL 60 DAY));
 
 -- ==================================================
--- 12. ORDERS - Đơn hàng mẫu
+-- 13. ORDERS - Đơn hàng mẫu
 -- ==================================================
 INSERT INTO orders (order_code, user_id, shipping_name, shipping_phone, shipping_address, shipping_ward, shipping_district, shipping_city, subtotal, shipping_fee, discount_amount, total, payment_method, payment_status, status, order_date) VALUES
 ('ORD240101001', 4, 'Nguyễn Văn A', '0904234567', '123 Nguyễn Huệ', 'Phường Bến Nghé', 'Quận 1', 'TP. Hồ Chí Minh', 16990000, 0, 0, 16990000, 'cod', 'pending', 'delivered', DATE_SUB(NOW(), INTERVAL 30 DAY)),
@@ -231,7 +283,7 @@ INSERT INTO orders (order_code, user_id, shipping_name, shipping_phone, shipping
 ('ORD240101005', 5, 'Trần Thị B', '0905234567', '789 Trần Hưng Đạo', 'Phường Cầu Kho', 'Quận 1', 'TP. Hồ Chí Minh', 18990000, 0, 0, 18990000, 'vnpay', 'paid', 'processing', NOW());
 
 -- ==================================================
--- 13. ORDER_DETAILS - Chi tiết đơn hàng
+-- 14. ORDER_DETAILS - Chi tiết đơn hàng
 -- ==================================================
 INSERT INTO order_details (order_id, product_id, product_name, sku, price, quantity, subtotal) VALUES
 (1, 3, 'iPhone 13', 'IP13-001', 16990000, 1, 16990000),
@@ -241,7 +293,7 @@ INSERT INTO order_details (order_id, product_id, product_name, sku, price, quant
 (5, 7, 'Xiaomi 14 Pro', 'XM14P-001', 18990000, 1, 18990000);
 
 -- ==================================================
--- 14. REVIEWS - Đánh giá sản phẩm
+-- 15. REVIEWS - Đánh giá sản phẩm
 -- ==================================================
 INSERT INTO reviews (product_id, user_id, order_id, rating, title, comment, is_verified_purchase, status) VALUES
 (3, 4, 1, 5, 'Sản phẩm tuyệt vời', 'iPhone 13 vẫn rất mượt, pin trâu, camera đẹp. Giá cả hợp lý!', TRUE, 'approved'),
@@ -250,7 +302,7 @@ INSERT INTO reviews (product_id, user_id, order_id, rating, title, comment, is_v
 (13, 6, 4, 5, 'Tai nghe đáng mua', 'Chất lượng âm thanh tuyệt vời, chống ồn rất tốt. Xứng đáng!', TRUE, 'approved');
 
 -- ==================================================
--- 15. POSTS - Bài viết
+-- 16. POSTS - Bài viết
 -- ==================================================
 INSERT INTO posts (title, slug, content, excerpt, author_id, category, is_published, published_at) VALUES
 ('iPhone 15 Pro Max: Đánh giá chi tiết sau 1 tháng sử dụng', 'iphone-15-pro-max-danh-gia-chi-tiet', 
@@ -269,7 +321,7 @@ INSERT INTO posts (title, slug, content, excerpt, author_id, category, is_publis
 1, 'promotion', TRUE, DATE_SUB(NOW(), INTERVAL 1 DAY));
 
 -- ==================================================
--- 16. WISHLISTS - Yêu thích
+-- 17. WISHLISTS - Yêu thích
 -- ==================================================
 INSERT INTO wishlists (user_id, product_id) VALUES
 (4, 1), (4, 4), (4, 11),
@@ -277,7 +329,7 @@ INSERT INTO wishlists (user_id, product_id) VALUES
 (6, 1), (6, 5), (6, 13);
 
 -- ==================================================
--- 17. PRODUCT_VIEWS - Lượt xem
+-- 18. PRODUCT_VIEWS - Lượt xem
 -- ==================================================
 INSERT INTO product_views (user_id, product_id, viewed_at) VALUES
 (4, 1, DATE_SUB(NOW(), INTERVAL 1 HOUR)),
@@ -287,7 +339,7 @@ INSERT INTO product_views (user_id, product_id, viewed_at) VALUES
 (6, 3, DATE_SUB(NOW(), INTERVAL 1 DAY));
 
 -- ==================================================
--- 18. SETTINGS - Cấu hình hệ thống
+-- 19. SETTINGS - Cấu hình hệ thống
 -- ==================================================
 INSERT INTO settings (setting_key, setting_value, description, data_type, is_public) VALUES
 ('site_name', 'Mobile Shop', 'Tên website', 'string', TRUE),

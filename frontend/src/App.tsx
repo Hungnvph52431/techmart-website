@@ -10,6 +10,9 @@ import { AdminDashboard } from '@/features/admin/pages/AdminDashboard';
 import { AdminProducts } from '@/features/admin/pages/AdminProducts';
 import { AdminOrders } from '@/features/admin/pages/AdminOrders';
 import { AdminUsers } from '@/features/admin/pages/AdminUsers';
+import { AdminCategories } from '@/features/admin/pages/AdminCategories';
+import { AdminAttributes } from '@/features/admin/pages/AdminAttributes';
+import { AdminProductFormPage } from '@/features/admin/pages/AdminProductFormPage';
 
 function App() {
   return (
@@ -25,7 +28,11 @@ function App() {
         {/* Admin Routes */}
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
+          <Route path="categories" element={<AdminCategories />} />
+          <Route path="attributes" element={<AdminAttributes />} />
           <Route path="products" element={<AdminProducts />} />
+          <Route path="products/new" element={<AdminProductFormPage />} />
+          <Route path="products/:id/edit" element={<AdminProductFormPage />} />
           <Route path="orders" element={<AdminOrders />} />
           <Route path="users" element={<AdminUsers />} />
         </Route>

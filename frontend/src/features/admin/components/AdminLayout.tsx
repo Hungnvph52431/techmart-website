@@ -71,6 +71,26 @@ export const AdminLayout = () => {
               📊 Dashboard
             </Link>
             <Link
+              to="/admin/categories"
+              className={`block px-4 py-3 rounded-lg transition-colors ${
+                isActive('/admin/categories')
+                  ? 'bg-blue-500 text-white'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              🗂️ Danh mục
+            </Link>
+            <Link
+              to="/admin/attributes"
+              className={`block px-4 py-3 rounded-lg transition-colors ${
+                isActive('/admin/attributes')
+                  ? 'bg-blue-500 text-white'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              🧩 Thuộc tính
+            </Link>
+            <Link
               to="/admin/products"
               className={`block px-4 py-3 rounded-lg transition-colors ${
                 isActive('/admin/products')
