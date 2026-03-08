@@ -31,4 +31,8 @@ export class ProductUseCase {
   async updateStock(id: number, quantity: number) {
     return this.productRepository.updateStock(id, quantity);
   }
+
+  async getProductStats() {
+    return this.productRepository.getStats();
+  }
 }

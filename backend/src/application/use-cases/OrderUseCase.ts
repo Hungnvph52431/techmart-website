@@ -24,6 +24,10 @@ export class OrderUseCase {
     return this.orderRepository.getOrderDetails(orderId);
   }
 
+  async getOrderStats() {
+    return this.orderRepository.getStats();
+  }
+
   async createOrder(orderData: CreateOrderDTO) {
     // Validate product stock
     for (const item of orderData.items) {
