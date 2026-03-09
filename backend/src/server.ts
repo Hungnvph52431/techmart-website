@@ -23,6 +23,7 @@ import { AuthController } from './presentation/controllers/AuthController';
 import { ProductController } from './presentation/controllers/ProductController';
 import { AdminProductController } from './presentation/controllers/AdminProductController';
 import { OrderController } from './presentation/controllers/OrderController';
+import { AdminOrderController } from './presentation/controllers/AdminOrderController';
 import { UserController } from './presentation/controllers/UserControllers';
 import { CategoryController } from './presentation/controllers/CategoryController';
 import { AttributeController } from './presentation/controllers/AttributeController';
@@ -36,6 +37,7 @@ import { createCategoryRoutes } from './presentation/routes/category.routes';
 import { createAdminProductRoutes } from './presentation/routes/admin/product.routes';
 import { createAdminCategoryRoutes } from './presentation/routes/admin/category.routes';
 import { createAdminAttributeRoutes } from './presentation/routes/admin/attribute.routes';
+import { createAdminOrderRoutes } from './presentation/routes/admin/order.routes';
 
 dotenv.config();
 
@@ -68,6 +70,7 @@ const authController = new AuthController(authUseCase);
 const productController = new ProductController(productUseCase);
 const adminProductController = new AdminProductController(productUseCase);
 const orderController = new OrderController(orderUseCase);
+const adminOrderController = new AdminOrderController(orderUseCase);
 const userController = new UserController(userUseCase);
 const categoryController = new CategoryController(categoryUseCase);
 const attributeController = new AttributeController(attributeUseCase);
@@ -81,6 +84,7 @@ app.use('/api/users', createUserRoutes(userController));
 app.use('/api/admin/products', createAdminProductRoutes(adminProductController));
 app.use('/api/admin/categories', createAdminCategoryRoutes(categoryController));
 app.use('/api/admin/attributes', createAdminAttributeRoutes(attributeController));
+app.use('/api/admin/orders', createAdminOrderRoutes(adminOrderController));
 
 // Health check
 app.get('/health', (req, res) => {

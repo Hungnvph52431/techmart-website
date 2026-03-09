@@ -364,7 +364,83 @@ CREATE TABLE order_details (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
--- 13. BẢNG PROMOTIONS - Chương trình khuyến mãi
+-- 16. BẢNG ORDER_EVENTS - Lịch sử trạng thái đơn hàng
+-- ==================================================
+CREATE TABLE order_events (
+    order_event_id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    event_type ENUM(
+        'order_created',
+        'status_changed',
+        'payment_status_changed',
+        'order_cancelled',
+        'return_requested',
+        'return_approved',
+        'return_rejected',
+        'return_received',
+        'return_refunded',
+        'return_closed'
+    ) NOT NULL,
+    from_status VARCHAR(50),
+    to_status VARCHAR(50),
+    actor_user_id INT,
+    actor_role ENUM('customer', 'admin', 'staff', 'warehouse', 'system'),
+    note TEXT,
+    metadata JSON,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE,
+    FOREIGN KEY (actor_user_id) REFERENCES users(user_id) ON DELETE SET NULL,
+    INDEX idx_order (order_id),
+    INDEX idx_event_type (event_type),
+    INDEX idx_actor_user (actor_user_id),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==================================================
+-- 17. BẢNG ORDER_RETURNS - Yêu cầu hoàn/trả hàng
+-- ==================================================
+CREATE TABLE order_returns (
+    order_return_id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    request_code VARCHAR(50) NOT NULL UNIQUE,
+    requested_by INT NOT NULL,
+    status ENUM('requested', 'approved', 'rejected', 'received', 'refunded', 'closed') DEFAULT 'requested',
+    reason TEXT NOT NULL,
+    customer_note TEXT,
+    admin_note TEXT,
+    requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    approved_at TIMESTAMP NULL,
+    rejected_at TIMESTAMP NULL,
+    received_at TIMESTAMP NULL,
+    refunded_at TIMESTAMP NULL,
+    closed_at TIMESTAMP NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE,
+    FOREIGN KEY (requested_by) REFERENCES users(user_id) ON DELETE RESTRICT,
+    INDEX idx_order (order_id),
+    INDEX idx_status (status),
+    INDEX idx_requested_at (requested_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==================================================
+-- 18. BẢNG ORDER_RETURN_ITEMS - Sản phẩm trong yêu cầu hoàn/trả
+-- ==================================================
+CREATE TABLE order_return_items (
+    order_return_item_id INT AUTO_INCREMENT PRIMARY KEY,
+    order_return_id INT NOT NULL,
+    order_detail_id INT NOT NULL,
+    quantity INT NOT NULL,
+    reason TEXT,
+    restock_action ENUM('restock', 'inspect', 'discard') DEFAULT 'restock',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_return_id) REFERENCES order_returns(order_return_id) ON DELETE CASCADE,
+    FOREIGN KEY (order_detail_id) REFERENCES order_details(order_detail_id) ON DELETE RESTRICT,
+    INDEX idx_order_return (order_return_id),
+    INDEX idx_order_detail (order_detail_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==================================================
+-- 19. BẢNG PROMOTIONS - Chương trình khuyến mãi
 -- ==================================================
 CREATE TABLE promotions (
     promotion_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -385,7 +461,7 @@ CREATE TABLE promotions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
--- 14. BẢNG PROMOTION_PRODUCTS - Sản phẩm khuyến mãi
+-- 20. BẢNG PROMOTION_PRODUCTS - Sản phẩm khuyến mãi
 -- ==================================================
 CREATE TABLE promotion_products (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -399,7 +475,7 @@ CREATE TABLE promotion_products (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
--- 15. BẢNG BANNERS - Quảng cáo banner
+-- 21. BẢNG BANNERS - Quảng cáo banner
 -- ==================================================
 CREATE TABLE banners (
     banner_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -418,7 +494,7 @@ CREATE TABLE banners (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
--- 16. BẢNG POSTS - Bài viết/Tin tức
+-- 22. BẢNG POSTS - Bài viết/Tin tức
 -- ==================================================
 CREATE TABLE posts (
     post_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -445,7 +521,7 @@ CREATE TABLE posts (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
--- 17. BẢNG WISHLISTS - Danh sách yêu thích
+-- 23. BẢNG WISHLISTS - Danh sách yêu thích
 -- ==================================================
 CREATE TABLE wishlists (
     wishlist_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -460,7 +536,7 @@ CREATE TABLE wishlists (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
--- 18. BẢNG PRODUCT_VIEWS - Lịch sử xem sản phẩm
+-- 24. BẢNG PRODUCT_VIEWS - Lịch sử xem sản phẩm
 -- ==================================================
 CREATE TABLE product_views (
     view_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -477,7 +553,7 @@ CREATE TABLE product_views (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
--- 19. BẢNG NOTIFICATIONS - Thông báo
+-- 25. BẢNG NOTIFICATIONS - Thông báo
 -- ==================================================
 CREATE TABLE notifications (
     notification_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -495,7 +571,7 @@ CREATE TABLE notifications (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
--- 20. BẢNG SUPPORT_TICKETS - Yêu cầu hỗ trợ
+-- 26. BẢNG SUPPORT_TICKETS - Yêu cầu hỗ trợ
 -- ==================================================
 CREATE TABLE support_tickets (
     ticket_id INT AUTO_INCREMENT PRIMARY KEY,

@@ -1,48 +1,62 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { OrderUseCase } from '../../application/use-cases/OrderUseCase';
+import { AuthRequest } from '../middlewares/auth.middleware';
+import { toOrderDetail, toOrderListItem } from '../../application/mappers/OrderPresenter';
 
 export class OrderController {
   constructor(private orderUseCase: OrderUseCase) {}
 
-  getAll = async (req: Request, res: Response) => {
+  getMine = async (req: AuthRequest, res: Response) => {
     try {
-      const orders = await this.orderUseCase.getAllOrders();
-      res.json(orders);
+      const orders = await this.orderUseCase.getMyOrders(
+        req.user.userId,
+        req.query.status as any
+      );
+      res.json(orders.map((order) => toOrderListItem(order, 'customer')));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   };
 
-  getById = async (req: Request, res: Response) => {
+  getMyById = async (req: AuthRequest, res: Response) => {
     try {
-      const order = await this.orderUseCase.getOrderById(Number(req.params.id));
-      
-      if (!order) {
+      const aggregate = await this.orderUseCase.getMyOrderDetail(
+        Number(req.params.id),
+        req.user.userId
+      );
+
+      if (!aggregate) {
         return res.status(404).json({ message: 'Order not found' });
       }
 
-      res.json(order);
+      res.json(toOrderDetail(aggregate, 'customer'));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   };
 
-  getByUser = async (req: Request, res: Response) => {
+  getMyTimeline = async (req: AuthRequest, res: Response) => {
     try {
-      const userId = (req as any).user.userId;
-      const orders = await this.orderUseCase.getOrdersByUserId(userId);
-      res.json(orders);
+      const timeline = await this.orderUseCase.getMyOrderTimeline(
+        Number(req.params.id),
+        req.user.userId
+      );
+
+      if (!timeline) {
+        return res.status(404).json({ message: 'Order not found' });
+      }
+
+      res.json(timeline);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   };
 
-  create = async (req: Request, res: Response) => {
+  create = async (req: AuthRequest, res: Response) => {
     try {
-      const userId = (req as any).user.userId;
       const order = await this.orderUseCase.createOrder({
         ...req.body,
-        userId,
+        userId: req.user.userId,
       });
       res.status(201).json(order);
     } catch (error: any) {
@@ -50,33 +64,76 @@ export class OrderController {
     }
   };
 
-  updateStatus = async (req: Request, res: Response) => {
+  cancelMine = async (req: AuthRequest, res: Response) => {
     try {
-      const { status } = req.body;
-      const success = await this.orderUseCase.updateOrderStatus(Number(req.params.id), status);
+      const order = await this.orderUseCase.cancelOrder(
+        Number(req.params.id),
+        req.user.userId,
+        req.user.role,
+        req.body.reason || '',
+        req.body.adminNote
+      );
 
-      if (!success) {
+      if (!order) {
         return res.status(404).json({ message: 'Order not found' });
       }
 
-      res.json({ message: 'Order status updated' });
+      res.json(order);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
   };
 
-  updatePaymentStatus = async (req: Request, res: Response) => {
+  createReturn = async (req: AuthRequest, res: Response) => {
     try {
-      const { status } = req.body;
-      const success = await this.orderUseCase.updatePaymentStatus(Number(req.params.id), status);
+      const orderReturn = await this.orderUseCase.requestReturn(
+        Number(req.params.id),
+        req.user.userId,
+        req.body
+      );
 
-      if (!success) {
+      if (!orderReturn) {
         return res.status(404).json({ message: 'Order not found' });
       }
 
-      res.json({ message: 'Payment status updated' });
+      res.status(201).json(orderReturn);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
+    }
+  };
+
+  getReturns = async (req: AuthRequest, res: Response) => {
+    try {
+      const returns = await this.orderUseCase.getOrderReturns(
+        Number(req.params.id),
+        req.user.userId
+      );
+
+      if (!returns) {
+        return res.status(404).json({ message: 'Order not found' });
+      }
+
+      res.json(returns);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  };
+
+  getReturnById = async (req: AuthRequest, res: Response) => {
+    try {
+      const orderReturn = await this.orderUseCase.getOrderReturn(
+        Number(req.params.id),
+        Number(req.params.returnId),
+        req.user.userId
+      );
+
+      if (!orderReturn) {
+        return res.status(404).json({ message: 'Return request not found' });
+      }
+
+      res.json(orderReturn);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
     }
   };
 }

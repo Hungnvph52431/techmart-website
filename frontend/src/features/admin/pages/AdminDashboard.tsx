@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { adminProductService } from '@/services/admin/product.service';
-import { orderService } from '@/services/order.service';
+import { adminOrderService } from '@/services/admin/order.service';
 import { Link } from 'react-router-dom';
 
 interface Stats {
@@ -26,23 +26,20 @@ export const AdminDashboard = () => {
   const fetchStats = async () => {
     try {
       setLoading(true);
-      const [products, orders] = await Promise.all([
+      const [products, orders, pendingOrdersResponse] = await Promise.all([
         adminProductService.getAll(),
-        orderService.getAll(),
+        adminOrderService.getAll({ limit: 1000 }),
+        adminOrderService.getAll({ status: 'pending', limit: 1 }),
       ]);
 
-      const pendingOrders = orders.filter(
-        (order: any) => order.status === 'pending'
-      ).length;
-
-      const revenue = orders
+      const revenue = orders.items
         .filter((order: any) => order.status === 'delivered')
-        .reduce((sum: number, order: any) => sum + Number(order.total || order.total_amount || 0), 0);
+        .reduce((sum: number, order: any) => sum + Number(order.total || 0), 0);
 
       setStats({
         totalProducts: products.length,
-        totalOrders: orders.length,
-        pendingOrders,
+        totalOrders: orders.total,
+        pendingOrders: pendingOrdersResponse.total,
         revenue,
       });
     } catch (error) {
