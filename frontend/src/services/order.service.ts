@@ -1,40 +1,65 @@
 import api from './api';
-import { Order, ShippingAddress, OrderItem } from '@/types';
+import type {
+  CreateOrderPayload,
+  CreateOrderReturnPayload,
+  OrderDetailView,
+  OrderListItemView,
+  OrderReturnView,
+  OrderStatus,
+  OrderTimelineEventView,
+} from '@/types/order';
 
 export const orderService = {
-  getMyOrders: async (): Promise<Order[]> => {
-    const response = await api.get('/orders/my-orders');
+  getMyOrders: async (status?: OrderStatus | 'all'): Promise<OrderListItemView[]> => {
+    const params = new URLSearchParams();
+
+    if (status && status !== 'all') {
+      params.append('status', status);
+    }
+
+    const query = params.toString();
+    const response = await api.get(`/orders/my-orders${query ? `?${query}` : ''}`);
     return response.data;
   },
 
-  getAll: async (): Promise<Order[]> => {
-    const response = await api.get('/orders');
+  getById: async (id: number): Promise<OrderDetailView> => {
+    const response = await api.get(`/orders/my-orders/${id}`);
     return response.data;
   },
 
-  getById: async (id: string): Promise<Order> => {
-    const response = await api.get(`/orders/${id}`);
+  getTimeline: async (id: number): Promise<OrderTimelineEventView[]> => {
+    const response = await api.get(`/orders/my-orders/${id}/timeline`);
     return response.data;
   },
 
-  create: async (orderData: {
-    items: OrderItem[];
-    totalAmount: number;
-    shippingAddress: ShippingAddress;
-    paymentMethod: 'cod' | 'online';
-    note?: string;
-  }): Promise<Order> => {
+  create: async (orderData: CreateOrderPayload): Promise<{ orderId: number; orderCode: string }> => {
     const response = await api.post('/orders', orderData);
     return response.data;
   },
 
-  updateStatus: async (orderId: number, status: string): Promise<Order> => {
-    const response = await api.patch(`/orders/${orderId}/status`, { status });
+  cancel: async (
+    orderId: number,
+    payload: { reason: string; adminNote?: string }
+  ): Promise<{ status: string }> => {
+    const response = await api.post(`/orders/my-orders/${orderId}/cancel`, payload);
     return response.data;
   },
 
-  updatePaymentStatus: async (orderId: number, paymentStatus: string): Promise<Order> => {
-    const response = await api.patch(`/orders/${orderId}/payment-status`, { paymentStatus });
+  createReturn: async (
+    orderId: number,
+    payload: CreateOrderReturnPayload
+  ): Promise<OrderReturnView> => {
+    const response = await api.post(`/orders/my-orders/${orderId}/returns`, payload);
+    return response.data;
+  },
+
+  getReturns: async (orderId: number): Promise<OrderReturnView[]> => {
+    const response = await api.get(`/orders/my-orders/${orderId}/returns`);
+    return response.data;
+  },
+
+  getReturnById: async (orderId: number, returnId: number): Promise<OrderReturnView> => {
+    const response = await api.get(`/orders/my-orders/${orderId}/returns/${returnId}`);
     return response.data;
   },
 };
