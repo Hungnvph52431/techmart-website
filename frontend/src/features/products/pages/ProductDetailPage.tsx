@@ -12,7 +12,23 @@ export const ProductDetailPage = () => {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
-  const { addItem } = useCartStore();
+  const { addItem, items } = useCartStore();
+
+  const currentCartItem = items.find(item => item.product.productId === product?.productId);
+  const cartQuantity = currentCartItem ? currentCartItem.quantity : 0;
+  const availableStock = product ? product.stockQuantity - cartQuantity : 0;
+
+  const isOutOfStock = product ? product.stockQuantity <= 0 : false;
+  const isMaxReached = !isOutOfStock && availableStock <= 0;
+  const isDisabled = isOutOfStock || isMaxReached;
+
+  useEffect(() => {
+    if (quantity > availableStock && availableStock > 0) {
+      setQuantity(availableStock);
+    } else if (availableStock <= 0) {
+      setQuantity(0);
+    }
+  }, [availableStock, quantity]);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -111,33 +127,35 @@ export const ProductDetailPage = () => {
               <div className="flex items-center space-x-3">
                 <button
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100"
+                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isDisabled || quantity <= 1}
                 >
                   -
                 </button>
                 <span className="px-4 py-2 border border-gray-300 rounded">{quantity}</span>
                 <button
-                  onClick={() => setQuantity(Math.min(product.stockQuantity, quantity + 1))}
-                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100"
+                  onClick={() => setQuantity(Math.min(availableStock, quantity + 1))}
+                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isDisabled || quantity >= availableStock}
                 >
                   +
                 </button>
-                <span className="text-gray-500 ml-4">
-                  Còn {product.stockQuantity} sản phẩm
+                <span className="text-gray-500 ml-4 font-medium">
+                  Còn {Math.max(0, availableStock)} SP có thể mua
                 </span>
               </div>
             </div>
 
             <button
               onClick={handleAddToCart}
-              disabled={product.stockQuantity <= 0}
-              className={`w-full py-3 rounded-lg transition-colors flex items-center justify-center space-x-2 mb-6 ${product.stockQuantity <= 0
-                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                  : 'bg-primary-600 text-white hover:bg-primary-700'
+              disabled={isDisabled || quantity <= 0}
+              className={`w-full py-3 rounded-lg transition-colors flex items-center justify-center space-x-2 mb-6 ${isDisabled || quantity <= 0
+                ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                : 'bg-primary-600 text-white hover:bg-primary-700'
                 }`}
             >
               <ShoppingCart className="h-5 w-5" />
-              <span className="font-semibold text-lg">{product.stockQuantity <= 0 ? 'Tạm hết hàng' : 'Thêm vào giỏ hàng'}</span>
+              <span className="font-semibold text-lg">{isOutOfStock ? 'Tạm hết hàng' : isMaxReached ? 'Đã đạt giới hạn' : 'Thêm vào giỏ hàng'}</span>
             </button>
 
             <div className="grid grid-cols-3 gap-4 mb-6">
