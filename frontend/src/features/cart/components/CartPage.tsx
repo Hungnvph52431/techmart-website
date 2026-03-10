@@ -1,5 +1,6 @@
 import { Layout } from '@/components/layout/Layout';
 import { useCartStore } from '@/store/cartStore';
+import toast from 'react-hot-toast';
 import { Trash2, Plus, Minus, ShoppingCart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -7,11 +8,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 export const CartPage = () => {
   const { items, removeItem, updateQuantity, getTotalPrice, getTotalItems } = useCartStore();
 
-  const handleUpdateQuantity = (productId: number, newQuantity: number) => {
+  const handleUpdateQuantity = (productId: number, newQuantity: number, stockQuantity: number) => {
     if (newQuantity === 0) {
       if (window.confirm('Bạn có muốn xóa sản phẩm này khỏi giỏ hàng không?')) {
         removeItem(productId);
       }
+    } else if (newQuantity > stockQuantity) {
+      toast.error(`Rất tiếc, sản phẩm này chỉ còn ${stockQuantity} cái trong kho.`);
     } else {
       updateQuantity(productId, newQuantity);
     }
@@ -78,20 +81,26 @@ export const CartPage = () => {
                       <p className="text-red-600 font-bold mt-1">
                         {(item.product.salePrice || item.product.price).toLocaleString('vi-VN')}₫
                       </p>
+                      <p className="text-sm text-green-600 mt-1">
+                        Còn lại: {item.product.stockQuantity} SP
+                      </p>
                     </div>
 
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => handleUpdateQuantity(item.product.productId, item.quantity - 1)}
+                        onClick={() => handleUpdateQuantity(item.product.productId, item.quantity - 1, item.product.stockQuantity)}
                         className="p-1 border border-gray-300 rounded hover:bg-gray-100 transition-colors"
                       >
                         <Minus className="h-4 w-4" />
                       </button>
                       <span className="w-8 text-center">{item.quantity}</span>
                       <button
-                        onClick={() => handleUpdateQuantity(item.product.productId, item.quantity + 1)}
-                        className="p-1 border border-gray-300 rounded hover:bg-gray-100 transition-colors"
-                        disabled={item.quantity >= item.product.stockQuantity}
+                        onClick={() => handleUpdateQuantity(item.product.productId, item.quantity + 1, item.product.stockQuantity)}
+                        className={`p-1 border rounded transition-colors ${item.quantity >= item.product.stockQuantity
+                            ? 'border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed'
+                            : 'border-gray-300 hover:bg-gray-100'
+                          }`}
+                        title={item.quantity >= item.product.stockQuantity ? 'Đã đạt giới hạn kho' : ''}
                       >
                         <Plus className="h-4 w-4" />
                       </button>
