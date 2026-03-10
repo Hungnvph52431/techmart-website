@@ -1,11 +1,12 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart, User, Search } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useCartStore } from '@/store/cartStore';
 
 export const Header = () => {
   const { user, isAuthenticated, clearAuth } = useAuthStore();
-  const { getTotalItems } = useCartStore();
+  const { getTotalItems, items, getTotalPrice } = useCartStore();
+  const navigate = useNavigate();
 
   const handleLogout = () => {
     clearAuth();
@@ -35,14 +36,60 @@ export const Header = () => {
 
           {/* Actions */}
           <div className="flex items-center space-x-6">
-            <Link to="/cart" className="relative">
-              <ShoppingCart className="h-6 w-6 text-gray-700 hover:text-primary-600" />
-              {getTotalItems() > 0 && (
-                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {getTotalItems()}
-                </span>
-              )}
-            </Link>
+            <div className="relative group">
+              <Link to="/cart" className="relative flex items-center py-2">
+                <ShoppingCart className="h-6 w-6 text-gray-700 hover:text-primary-600 transition-colors" />
+                {getTotalItems() > 0 && (
+                  <span className="absolute -top-1 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold shadow-sm">
+                    {getTotalItems()}
+                  </span>
+                )}
+              </Link>
+
+              {/* Mini Cart Dropdown */}
+              <div className="absolute right-0 top-full mt-1 w-80 bg-white rounded-lg shadow-xl py-2 hidden group-hover:block border border-gray-100 z-50 transition-all duration-200 origin-top">
+                {items.length === 0 ? (
+                  <div className="text-center py-8">
+                    <ShoppingCart className="mx-auto h-12 w-12 text-gray-200 mb-3" />
+                    <p className="text-gray-500 font-medium">Giỏ hàng trống</p>
+                  </div>
+                ) : (
+                  <>
+                    <h3 className="px-4 py-2 font-bold text-gray-800 border-b border-gray-100">Sản phẩm mới thêm</h3>
+                    <div className="max-h-64 overflow-y-auto px-4 py-2">
+                      {items.slice(-3).reverse().map((item) => (
+                        <div key={item.product.productId} className="flex gap-3 py-3 border-b border-gray-50 last:border-0">
+                          <img src={item.product.mainImage || '/placeholder.jpg'} alt={item.product.name} className="w-12 h-12 object-cover rounded shadow-sm" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate" title={item.product.name}>{item.product.name}</p>
+                            <p className="text-xs text-gray-500 mt-1">Số lượng: {item.quantity}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-bold text-red-600">
+                              {(item.product.salePrice || item.product.price).toLocaleString('vi-VN')}₫
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="px-4 py-3 bg-gray-50 rounded-b-lg border-t border-gray-100">
+                      <div className="flex justify-between mb-3 text-sm">
+                        <span className="text-gray-600">Tổng cộng (chưa gồm phí ship):</span>
+                        <span className="font-bold text-red-600 text-base">{getTotalPrice().toLocaleString('vi-VN')}₫</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button onClick={() => navigate('/cart')} className="w-full px-4 py-2 text-sm font-medium text-center text-primary-600 bg-white border border-primary-600 hover:bg-primary-50 rounded-lg transition-colors">
+                          Xem giỏ hàng
+                        </button>
+                        <button onClick={() => navigate('/checkout')} className="w-full px-4 py-2 text-sm font-medium text-center text-white bg-primary-600 hover:bg-primary-700 shadow flex items-center justify-center rounded-lg transition-colors">
+                          Thanh toán
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
 
             {isAuthenticated() ? (
               <div className="relative group">
