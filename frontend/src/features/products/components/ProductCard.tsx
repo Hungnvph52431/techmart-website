@@ -9,7 +9,13 @@ interface ProductCardProps {
 }
 
 export const ProductCard = ({ product }: ProductCardProps) => {
-  const { addItem } = useCartStore();
+  const { addItem, items } = useCartStore();
+
+  const currentCartItem = items.find(item => item.product.productId === product.productId);
+  const cartQuantity = currentCartItem ? currentCartItem.quantity : 0;
+  const isOutOfStock = product.stockQuantity <= 0;
+  const isMaxReached = !isOutOfStock && cartQuantity >= product.stockQuantity;
+  const isDisabled = isOutOfStock || isMaxReached;
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -44,10 +50,10 @@ export const ProductCard = ({ product }: ProductCardProps) => {
             Nổi bật
           </div>
         )}
-        {product.stockQuantity <= 0 && (
+        {isDisabled && (
           <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
-            <span className="bg-gray-800 text-white px-4 py-2 rounded-lg font-bold text-sm tracking-wider uppercase shadow-md">
-              Hết Hàng
+            <span className="bg-gray-800 text-white px-4 py-2 rounded-lg font-bold text-sm tracking-wider uppercase shadow-md text-center max-w-[90%]">
+              {isOutOfStock ? 'Hết Hàng' : 'Đã thêm tối đa'}
             </span>
           </div>
         )}
@@ -82,14 +88,14 @@ export const ProductCard = ({ product }: ProductCardProps) => {
 
         <button
           onClick={handleAddToCart}
-          disabled={product.stockQuantity <= 0}
-          className={`w-full py-2 rounded-lg transition-colors flex items-center justify-center space-x-2 ${product.stockQuantity <= 0
-              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              : 'bg-primary-600 text-white hover:bg-primary-700'
+          disabled={isDisabled}
+          className={`w-full py-2 rounded-lg transition-colors flex items-center justify-center space-x-2 ${isDisabled
+            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            : 'bg-primary-600 text-white hover:bg-primary-700'
             }`}
         >
           <ShoppingCart className="h-4 w-4" />
-          <span>{product.stockQuantity <= 0 ? 'Tạm hết hàng' : 'Thêm vào giỏ'}</span>
+          <span>{isOutOfStock ? 'Tạm hết hàng' : isMaxReached ? 'Đã đạt giới hạn' : 'Thêm vào giỏ'}</span>
         </button>
       </div>
     </Link>

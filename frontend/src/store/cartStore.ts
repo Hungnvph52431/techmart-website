@@ -22,15 +22,19 @@ export const useCartStore = create<CartState>()(
         const existingItem = items.find((item) => item.product.productId === product.productId);
 
         if (existingItem) {
+          const newQuantity = existingItem.quantity + quantity;
+          const finalQuantity = newQuantity > product.stockQuantity ? product.stockQuantity : newQuantity;
+
           set({
             items: items.map((item) =>
               item.product.productId === product.productId
-                ? { ...item, quantity: item.quantity + quantity }
+                ? { ...item, quantity: finalQuantity }
                 : item
             ),
           });
         } else {
-          set({ items: [...items, { product, quantity }] });
+          const finalQuantity = quantity > product.stockQuantity ? product.stockQuantity : quantity;
+          set({ items: [...items, { product, quantity: finalQuantity }] });
         }
       },
 
