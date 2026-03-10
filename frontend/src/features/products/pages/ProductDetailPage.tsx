@@ -34,7 +34,7 @@ export const ProductDetailPage = () => {
   const handleAddToCart = () => {
     if (product) {
       addItem(product, quantity);
-      toast.success('Đã thêm vào giỏ hàng!');
+      toast.success(`Đã thêm ${product.name} vào giỏ hàng!`);
     }
   };
 

@@ -14,7 +14,7 @@ export const ProductCard = ({ product }: ProductCardProps) => {
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     addItem(product);
-    toast.success('Đã thêm vào giỏ hàng!');
+    toast.success(`Đã thêm ${product.name} vào giỏ hàng!`);
   };
 
   const displayPrice = product.salePrice || product.price;
