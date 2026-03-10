@@ -130,11 +130,14 @@ export const ProductDetailPage = () => {
 
             <button
               onClick={handleAddToCart}
-              disabled={product.stockQuantity === 0}
-              className="w-full bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 transition-colors flex items-center justify-center space-x-2 mb-6 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              disabled={product.stockQuantity <= 0}
+              className={`w-full py-3 rounded-lg transition-colors flex items-center justify-center space-x-2 mb-6 ${product.stockQuantity <= 0
+                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  : 'bg-primary-600 text-white hover:bg-primary-700'
+                }`}
             >
               <ShoppingCart className="h-5 w-5" />
-              <span>Thêm vào giỏ hàng</span>
+              <span className="font-semibold text-lg">{product.stockQuantity <= 0 ? 'Tạm hết hàng' : 'Thêm vào giỏ hàng'}</span>
             </button>
 
             <div className="grid grid-cols-3 gap-4 mb-6">

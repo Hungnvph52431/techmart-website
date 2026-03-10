@@ -34,14 +34,21 @@ export const ProductCard = ({ product }: ProductCardProps) => {
           alt={product.name}
           className="w-full h-64 object-cover group-hover:scale-110 transition-transform duration-300"
         />
-        {discount > 0 && (
+        {discount > 0 && product.stockQuantity > 0 && (
           <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded-md text-sm font-semibold">
             -{discount}%
           </div>
         )}
-        {product.isFeatured && (
+        {product.isFeatured && product.stockQuantity > 0 && (
           <div className="absolute top-2 left-2 bg-yellow-500 text-white px-2 py-1 rounded-md text-xs font-semibold">
             Nổi bật
+          </div>
+        )}
+        {product.stockQuantity <= 0 && (
+          <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
+            <span className="bg-gray-800 text-white px-4 py-2 rounded-lg font-bold text-sm tracking-wider uppercase shadow-md">
+              Hết Hàng
+            </span>
           </div>
         )}
       </div>
@@ -75,10 +82,14 @@ export const ProductCard = ({ product }: ProductCardProps) => {
 
         <button
           onClick={handleAddToCart}
-          className="w-full bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center justify-center space-x-2"
+          disabled={product.stockQuantity <= 0}
+          className={`w-full py-2 rounded-lg transition-colors flex items-center justify-center space-x-2 ${product.stockQuantity <= 0
+              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              : 'bg-primary-600 text-white hover:bg-primary-700'
+            }`}
         >
           <ShoppingCart className="h-4 w-4" />
-          <span>Thêm vào giỏ</span>
+          <span>{product.stockQuantity <= 0 ? 'Tạm hết hàng' : 'Thêm vào giỏ'}</span>
         </button>
       </div>
     </Link>
