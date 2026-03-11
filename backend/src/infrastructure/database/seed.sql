@@ -345,16 +345,25 @@ INSERT INTO order_return_items (order_return_id, order_detail_id, quantity, reas
 (2, 3, 1, 'Muốn đổi sang phân khúc khác', 'restock', DATE_SUB(NOW(), INTERVAL 10 DAY));
 
 -- ==================================================
--- 18. REVIEWS - Đánh giá sản phẩm
+-- 18. ORDER_FEEDBACKS - Đánh giá đơn hàng
 -- ==================================================
-INSERT INTO reviews (product_id, user_id, order_id, rating, title, comment, is_verified_purchase, status) VALUES
-(3, 4, 1, 5, 'Sản phẩm tuyệt vời', 'iPhone 13 vẫn rất mượt, pin trâu, camera đẹp. Giá cả hợp lý!', TRUE, 'approved'),
-(1, 5, 2, 5, 'Đỉnh cao công nghệ', 'iPhone 15 Pro Max xứng đáng là flagship 2024. Camera xuất sắc, hiệu năng khủng!', TRUE, 'approved'),
-(8, 4, 3, 4, 'Tốt trong tầm giá', 'Camera 200MP rất ấn tượng, pin khỏe. Tuy nhiên màn hình hơi kém so với giá tiền.', TRUE, 'approved'),
-(13, 6, 4, 5, 'Tai nghe đáng mua', 'Chất lượng âm thanh tuyệt vời, chống ồn rất tốt. Xứng đáng!', TRUE, 'approved');
+INSERT INTO order_feedbacks (order_id, user_id, rating, title, comment, created_at, updated_at) VALUES
+(1, 4, 5, 'Giao nhanh, đóng gói ổn', 'Nhân viên giao hàng hỗ trợ tốt, sản phẩm đúng mô tả.', DATE_SUB(NOW(), INTERVAL 25 DAY), DATE_SUB(NOW(), INTERVAL 25 DAY)),
+(2, 5, 4, 'Trải nghiệm nhìn chung tốt', 'Thanh toán nhanh nhưng phần hỗ trợ sau bán hàng cần phản hồi sớm hơn.', DATE_SUB(NOW(), INTERVAL 21 DAY), DATE_SUB(NOW(), INTERVAL 21 DAY));
 
 -- ==================================================
--- 19. POSTS - Bài viết
+-- 19. REVIEWS - Đánh giá sản phẩm
+-- ==================================================
+INSERT INTO reviews (
+    product_id, user_id, order_id, order_detail_id, rating, title, comment, is_verified_purchase, status
+) VALUES
+(3, 4, 1, 1, 5, 'Sản phẩm tuyệt vời', 'iPhone 13 vẫn rất mượt, pin trâu, camera đẹp. Giá cả hợp lý!', TRUE, 'approved'),
+(1, 5, 2, 2, 5, 'Đỉnh cao công nghệ', 'iPhone 15 Pro Max xứng đáng là flagship 2024. Camera xuất sắc, hiệu năng khủng!', TRUE, 'approved'),
+(8, 4, 3, 3, 4, 'Tốt trong tầm giá', 'Camera 200MP rất ấn tượng, pin khỏe. Tuy nhiên màn hình hơi kém so với giá tiền.', TRUE, 'approved'),
+(13, 6, 4, 4, 5, 'Tai nghe đáng mua', 'Chất lượng âm thanh tuyệt vời, chống ồn rất tốt. Xứng đáng!', TRUE, 'approved');
+
+-- ==================================================
+-- 20. POSTS - Bài viết
 -- ==================================================
 INSERT INTO posts (title, slug, content, excerpt, author_id, category, is_published, published_at) VALUES
 ('iPhone 15 Pro Max: Đánh giá chi tiết sau 1 tháng sử dụng', 'iphone-15-pro-max-danh-gia-chi-tiet', 
@@ -373,7 +382,7 @@ INSERT INTO posts (title, slug, content, excerpt, author_id, category, is_publis
 1, 'promotion', TRUE, DATE_SUB(NOW(), INTERVAL 1 DAY));
 
 -- ==================================================
--- 20. WISHLISTS - Yêu thích
+-- 21. WISHLISTS - Yêu thích
 -- ==================================================
 INSERT INTO wishlists (user_id, product_id) VALUES
 (4, 1), (4, 4), (4, 11),
@@ -381,7 +390,7 @@ INSERT INTO wishlists (user_id, product_id) VALUES
 (6, 1), (6, 5), (6, 13);
 
 -- ==================================================
--- 21. PRODUCT_VIEWS - Lượt xem
+-- 22. PRODUCT_VIEWS - Lượt xem
 -- ==================================================
 INSERT INTO product_views (user_id, product_id, viewed_at) VALUES
 (4, 1, DATE_SUB(NOW(), INTERVAL 1 HOUR)),
@@ -391,7 +400,7 @@ INSERT INTO product_views (user_id, product_id, viewed_at) VALUES
 (6, 3, DATE_SUB(NOW(), INTERVAL 1 DAY));
 
 -- ==================================================
--- 22. SETTINGS - Cấu hình hệ thống
+-- 23. SETTINGS - Cấu hình hệ thống
 -- ==================================================
 INSERT INTO settings (setting_key, setting_value, description, data_type, is_public) VALUES
 ('site_name', 'Mobile Shop', 'Tên website', 'string', TRUE),

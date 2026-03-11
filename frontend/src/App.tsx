@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { HomePage } from '@/pages/HomePage';
 import { ProductListPage } from '@/features/products/pages/ProductListPage';
@@ -13,6 +13,10 @@ import { AdminUsers } from '@/features/admin/pages/AdminUsers';
 import { AdminCategories } from '@/features/admin/pages/AdminCategories';
 import { AdminAttributes } from '@/features/admin/pages/AdminAttributes';
 import { AdminProductFormPage } from '@/features/admin/pages/AdminProductFormPage';
+import { CustomerRouteGuard } from '@/features/orders/components/CustomerRouteGuard';
+import { CustomerOrdersLayout } from '@/features/orders/components/CustomerOrdersLayout';
+import { OrdersPage } from '@/features/orders/pages/OrdersPage';
+import { OrderDetailPage } from '@/features/orders/pages/OrderDetailPage';
 
 function App() {
   return (
@@ -24,6 +28,14 @@ function App() {
         <Route path="/products/:slug" element={<ProductDetailPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/cart" element={<CartPage />} />
+
+        <Route element={<CustomerRouteGuard />}>
+          <Route path="/orders" element={<CustomerOrdersLayout />}>
+            <Route index element={<OrdersPage />} />
+            <Route path=":id" element={<OrderDetailPage />} />
+          </Route>
+          <Route path="/profile" element={<Navigate to="/orders" replace />} />
+        </Route>
         
         {/* Admin Routes */}
         <Route path="/admin" element={<AdminLayout />}>

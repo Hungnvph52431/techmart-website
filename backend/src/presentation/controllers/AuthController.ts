@@ -29,7 +29,14 @@ export class AuthController {
 
   getProfile = async (req: Request, res: Response) => {
     try {
-      res.json({ user: (req as any).user });
+      const authUser = (req as any).user;
+      const user = await this.authUseCase.getProfile(authUser.userId);
+
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      res.json({ user });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

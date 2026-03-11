@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { authService } from '@/services/auth.service';
 import { useAuthStore } from '@/store/authStore';
@@ -11,6 +11,7 @@ export const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const { setAuth } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,12 +21,16 @@ export const LoginPage = () => {
       const result = await authService.login(email, password);
       setAuth(result.user, result.token);
       toast.success('Đăng nhập thành công!');
-      
-      // Redirect based on user role
+
+      const redirectTarget =
+        typeof location.state === 'object' && location.state !== null && 'from' in location.state
+          ? String((location.state as { from?: string }).from || '')
+          : '';
+
       if (result.user.role !== 'customer') {
         navigate('/admin');
       } else {
-        navigate('/');
+        navigate(redirectTarget || '/orders');
       }
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Đăng nhập thất bại');
