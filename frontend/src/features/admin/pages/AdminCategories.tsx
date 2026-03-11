@@ -61,7 +61,7 @@ export const AdminCategories = () => {
   };
 
   const handleAddNew = () => {
-    setIsEditing(false);
+    setIsEditing(true);
     setEditingId(null);
     setFormData({
       name: '',
