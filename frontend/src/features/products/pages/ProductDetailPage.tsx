@@ -155,7 +155,7 @@ export const ProductDetailPage = () => {
                 }`}
             >
               <ShoppingCart className="h-5 w-5" />
-              <span className="font-semibold text-lg">{isOutOfStock ? 'Tạm hết hàng' : isMaxReached ? 'Đã đạt giới hạn' : 'Thêm vào giỏ hàng'}</span>
+              <span className="font-semibold text-lg">{isOutOfStock ? 'Tạm hết hàng' : isMaxReached ? 'Tạm hết hàng' : 'Thêm vào giỏ hàng'}</span>
             </button>
 
             <div className="grid grid-cols-3 gap-4 mb-6">
