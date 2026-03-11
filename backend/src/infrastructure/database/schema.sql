@@ -226,6 +226,7 @@ CREATE TABLE reviews (
     product_id INT NOT NULL,
     user_id INT NOT NULL,
     order_id INT,
+    order_detail_id INT,
     rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
     title VARCHAR(255),
     comment TEXT,
@@ -237,8 +238,11 @@ CREATE TABLE reviews (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    UNIQUE KEY uniq_order_detail_user_review (order_detail_id, user_id),
     INDEX idx_product (product_id),
     INDEX idx_user (user_id),
+    INDEX idx_order (order_id),
+    INDEX idx_order_detail (order_detail_id),
     INDEX idx_status (status),
     INDEX idx_rating (rating)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -440,7 +444,26 @@ CREATE TABLE order_return_items (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
--- 19. BẢNG PROMOTIONS - Chương trình khuyến mãi
+-- 19. BẢNG ORDER_FEEDBACKS - Đánh giá trải nghiệm đơn hàng
+-- ==================================================
+CREATE TABLE order_feedbacks (
+    order_feedback_id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    user_id INT NOT NULL,
+    rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    title VARCHAR(255),
+    comment TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    UNIQUE KEY uniq_order_feedback_per_order (order_id),
+    INDEX idx_user (user_id),
+    INDEX idx_rating (rating)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==================================================
+-- 20. BẢNG PROMOTIONS - Chương trình khuyến mãi
 -- ==================================================
 CREATE TABLE promotions (
     promotion_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -461,7 +484,7 @@ CREATE TABLE promotions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
--- 20. BẢNG PROMOTION_PRODUCTS - Sản phẩm khuyến mãi
+-- 21. BẢNG PROMOTION_PRODUCTS - Sản phẩm khuyến mãi
 -- ==================================================
 CREATE TABLE promotion_products (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -475,7 +498,7 @@ CREATE TABLE promotion_products (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
--- 21. BẢNG BANNERS - Quảng cáo banner
+-- 22. BẢNG BANNERS - Quảng cáo banner
 -- ==================================================
 CREATE TABLE banners (
     banner_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -494,7 +517,7 @@ CREATE TABLE banners (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
--- 22. BẢNG POSTS - Bài viết/Tin tức
+-- 23. BẢNG POSTS - Bài viết/Tin tức
 -- ==================================================
 CREATE TABLE posts (
     post_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -521,7 +544,7 @@ CREATE TABLE posts (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
--- 23. BẢNG WISHLISTS - Danh sách yêu thích
+-- 24. BẢNG WISHLISTS - Danh sách yêu thích
 -- ==================================================
 CREATE TABLE wishlists (
     wishlist_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -536,7 +559,7 @@ CREATE TABLE wishlists (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
--- 24. BẢNG PRODUCT_VIEWS - Lịch sử xem sản phẩm
+-- 25. BẢNG PRODUCT_VIEWS - Lịch sử xem sản phẩm
 -- ==================================================
 CREATE TABLE product_views (
     view_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -553,7 +576,7 @@ CREATE TABLE product_views (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
--- 25. BẢNG NOTIFICATIONS - Thông báo
+-- 26. BẢNG NOTIFICATIONS - Thông báo
 -- ==================================================
 CREATE TABLE notifications (
     notification_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -571,7 +594,7 @@ CREATE TABLE notifications (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
--- 26. BẢNG SUPPORT_TICKETS - Yêu cầu hỗ trợ
+-- 27. BẢNG SUPPORT_TICKETS - Yêu cầu hỗ trợ
 -- ==================================================
 CREATE TABLE support_tickets (
     ticket_id INT AUTO_INCREMENT PRIMARY KEY,

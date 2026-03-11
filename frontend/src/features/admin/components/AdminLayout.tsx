@@ -26,6 +26,8 @@ export const AdminLayout = () => {
     return null;
   }
 
+  const displayName = user.name || (user as any).fullName || user.email;
+
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Top Header */}
@@ -38,7 +40,7 @@ export const AdminLayout = () => {
           </div>
           <div className="flex items-center space-x-4">
             <span className="text-gray-700">
-              👤 {user.fullName || user.email}
+              👤 {displayName}
             </span>
             <Link
               to="/"

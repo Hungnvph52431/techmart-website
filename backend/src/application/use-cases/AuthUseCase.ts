@@ -57,6 +57,16 @@ export class AuthUseCase {
     };
   }
 
+  async getProfile(userId: number) {
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
+      return null;
+    }
+
+    const { password, ...userWithoutPassword } = user;
+    return userWithoutPassword;
+  }
+
   verifyToken(token: string): any {
     try {
       return jwt.verify(token, JWT_SECRET);
