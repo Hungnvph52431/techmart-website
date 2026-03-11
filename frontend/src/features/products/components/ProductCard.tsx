@@ -53,7 +53,7 @@ export const ProductCard = ({ product }: ProductCardProps) => {
         {isDisabled && (
           <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
             <span className="bg-gray-800 text-white px-4 py-2 rounded-lg font-bold text-sm tracking-wider uppercase shadow-md text-center max-w-[90%]">
-              {isOutOfStock ? 'Hết Hàng' : 'Đã thêm tối đa'}
+              {isOutOfStock ? 'Hết Hàng' : 'Hết Hàng'}
             </span>
           </div>
         )}
@@ -95,7 +95,7 @@ export const ProductCard = ({ product }: ProductCardProps) => {
             }`}
         >
           <ShoppingCart className="h-4 w-4" />
-          <span>{isOutOfStock ? 'Tạm hết hàng' : isMaxReached ? 'Đã đạt giới hạn' : 'Thêm vào giỏ'}</span>
+          <span>{isOutOfStock ? 'Tạm hết hàng' : isMaxReached ? 'Tạm hết hàng' : 'Thêm vào giỏ'}</span>
         </button>
       </div>
     </Link>
