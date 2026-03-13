@@ -11,6 +11,9 @@ import { AdminCategories } from '@/features/admin/pages/AdminCategories';
 import { AdminProductForm } from '@/features/admin/pages/AdminProductForm';
 import { AdminProducts } from '@/features/admin/pages/AdminProducts';
 import { AdminOrders } from '@/features/admin/pages/AdminOrders';
+import { RegisterPage } from '@/features/auth/pages/RegisterPage';
+import { ProfilePage } from '@/features/account/pages/ProfilePage';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 
 function App() {
   return (
@@ -21,7 +24,16 @@ function App() {
         <Route path="/products" element={<ProductListPage />} />
         <Route path="/products/:slug" element={<ProductDetailPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
         <Route path="/cart" element={<CartPage />} />
+        <Route 
+          path="/profile" 
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
+            </ProtectedRoute>
+          } 
+        />
 
         {/* Admin Routes */}
         <Route path="/admin" element={<AdminLayout />}>
