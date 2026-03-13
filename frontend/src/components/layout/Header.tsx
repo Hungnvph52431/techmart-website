@@ -97,25 +97,27 @@ export const Header = () => {
                   <User className="h-6 w-6 text-gray-700" />
                   <span className="text-sm">{user?.fullName}</span>
                 </button>
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 hidden group-hover:block">
-                  <Link
-                    to="/profile"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    Thông tin cá nhân
-                  </Link>
-                  <Link
-                    to="/orders"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    Đơn hàng của tôi
-                  </Link>
-                  <button
-                    onClick={handleLogout}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    Đăng xuất
-                  </button>
+                <div className="absolute right-0 top-full pt-2 w-48 hidden group-hover:block z-50">
+                  <div className="bg-white rounded-md shadow-lg py-1 border border-gray-100">
+                    <Link
+                      to="/profile"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      Thông tin cá nhân
+                    </Link>
+                    <Link
+                      to="/orders"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      Đơn hàng của tôi
+                    </Link>
+                    <button
+                      onClick={handleLogout}
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      Đăng xuất
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
