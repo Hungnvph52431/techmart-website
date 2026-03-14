@@ -9,6 +9,38 @@ import type {
   OrderTimelineEventView,
 } from '@/types/order';
 
+export interface OrderStats {
+  totalOrders: number;
+  totalRevenue: number;
+  revenueThisMonth: number;
+  avgOrderValue: number;
+  ordersByStatus: {
+    pending: number;
+    confirmed: number;
+    processing: number;
+    shipping: number;
+    delivered: number;
+    cancelled: number;
+    returned: number;
+  };
+  paymentMethodStats: {
+    cod: number;
+    bank_transfer: number;
+    momo: number;
+    vnpay: number;
+    zalopay: number;
+  };
+  recentOrders: Array<{
+    orderId: number;
+    orderCode: string;
+    shippingName: string;
+    total: number;
+    status: string;
+    paymentMethod: string;
+    orderDate: string;
+  }>;
+}
+
 export const orderService = {
   getMyOrders: async (status?: OrderStatus | 'all'): Promise<OrderListItemView[]> => {
     const params = new URLSearchParams();
@@ -61,5 +93,10 @@ export const orderService = {
   getReturnById: async (orderId: number, returnId: number): Promise<OrderReturnView> => {
     const response = await api.get(`/orders/my-orders/${orderId}/returns/${returnId}`);
     return response.data;
+  },
+
+  getStats: async (): Promise<OrderStats> => {
+    const response = await api.get('/orders/stats');
+    return response.data.data;
   },
 };

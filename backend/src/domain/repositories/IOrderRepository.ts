@@ -18,6 +18,38 @@ import {
   UpdatePaymentStatusDTO,
 } from '../entities/Order';
 
+export interface OrderStats {
+  totalOrders: number;
+  totalRevenue: number;
+  revenueThisMonth: number;
+  avgOrderValue: number;
+  ordersByStatus: {
+    pending: number;
+    confirmed: number;
+    processing: number;
+    shipping: number;
+    delivered: number;
+    cancelled: number;
+    returned: number;
+  };
+  paymentMethodStats: {
+    cod: number;
+    bank_transfer: number;
+    momo: number;
+    vnpay: number;
+    zalopay: number;
+  };
+  recentOrders: Array<{
+    orderId: number;
+    orderCode: string;
+    shippingName: string;
+    total: number;
+    status: string;
+    paymentMethod: string;
+    orderDate: Date;
+  }>;
+}
+
 export interface IOrderRepository {
   findById(orderId: number): Promise<Order | null>;
   findOwnedById(orderId: number, userId: number): Promise<Order | null>;
@@ -29,6 +61,7 @@ export interface IOrderRepository {
   getOrderDetails(orderId: number): Promise<OrderDetail[]>;
   getOrderTimeline(orderId: number): Promise<OrderEvent[]>;
   create(order: CreateOrderDTO): Promise<Order>;
+  getStats(): Promise<OrderStats>;
   transitionStatus(input: TransitionOrderStatusDTO): Promise<Order | null>;
   updatePaymentStatus(input: UpdatePaymentStatusDTO): Promise<Order | null>;
   cancel(input: CancelOrderDTO): Promise<Order | null>;

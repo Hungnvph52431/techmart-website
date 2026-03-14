@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import { OrderController } from '../controllers/OrderController';
-import { authMiddleware } from '../middlewares/auth.middleware';
+import { adminMiddleware, authMiddleware } from '../middlewares/auth.middleware';
 
 export const createOrderRoutes = (orderController: OrderController) => {
   const router = Router();
+
+  router.get('/stats', authMiddleware, adminMiddleware, orderController.getStats);
 
   router.use(authMiddleware);
   router.get('/my-orders', orderController.getMine);

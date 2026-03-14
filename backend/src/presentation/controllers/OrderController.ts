@@ -1,4 +1,4 @@
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import { OrderUseCase } from '../../application/use-cases/OrderUseCase';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { toOrderDetail, toOrderListItem } from '../../application/mappers/OrderPresenter';
@@ -102,6 +102,14 @@ export class OrderController {
     }
   };
 
+  getStats = async (_req: Request, res: Response) => {
+    try {
+      const stats = await this.orderUseCase.getOrderStats();
+      res.json({ success: true, data: stats });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  };
   getReturns = async (req: AuthRequest, res: Response) => {
     try {
       const returns = await this.orderUseCase.getOrderReturns(

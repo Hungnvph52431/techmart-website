@@ -1,7 +1,7 @@
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { PoolConnection } from 'mysql2/promise';
 import pool from '../database/connection';
-import { IOrderRepository } from '../../domain/repositories/IOrderRepository';
+import { IOrderRepository, OrderStats } from '../../domain/repositories/IOrderRepository';
 import {
   AdminOrderListFilters,
   CancelOrderDTO,
@@ -1146,6 +1146,68 @@ export class OrderRepository implements IOrderRepository {
         new Date(),
       ]
     );
+  }
+
+  async getStats(): Promise<OrderStats> {
+    const [[summary]] = await pool.execute<RowDataPacket[]>(
+      `SELECT
+        COUNT(*) AS total_orders,
+        COALESCE(SUM(total), 0) AS total_revenue,
+        COALESCE(SUM(CASE WHEN YEAR(order_date) = YEAR(CURDATE()) AND MONTH(order_date) = MONTH(CURDATE()) THEN total ELSE 0 END), 0) AS revenue_this_month,
+        SUM(CASE WHEN status = 'pending'    THEN 1 ELSE 0 END) AS pending_count,
+        SUM(CASE WHEN status = 'confirmed'  THEN 1 ELSE 0 END) AS confirmed_count,
+        SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) AS processing_count,
+        SUM(CASE WHEN status = 'shipping'   THEN 1 ELSE 0 END) AS shipping_count,
+        SUM(CASE WHEN status = 'delivered'  THEN 1 ELSE 0 END) AS delivered_count,
+        SUM(CASE WHEN status = 'cancelled'  THEN 1 ELSE 0 END) AS cancelled_count,
+        SUM(CASE WHEN status = 'returned'   THEN 1 ELSE 0 END) AS returned_count,
+        COALESCE(SUM(CASE WHEN payment_method = 'cod'           THEN total ELSE 0 END), 0) AS cod_revenue,
+        COALESCE(SUM(CASE WHEN payment_method = 'bank_transfer' THEN total ELSE 0 END), 0) AS bank_transfer_revenue,
+        COALESCE(SUM(CASE WHEN payment_method = 'momo'          THEN total ELSE 0 END), 0) AS momo_revenue,
+        COALESCE(SUM(CASE WHEN payment_method = 'vnpay'         THEN total ELSE 0 END), 0) AS vnpay_revenue,
+        COALESCE(SUM(CASE WHEN payment_method = 'zalopay'       THEN total ELSE 0 END), 0) AS zalopay_revenue
+      FROM orders`
+    );
+
+    const [recentRows] = await pool.execute<RowDataPacket[]>(
+      `SELECT order_id, order_code, shipping_name, total, status, payment_method, order_date
+       FROM orders ORDER BY order_date DESC LIMIT 10`
+    );
+
+    const totalOrders = Number(summary.total_orders) || 0;
+    const totalRevenue = parseFloat(summary.total_revenue) || 0;
+
+    return {
+      totalOrders,
+      totalRevenue,
+      revenueThisMonth: parseFloat(summary.revenue_this_month) || 0,
+      avgOrderValue: totalOrders > 0 ? totalRevenue / totalOrders : 0,
+      ordersByStatus: {
+        pending:    Number(summary.pending_count)    || 0,
+        confirmed:  Number(summary.confirmed_count)  || 0,
+        processing: Number(summary.processing_count) || 0,
+        shipping:   Number(summary.shipping_count)   || 0,
+        delivered:  Number(summary.delivered_count)  || 0,
+        cancelled:  Number(summary.cancelled_count)  || 0,
+        returned:   Number(summary.returned_count)   || 0,
+      },
+      paymentMethodStats: {
+        cod:           parseFloat(summary.cod_revenue)           || 0,
+        bank_transfer: parseFloat(summary.bank_transfer_revenue) || 0,
+        momo:          parseFloat(summary.momo_revenue)          || 0,
+        vnpay:         parseFloat(summary.vnpay_revenue)         || 0,
+        zalopay:       parseFloat(summary.zalopay_revenue)       || 0,
+      },
+      recentOrders: recentRows.map(r => ({
+        orderId:       r.order_id,
+        orderCode:     r.order_code,
+        shippingName:  r.shipping_name,
+        total:         parseFloat(r.total),
+        status:        r.status,
+        paymentMethod: r.payment_method,
+        orderDate:     r.order_date,
+      })),
+    };
   }
 
   private mapRowToOrder(row: any): Order {
