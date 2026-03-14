@@ -37,6 +37,10 @@ export class ProductUseCase {
     return this.productRepository.updateStock(id, quantity);
   }
 
+  async getProductStats() {
+    return this.productRepository.getStats();
+  }
+
   async getAdminProducts(filters?: {
     search?: string;
     categoryId?: number;

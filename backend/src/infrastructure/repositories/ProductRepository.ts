@@ -1,6 +1,6 @@
+import { IProductRepository, ProductStats } from '../../domain/repositories/IProductRepository';
 import { PoolConnection } from 'mysql2/promise';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
-import { IProductRepository } from '../../domain/repositories/IProductRepository';
 import {
   CreateProductDTO,
   Product,
@@ -10,6 +10,7 @@ import {
   SaveProductPayload,
   UpdateProductDTO,
 } from '../../domain/entities/Product';
+import pool from '../database/connection';
 import pool from '../database/connection';
 
 type PublicFilters = {
@@ -253,6 +254,47 @@ export class ProductRepository implements IProductRepository {
     return result.affectedRows > 0;
   }
 
+  async getStats(): Promise<ProductStats> {
+    const [[summary]] = await pool.execute<RowDataPacket[]>(
+      `SELECT
+        COUNT(*) AS total_products,
+        SUM(CASE WHEN status = 'active'        THEN 1 ELSE 0 END) AS active_products,
+        SUM(CASE WHEN status = 'inactive'      THEN 1 ELSE 0 END) AS inactive_products,
+        SUM(CASE WHEN status = 'out_of_stock'  THEN 1 ELSE 0 END) AS out_of_stock_count,
+        SUM(CASE WHEN stock_quantity > 0 AND stock_quantity < 10 THEN 1 ELSE 0 END) AS low_stock_count
+      FROM products`
+    );
+
+    const [topRows] = await pool.execute<RowDataPacket[]>(
+      `SELECT product_id, name, sold_quantity, stock_quantity, main_image
+       FROM products ORDER BY sold_quantity DESC LIMIT 5`
+    );
+
+    const [lowStockRows] = await pool.execute<RowDataPacket[]>(
+      `SELECT product_id, name, stock_quantity
+       FROM products WHERE stock_quantity > 0 AND stock_quantity < 10
+       ORDER BY stock_quantity ASC LIMIT 10`
+    );
+
+    return {
+      totalProducts:   Number(summary.total_products)   || 0,
+      activeProducts:  Number(summary.active_products)  || 0,
+      inactiveProducts: Number(summary.inactive_products) || 0,
+      outOfStockCount: Number(summary.out_of_stock_count) || 0,
+      lowStockCount:   Number(summary.low_stock_count)   || 0,
+      topSellingProducts: topRows.map(r => ({
+        productId:    r.product_id,
+        name:         r.name,
+        soldQuantity: r.sold_quantity,
+        stockQuantity: r.stock_quantity,
+        mainImage:    r.main_image,
+      })),
+      lowStockProducts: lowStockRows.map(r => ({
+        productId:    r.product_id,
+        name:         r.name,
+        stockQuantity: r.stock_quantity,
+      })),
+    };
   async findVariantById(variantId: number): Promise<ProductVariant | null> {
     const [rows] = await pool.execute<RowDataPacket[]>(
       'SELECT * FROM product_variants WHERE variant_id = ?',

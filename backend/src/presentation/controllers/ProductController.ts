@@ -55,4 +55,13 @@ export class ProductController {
       res.status(500).json({ message: error.message });
     }
   };
+
+  getStats = async (_req: Request, res: Response) => {
+    try {
+      const stats = await this.productUseCase.getProductStats();
+      res.json({ success: true, data: stats });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  };
 }

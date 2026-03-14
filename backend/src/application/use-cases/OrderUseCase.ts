@@ -55,6 +55,10 @@ export class OrderUseCase {
     return this.orderRepository.getOrderTimeline(orderId);
   }
 
+  async getOrderStats() {
+    return this.orderRepository.getStats();
+  }
+
   async createOrder(orderData: CreateOrderDTO) {
     if (!orderData.items.length) {
       throw new Error('Order must contain at least one item');
