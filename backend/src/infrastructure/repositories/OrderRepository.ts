@@ -108,8 +108,8 @@ export class OrderRepository implements IOrderRepository {
        LEFT JOIN users u ON u.user_id = o.user_id
        WHERE 1=1 ${whereClause}
        ORDER BY o.order_date DESC, o.order_id DESC
-       LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
+       LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
+      params
     );
 
     const total = Number(countRows[0]?.total || 0);
