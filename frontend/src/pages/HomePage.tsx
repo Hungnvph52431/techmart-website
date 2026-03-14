@@ -12,21 +12,30 @@ export const HomePage = () => {
 
   useEffect(() => {
     const fetchFeaturedProducts = async () => {
-      try {
-        console.log('Fetching featured products...');
-        const data = await productService.getAll({ featured: true });
-        console.log('Fetched products:', data);
-        setFeaturedProducts(data.slice(0, 8));
-      } catch (error) {
-        console.error('Error fetching featured products:', error);
-        // Set empty array on error to prevent crash
+    try {
+      setLoading(true);
+      console.log('Fetching featured products...');
+      const data = await productService.getAll({ featured: true });
+      console.log('Fetched products:', data);
+
+      // KIỂM TRA DỮ LIỆU TRƯỚC KHI SLICE
+      // Nếu data là mảng thì dùng luôn, nếu không thì thử tìm trong data.products
+      const productList = Array.isArray(data) ? data : (data?.products || []);
+
+      if (productList.length > 0) {
+        setFeaturedProducts(productList.slice(0, 8));
+      } else {
         setFeaturedProducts([]);
-        // Show toast notification
-        console.warn('Backend không hoạt động. Vui lòng kiểm tra backend server.');
-      } finally {
-        setLoading(false);
       }
-    };
+
+    } catch (error) {
+      console.error('Error fetching featured products:', error);
+      setFeaturedProducts([]);
+      console.warn('Backend không hoạt động hoặc trả về dữ liệu sai cấu trúc.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
     fetchFeaturedProducts();
   }, []);
@@ -88,10 +97,12 @@ export const HomePage = () => {
             </div>
           ) : featuredProducts.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {featuredProducts.map((product, index) => {
-                const productKey = (product as any).id ?? (product as any).productId ?? product.slug ?? index;
-                return <ProductCard key={String(productKey)} product={product} />;
-              })}
+             {featuredProducts.map((product) => (
+                        <ProductCard 
+                          key={product.product_id} // Dùng productId làm khóa duy nhất
+                          product={product} 
+                        />
+              ))}
             </div>
           ) : (
             <div className="text-center py-12">

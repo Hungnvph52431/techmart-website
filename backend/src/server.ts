@@ -1,3 +1,4 @@
+
 import express, { Application } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -62,8 +63,7 @@ app.use('/api/auth', createAuthRoutes(authController));
 app.use('/api/products', createProductRoutes(productController));
 app.use('/api/orders', createOrderRoutes(orderController));
 app.use('/api/users', createUserRoutes(userController));
-app.use('/api/coupons', createVoucherRoutes(voucherController));
-// Health check
+app.use('/api/vouchers', createVoucherRoutes(voucherController));
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'TechMart API is running' });
 });

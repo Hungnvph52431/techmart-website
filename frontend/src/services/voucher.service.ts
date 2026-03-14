@@ -22,14 +22,14 @@ export type CreateVoucherPayload = Omit<Voucher, 'coupon_id' | 'used_count'>;
 
 export const voucherService = {
   getAll: async (): Promise<Voucher[]> => {
-    const response = await api.get('/coupons');
+    const response = await api.get('/vouchers');
     return response.data;
   },
   create: async (data: CreateVoucherPayload): Promise<Voucher> => {
-    const response = await api.post('/coupons', data);
+    const response = await api.post('/vouchers', data);
     return response.data;
   },
   delete: async (id: number): Promise<void> => {
-    await api.delete(`/coupons/${id}`);
+    await api.delete(`/vouchers/${id}`);
   }
 };

@@ -1,8 +1,8 @@
-import { Link } from 'react-router-dom';
-import { ShoppingCart, Star } from 'lucide-react';
-import { Product } from '@/types';
-import { useCartStore } from '@/store/cartStore';
-import toast from 'react-hot-toast';
+import { Link } from "react-router-dom";
+import { ShoppingCart, Star } from "lucide-react";
+import { Product } from "@/types";
+import { useCartStore } from "@/store/cartStore";
+import toast from "react-hot-toast";
 
 interface ProductCardProps {
   product: Product;
@@ -11,61 +11,81 @@ interface ProductCardProps {
 export const ProductCard = ({ product }: ProductCardProps) => {
   const { addItem } = useCartStore();
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  // Tính toán giá dựa trên CSDL của bạn (price = giá gốc, salePrice = giá khuyến mãi)
+  const originalPrice = product.price ?? 0;
+  const currentPrice = product.salePrice ?? originalPrice;
+
+  const discount =
+    product.salePrice && originalPrice > product.salePrice
+      ? Math.round(((originalPrice - product.salePrice) / originalPrice) * 100)
+      : 0;
+
+  const handleAddToCart = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
+    e.stopPropagation();
+
     addItem(product);
-    toast.success('Đã thêm vào giỏ hàng!');
+    toast.success("Đã thêm vào giỏ hàng!");
   };
 
-  const discount = product.originalPrice && product.price 
-    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
-    : 0;
-
-  return (
+  return (  
     <Link
       to={`/products/${product.slug}`}
-      className="group bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300"
+      className="group block overflow-hidden rounded-xl border bg-white shadow-sm transition duration-300 hover:shadow-lg"
     >
       <div className="relative overflow-hidden">
+        {/* Dùng mainImage theo đúng CSDL */}
         <img
-          src={product.images?.[0] || '/placeholder.jpg'}
+          src={product.mainImage ?? "/placeholder.jpg"}
           alt={product.name}
-          className="w-full h-64 object-cover group-hover:scale-110 transition-transform duration-300"
+          className="h-60 w-full object-cover transition duration-300 group-hover:scale-105"
         />
+
         {discount > 0 && (
-          <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded-md text-sm font-semibold">
+          <span className="absolute right-2 top-2 rounded bg-red-500 px-2 py-1 text-xs text-white">
             -{discount}%
-          </div>
+          </span>
         )}
-        {product.featured && (
-          <div className="absolute top-2 left-2 bg-yellow-500 text-white px-2 py-1 rounded-md text-xs font-semibold">
+
+        {/* Dùng isFeatured theo đúng CSDL */}
+        {product.isFeatured && (
+          <span className="absolute left-2 top-2 rounded bg-yellow-500 px-2 py-1 text-xs text-white">
             Nổi bật
-          </div>
+          </span>
         )}
       </div>
 
       <div className="p-4">
-        <h3 className="text-lg font-semibold text-gray-800 mb-2 line-clamp-2 group-hover:text-primary-600">
+        {/* Tuỳ chọn: Hiện tên hãng nếu bạn muốn */}
+        {product.brandName && (
+          <div className="mb-1 text-xs font-bold uppercase tracking-wider text-blue-600">
+            {product.brandName}
+          </div>
+        )}
+
+        <h3 className="mb-2 line-clamp-2 text-sm font-semibold text-gray-800 transition group-hover:text-primary-600">
           {product.name}
         </h3>
 
-        <div className="flex items-center mb-2">
-          <div className="flex items-center">
-            <Star className="h-4 w-4 text-yellow-400 fill-current" />
-            <span className="ml-1 text-sm text-gray-600">{product.rating || 0}</span>
-          </div>
-          <span className="mx-2 text-gray-400">|</span>
-          <span className="text-sm text-gray-600">Đã bán {product.reviewCount || 0}</span>
+        <div className="mb-3 flex items-center text-sm text-gray-500">
+          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+
+          {/* Dùng ratingAvg thay cho rating */}
+          <span className="ml-1">{product.ratingAvg ?? 0}</span>
+          <span className="mx-2">|</span>
+
+          <span>{product.reviewCount ?? 0} đánh giá</span>
         </div>
 
-        <div className="flex items-center justify-between mb-3">
+        <div className="mb-3 flex items-end justify-between">
           <div>
-            <div className="text-xl font-bold text-red-600">
-              {(product.price || 0).toLocaleString('vi-VN')}₫
+            <div className="text-lg font-bold text-red-600">
+              {currentPrice.toLocaleString("vi-VN")}₫
             </div>
-            {product.originalPrice && product.originalPrice > product.price && (
-              <div className="text-sm text-gray-400 line-through">
-                {product.originalPrice.toLocaleString('vi-VN')}₫
+
+            {discount > 0 && (
+              <div className="text-xs text-gray-400 line-through">
+                {originalPrice.toLocaleString("vi-VN")}₫
               </div>
             )}
           </div>
@@ -73,11 +93,12 @@ export const ProductCard = ({ product }: ProductCardProps) => {
 
         <button
           onClick={handleAddToCart}
-          className="w-full bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center justify-center space-x-2"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 py-2 text-white transition hover:bg-primary-700"
         >
-          <ShoppingCart className="h-4 w-4" />
-          <span>Thêm vào giỏ</span>
+          <ShoppingCart size={16} />
+          Thêm vào giỏ
         </button>
+
       </div>
     </Link>
   );

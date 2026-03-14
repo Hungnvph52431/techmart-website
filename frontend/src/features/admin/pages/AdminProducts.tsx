@@ -4,24 +4,16 @@ import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
 
 interface ProductResponse {
-  productId?: number;
-  product_id?: number;
-  id?: number | string;
+  product_id: number;
   name: string;
   slug: string;
-  brandName?: string;
-  brand_name?: string;
-  categoryName?: string;
-  category_name?: string;
+  brand_name: string;
+  category_name: string;
   price: number;
-  originalPrice?: number;
   original_price?: number;
-  stockQuantity?: number;
-  stock_quantity?: number;
-  mainImage?: string;
-  main_image?: string;
-  isActive?: boolean;
-  is_active?: boolean;
+  stock_quantity: number;
+  main_image: string;
+  is_active: boolean;
 }
 
 export const AdminProducts = () => {
@@ -110,21 +102,12 @@ export const AdminProducts = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {products.map((product, index) => {
-                const productId = product.productId ?? product.product_id ?? Number(product.id);
-                const brandName = product.brandName ?? product.brand_name ?? 'N/A';
-                const categoryName = product.categoryName ?? product.category_name ?? 'N/A';
-                const originalPrice = product.originalPrice ?? product.original_price;
-                const stockQuantity = product.stockQuantity ?? product.stock_quantity ?? 0;
-                const mainImage = product.mainImage ?? product.main_image ?? '/placeholder.jpg';
-                const isActive = product.isActive ?? product.is_active ?? false;
-
-                return (
-                <tr key={String(productId || product.slug || index)} className="hover:bg-gray-50">
+              {products.map((product) => (
+                <tr key={product.product_id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <img
-                        src={mainImage}
+                        src={product.main_image}
                         alt={product.name}
                         className="w-12 h-12 object-cover rounded"
                       />
@@ -133,67 +116,67 @@ export const AdminProducts = () => {
                           {product.name}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {brandName}
+                          {product.brand_name}
                         </div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm text-gray-900">
-                      {categoryName}
+                      {product.category_name}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
                       {product.price.toLocaleString('vi-VN')} ₫
                     </div>
-                    {originalPrice && originalPrice > product.price && (
+                    {product.original_price && product.original_price > product.price && (
                       <div className="text-xs text-gray-500 line-through">
-                        {originalPrice.toLocaleString('vi-VN')} ₫
+                        {product.original_price.toLocaleString('vi-VN')} ₫
                       </div>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
                       className={`text-sm font-medium ${
-                        stockQuantity > 10
+                        product.stock_quantity > 10
                           ? 'text-green-600'
-                          : stockQuantity > 0
+                          : product.stock_quantity > 0
                           ? 'text-orange-600'
                           : 'text-red-600'
                       }`}
                     >
-                      {stockQuantity}
+                      {product.stock_quantity}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
                       className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        isActive
+                        product.is_active
                           ? 'bg-green-100 text-green-800'
                           : 'bg-red-100 text-red-800'
                       }`}
                     >
-                      {isActive ? 'Hoạt động' : 'Tạm ngưng'}
+                      {product.is_active ? 'Hoạt động' : 'Tạm ngưng'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <Link
-                      to={`/admin/products/edit/${productId}`}
+                      to={`/admin/products/edit/${product.product_id}`}
                       className="text-blue-600 hover:text-blue-900 mr-4"
                     >
                       ✏️ Sửa
                     </Link>
                     <button
-                      onClick={() => productId && handleDelete(productId, product.name)}
-                      disabled={deleteLoading === productId || !productId}
+                      onClick={() => handleDelete(product.product_id, product.name)}
+                      disabled={deleteLoading === product.product_id}
                       className="text-red-600 hover:text-red-900 disabled:opacity-50"
                     >
-                      {deleteLoading === productId ? '⏳' : '🗑️'} Xóa
+                      {deleteLoading === product.product_id ? '⏳' : '🗑️'} Xóa
                     </button>
                   </td>
                 </tr>
-              )})}
+              ))}
             </tbody>
           </table>
         </div>

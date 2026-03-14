@@ -4,6 +4,10 @@ export interface Product {
   slug: string;
   sku: string;
   categoryId: number;
+  categoryName?: string;
+  categorySlug?: string;
+  brandName?: string;
+  brandSlug?: string;
   brandId?: number;
   price: number;
   salePrice?: number;

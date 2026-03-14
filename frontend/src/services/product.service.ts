@@ -1,25 +1,21 @@
 import api from './api';
-import { Product } from '@/types';
+import { Product, ProductFilter, ProductResponse } from '@/types';
 
 export const productService = {
-  getAll: async (filters?: {
-    category?: string;
-    brand?: string;
-    minPrice?: number;
-    maxPrice?: number;
-    search?: string;
-    featured?: boolean;
-  }): Promise<Product[]> => {
-    const params = new URLSearchParams();
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          params.append(key, value.toString());
-        }
-      });
-    }
-    const response = await api.get(`/products?${params.toString()}`);
-    return response.data;
+  getAll: async (filters?: ProductFilter): Promise<ProductResponse> => {
+  const params = new URLSearchParams();
+
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        params.append(key, String(value));
+      }
+    });
+  }
+
+  const response = await api.get(`/products?${params.toString()}`);
+
+  return response.data;
   },
 
   getProducts: async (): Promise<Product[]> => {

@@ -17,10 +17,7 @@ export const LoginPage = () => {
     setLoading(true);
 
     try {
-      
-      console.log("2. Đang gọi authService.login với:", email); // Thêm dòng này
       const result = await authService.login(email, password);
-      console.log("3. Kết quả từ API:", result); // Thêm dòng này
       setAuth(result.user, result.token);
       toast.success('Đăng nhập thành công!');
       
@@ -31,7 +28,6 @@ export const LoginPage = () => {
         navigate('/');
       }
     } catch (error: any) {
-      console.log("X. Lỗi xảy ra:", error); // Thêm dòng này
       toast.error(error.response?.data?.message || 'Đăng nhập thất bại');
     } finally {
       setLoading(false);
@@ -54,7 +50,6 @@ export const LoginPage = () => {
                 id="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                autoComplete="username"
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="example@email.com"
@@ -70,7 +65,6 @@ export const LoginPage = () => {
                 id="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="••••••••"

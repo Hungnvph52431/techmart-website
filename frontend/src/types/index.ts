@@ -1,29 +1,55 @@
 export interface Product {
-  id: string;
+  productId: number;
   name: string;
   slug: string;
-  description: string;
+  sku: string;
+  categoryId: number;
+  categoryName?: string;
+  categorySlug?: string;
+  brandName?: string;
+  brandSlug?: string;
+  brandId?: number;
   price: number;
-  originalPrice: number;
-  brand: string;
-  category: string;
-  stock: number;
-  images: string[];
-  specifications: {
-    screen?: string;
-    os?: string;
-    camera?: string;
-    processor?: string;
-    ram?: string;
-    storage?: string;
-    battery?: string;
-    [key: string]: string | undefined;
-  };
-  featured: boolean;
-  rating: number;
+  salePrice?: number; // QUAN TRỌNG: Phải có dòng này!
+  costPrice?: number;
+  description?: string;
+  specifications?: Record<string, any>;
+  mainImage?: string; // QUAN TRỌNG: Phải có dòng này!
+  stockQuantity: number;
+  soldQuantity: number;
+  viewCount: number;
+  ratingAvg: number; // QUAN TRỌNG: Phải có dòng này!
   reviewCount: number;
-  createdAt: string;
-  updatedAt: string;
+  isFeatured: boolean; // QUAN TRỌNG: Phải có dòng này!
+  isNew: boolean;
+  isBestseller: boolean;
+  status: 'active' | 'inactive' | 'out_of_stock' | 'pre_order';
+  metaTitle?: string;
+  metaDescription?: string;
+  metaKeywords?: string;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
+export interface ProductFilter {
+  category?: string;
+  brand?: string;
+  search?: string;
+  featured?: boolean;
+
+  minPrice?: number;
+  maxPrice?: number;
+
+  page?: number;
+  limit?: number;
+}
+
+export interface ProductResponse {
+  products: Product[];
+  totalPages: number;
+  total: number;
+  page: number;
+  limit: number;
 }
 
 export interface User {

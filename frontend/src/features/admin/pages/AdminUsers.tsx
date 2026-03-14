@@ -44,17 +44,19 @@ export const AdminUsers = () => {
     }, [filters]);
 
     const fetchUsers = async () => {
-        try {
-            setLoading(true);
-            const data = await userService.getAllUsers(filters);
-            setUsers(data);
-        } catch (error) {
-            console.error('Failed to fetch users:', error);
-            toast.error('Không thể tải danh sách người dùng');
-        } finally {
-            setLoading(false);
-        }
-    };
+  try {
+    setLoading(true);
+    const response = await userService.getAllUsers(filters);
+
+    setUsers(response); 
+    
+  } catch (error) {
+    console.error('Failed to fetch users:', error);
+    toast.error('Không thể tải danh sách người dùng');
+  } finally {
+    setLoading(false);
+  }
+};
 
     const handleSearch = () => {
         setFilters((previous) => ({

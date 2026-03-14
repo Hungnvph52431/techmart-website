@@ -5,7 +5,7 @@ export class ProductUseCase {
   constructor(private productRepository: IProductRepository) {}
 
   async getAllProducts(filters?: any) {
-    return this.productRepository.findAll(filters);
+    return await this.productRepository.findAll(filters);
   }
 
   async getProductById(id: number) {

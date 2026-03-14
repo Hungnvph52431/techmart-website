@@ -1,16 +1,23 @@
 import api from './api';
 
 export interface User {
-  userId: number;
+  // Khớp với user_id trong DB
+  userId: number; 
   email: string;
   name: string;
   phone?: string;
-  role: 'customer' | 'admin' | 'staff' | 'warehouse';
-  status: 'active' | 'inactive' | 'banned';
+  
+  // ENUM khớp 100% với DB
+role: 'customer' | 'admin' | 'staff' | 'warehouse';  
+status: 'active' | 'inactive' | 'banned';  
   points: number;
-  membershipLevel: 'bronze' | 'silver' | 'gold' | 'platinum';
-  createdAt: string;
-  updatedAt: string;
+  
+  // membership_level trong DB
+  membershipLevel: 'bronze' | 'silver' | 'gold' | 'platinum'; 
+  
+  createdAt: string; // created_at
+  updatedAt: string; // updated_at
+  lastLogin?: string; // last_login (Mới thêm)
 }
 
 export type UserRole = User['role'];

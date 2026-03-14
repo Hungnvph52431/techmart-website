@@ -1,9 +1,11 @@
 import { Product, CreateProductDTO, UpdateProductDTO } from '../entities/Product';
-
 export interface IProductRepository {
   findAll(filters?: {
+    productId?: number;
+    categorySlug?: string;
     categoryId?: number;
     brandId?: number;
+    brandSlug?: string;
     minPrice?: number;
     maxPrice?: number;
     search?: string;

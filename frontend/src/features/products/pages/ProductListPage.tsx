@@ -1,57 +1,100 @@
-import { useState, useEffect } from 'react';
-import { ProductCard } from '../components/ProductCard';
-import { productService } from '@/services/product.service';
-import { Product } from '@/types';
-import { Layout } from '@/components/layout/Layout';
-import { useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from "react";
+import { Layout } from "@/components/layout/Layout";
+import { Product } from "@/types";
+import { productService } from "@/services/product.service";
+import { ProductCard } from "../components/ProductCard";
+import { useSearchParams } from "react-router-dom";
+import { ProductsFilter } from "../components/ProductFilter";
+import { ProductsSort } from "../components/ProductSort";
+import { Pagination } from "../components/ProductPagination";
 
 export const ProductListPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [totalPages, setTotalPages] = useState(1);
+
   const [searchParams] = useSearchParams();
+
+  const page = Number(searchParams.get("page")) || 1;
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
+
+        // Đã sửa lại tên filter cho khớp với API Backend (Thêm chữ Slug và is)
         const filters = {
-          category: searchParams.get('category') || undefined,
-          brand: searchParams.get('brand') || undefined,
-          search: searchParams.get('search') || undefined,
-          featured: searchParams.get('featured') === 'true' ? true : undefined,
+          categorySlug: searchParams.get("category") || undefined,
+          brandSlug: searchParams.get("brand") || undefined,
+          search: searchParams.get("search") || undefined,
+          isFeatured: searchParams.get("featured") === "true" ? true : undefined,
+          page,
+          limit: 8,
         };
-        const data = await productService.getAll(filters);
-        setProducts(data);
+
+        const data = await productService.getAll(filters) as any;
+
+        // Xử lý an toàn: Đề phòng API trả về Array trực tiếp thay vì Object { products: [] }
+        if (Array.isArray(data)) {
+           setProducts(data);
+           setTotalPages(1);
+        } else {
+           setProducts(data?.products || []);
+           setTotalPages(data?.totalPages || 1);
+        }
+
       } catch (error) {
-        console.error('Error fetching products:', error);
+        console.error("Fetch product error:", error);
       } finally {
         setLoading(false);
       }
     };
 
     fetchProducts();
-  }, [searchParams]);
+  }, [searchParams, page]);
 
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8">Sản phẩm</h1>
-
-        {loading ? (
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        <h1 className="text-3xl font-bold mb-6">Danh sách sản phẩm</h1>
+        
+        <ProductsFilter />
+        
+        <div className="flex justify-between items-center mb-6">
+          <p className="text-gray-600">
+            Hiển thị {products.length} sản phẩm
+          </p>
+          <ProductsSort />
+        </div>
+        
+        {loading && (
+          <div className="text-center py-20">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto"></div>
           </div>
-        ) : products.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">Không tìm thấy sản phẩm nào</p>
+        )}
+        
+        {!loading && products.length === 0 && (
+          <div className="text-center py-20 text-gray-500">
+            Không tìm thấy sản phẩm
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {products.map((product, index) => {
-              const productKey = (product as any).id ?? (product as any).productId ?? product.slug ?? index;
-              return <ProductCard key={String(productKey)} product={product} />;
-            })}
+        )}
+        
+        {!loading && products.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {products.map((product) => (
+              <ProductCard
+                key={product.productId} // Sửa từ id thành productId
+                product={product}
+              />
+            ))}
           </div>
+        )}
+        
+        {!loading && totalPages > 1 && (
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+          />
         )}
       </div>
     </Layout>
