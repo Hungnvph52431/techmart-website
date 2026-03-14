@@ -9,6 +9,7 @@ export const Header = () => {
   const { getTotalItems } = useCartStore();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
+  const displayName = user?.name || (user as any)?.fullName || user?.email || 'Tai khoan';
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -72,7 +73,7 @@ export const Header = () => {
                   className="flex items-center space-x-2"
                 >
                   <User className="h-6 w-6 text-gray-700" />
-                  <span className="text-sm">{user?.fullName}</span>
+                  <span className="text-sm">{displayName}</span>
                 </button>
                 {isUserMenuOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1">

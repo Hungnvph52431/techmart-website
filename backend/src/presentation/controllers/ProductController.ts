@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { ProductUseCase } from '../../application/use-cases/ProductUseCase';
+import { toStorefrontProduct } from '../../application/mappers/ProductPresenter';
 
 export class ProductController {
   constructor(private productUseCase: ProductUseCase) {}
@@ -8,7 +9,9 @@ export class ProductController {
     try {
       const filters = {
         categoryId: req.query.categoryId ? Number(req.query.categoryId) : undefined,
+        category: req.query.category as string | undefined,
         brandId: req.query.brandId ? Number(req.query.brandId) : undefined,
+        brand: req.query.brand as string | undefined,
         minPrice: req.query.minPrice ? Number(req.query.minPrice) : undefined,
         maxPrice: req.query.maxPrice ? Number(req.query.maxPrice) : undefined,
         search: req.query.search as string,
@@ -19,7 +22,7 @@ export class ProductController {
       };
 
       const products = await this.productUseCase.getAllProducts(filters);
-      res.json(products);
+      res.json(products.map(toStorefrontProduct));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -33,7 +36,7 @@ export class ProductController {
         return res.status(404).json({ message: 'Product not found' });
       }
 
-      res.json(product);
+      res.json(toStorefrontProduct(product));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -47,47 +50,7 @@ export class ProductController {
         return res.status(404).json({ message: 'Product not found' });
       }
 
-      res.json(product);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  };
-
-  create = async (req: Request, res: Response) => {
-    try {
-      const product = await this.productUseCase.createProduct(req.body);
-      res.status(201).json(product);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
-    }
-  };
-
-  update = async (req: Request, res: Response) => {
-    try {
-      const product = await this.productUseCase.updateProduct({
-        productId: Number(req.params.id),
-        ...req.body,
-      });
-
-      if (!product) {
-        return res.status(404).json({ message: 'Product not found' });
-      }
-
-      res.json(product);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
-    }
-  };
-
-  delete = async (req: Request, res: Response) => {
-    try {
-      const success = await this.productUseCase.deleteProduct(Number(req.params.id));
-
-      if (!success) {
-        return res.status(404).json({ message: 'Product not found' });
-      }
-
-      res.json({ message: 'Product deleted successfully' });
+      res.json(toStorefrontProduct(product));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

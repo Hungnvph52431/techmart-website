@@ -188,7 +188,59 @@ INSERT INTO product_images (product_id, image_url, alt_text, display_order, is_p
 (11, '/images/products/macbook-air-m2-2.jpg', 'MacBook Air M2 thiết kế', 2, FALSE);
 
 -- ==================================================
--- 8. COUPONS - Mã giảm giá
+-- 8. PRODUCT_ATTRIBUTES - Metadata thuộc tính
+-- ==================================================
+INSERT INTO product_attributes (name, code, input_type, scope, is_required, is_filterable, is_variant_axis, display_order, is_active) VALUES
+('Màu sắc', 'color', 'color', 'variant', TRUE, TRUE, TRUE, 1, TRUE),
+('Dung lượng', 'storage', 'select', 'variant', TRUE, TRUE, TRUE, 2, TRUE),
+('Màn hình', 'screen', 'text', 'product', TRUE, TRUE, FALSE, 3, TRUE),
+('Chip xử lý', 'chip', 'text', 'product', TRUE, TRUE, FALSE, 4, TRUE),
+('RAM', 'ram', 'select', 'product', TRUE, TRUE, FALSE, 5, TRUE),
+('Pin', 'battery', 'text', 'product', FALSE, FALSE, FALSE, 6, TRUE);
+
+INSERT INTO product_attribute_options (attribute_id, label, value, color_hex, display_order, is_active) VALUES
+(1, 'Titan Tự Nhiên', 'Titan Tự Nhiên', '#928d86', 1, TRUE),
+(1, 'Titan Trắng', 'Titan Trắng', '#f4f4f2', 2, TRUE),
+(1, 'Đen', 'Đen', '#111111', 3, TRUE),
+(1, 'Tím', 'Tím', '#7b61ff', 4, TRUE),
+(1, 'Titan Xám', 'Titan Xám', '#6b7280', 5, TRUE),
+(2, '128GB', '128GB', NULL, 1, TRUE),
+(2, '256GB', '256GB', NULL, 2, TRUE),
+(2, '512GB', '512GB', NULL, 3, TRUE),
+(2, '1TB', '1TB', NULL, 4, TRUE),
+(5, '4GB', '4GB', NULL, 1, TRUE),
+(5, '6GB', '6GB', NULL, 2, TRUE),
+(5, '8GB', '8GB', NULL, 3, TRUE),
+(5, '12GB', '12GB', NULL, 4, TRUE);
+
+INSERT INTO category_attributes (category_id, attribute_id, is_required, is_variant_axis, display_order) VALUES
+(6, 1, TRUE, TRUE, 1),
+(6, 2, TRUE, TRUE, 2),
+(6, 3, TRUE, FALSE, 3),
+(6, 4, TRUE, FALSE, 4),
+(6, 5, TRUE, FALSE, 5),
+(6, 6, FALSE, FALSE, 6),
+(7, 1, TRUE, TRUE, 1),
+(7, 2, TRUE, TRUE, 2),
+(7, 3, TRUE, FALSE, 3),
+(7, 4, TRUE, FALSE, 4),
+(7, 5, TRUE, FALSE, 5),
+(7, 6, FALSE, FALSE, 6),
+(8, 1, TRUE, TRUE, 1),
+(8, 2, TRUE, TRUE, 2),
+(8, 3, TRUE, FALSE, 3),
+(8, 4, TRUE, FALSE, 4),
+(8, 5, TRUE, FALSE, 5),
+(8, 6, FALSE, FALSE, 6),
+(9, 1, TRUE, TRUE, 1),
+(9, 2, TRUE, TRUE, 2),
+(9, 3, TRUE, FALSE, 3),
+(9, 4, TRUE, FALSE, 4),
+(9, 5, TRUE, FALSE, 5),
+(9, 6, FALSE, FALSE, 6);
+
+-- ==================================================
+-- 9. COUPONS - Mã giảm giá
 -- ==================================================
 INSERT INTO coupons (code, description, discount_type, discount_value, min_order_value, max_discount_amount, usage_limit, valid_from, valid_to, is_active) VALUES
 ('WELCOME2024', 'Giảm 10% cho đơn hàng đầu tiên', 'percentage', 10, 5000000, 500000, 1000, NOW(), DATE_ADD(NOW(), INTERVAL 90 DAY), TRUE),
@@ -197,7 +249,7 @@ INSERT INTO coupons (code, description, discount_type, discount_value, min_order
 ('NEWYEAR15', 'Tết 2024 giảm 15%', 'percentage', 15, 3000000, 1000000, 10000, NOW(), DATE_ADD(NOW(), INTERVAL 60 DAY), TRUE);
 
 -- ==================================================
--- 9. PROMOTIONS - Chương trình khuyến mãi
+-- 10. PROMOTIONS - Chương trình khuyến mãi
 -- ==================================================
 INSERT INTO promotions (name, description, promotion_type, discount_type, discount_value, applicable_to, valid_from, valid_to, is_active) VALUES
 ('Flash Sale Cuối Tuần', 'Giảm giá sốc các sản phẩm hot', 'flash_sale', 'percentage', 20, 'product', NOW(), DATE_ADD(NOW(), INTERVAL 3 DAY), TRUE),
@@ -205,14 +257,14 @@ INSERT INTO promotions (name, description, promotion_type, discount_type, discou
 ('Mua Laptop Tặng Phụ Kiện', 'Mua laptop tặng chuột + túi xách', 'gift', 'fixed_amount', 0, 'category', NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), TRUE);
 
 -- ==================================================
--- 10. PROMOTION_PRODUCTS - Sản phẩm khuyến mãi
+-- 11. PROMOTION_PRODUCTS - Sản phẩm khuyến mãi
 -- ==================================================
 INSERT INTO promotion_products (promotion_id, product_id) VALUES
 (1, 3), (1, 5), (1, 8), (1, 10),
 (2, 1), (2, 2), (2, 3);
 
 -- ==================================================
--- 11. BANNERS - Banner quảng cáo
+-- 12. BANNERS - Banner quảng cáo
 -- ==================================================
 INSERT INTO banners (title, image_url, link_url, position, display_order, is_active, valid_from, valid_to) VALUES
 ('iPhone 15 Pro Max - Ra Mắt', '/images/banners/iphone-15-banner.jpg', '/products/iphone-15-pro-max', 'home_slider', 1, TRUE, NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY)),
@@ -221,17 +273,21 @@ INSERT INTO banners (title, image_url, link_url, position, display_order, is_act
 ('Giảm giá phụ kiện', '/images/banners/phu-kien-banner.jpg', '/categories/phu-kien', 'home_middle', 1, TRUE, NOW(), DATE_ADD(NOW(), INTERVAL 60 DAY));
 
 -- ==================================================
--- 12. ORDERS - Đơn hàng mẫu
+-- 13. ORDERS - Đơn hàng mẫu
 -- ==================================================
-INSERT INTO orders (order_code, user_id, shipping_name, shipping_phone, shipping_address, shipping_ward, shipping_district, shipping_city, subtotal, shipping_fee, discount_amount, total, payment_method, payment_status, status, order_date) VALUES
-('ORD240101001', 4, 'Nguyễn Văn A', '0904234567', '123 Nguyễn Huệ', 'Phường Bến Nghé', 'Quận 1', 'TP. Hồ Chí Minh', 16990000, 0, 0, 16990000, 'cod', 'pending', 'delivered', DATE_SUB(NOW(), INTERVAL 30 DAY)),
-('ORD240101002', 5, 'Trần Thị B', '0905234567', '789 Trần Hưng Đạo', 'Phường Cầu Kho', 'Quận 1', 'TP. Hồ Chí Minh', 28990000, 0, 2000000, 26990000, 'bank_transfer', 'paid', 'delivered', DATE_SUB(NOW(), INTERVAL 25 DAY)),
-('ORD240101003', 4, 'Nguyễn Văn A', '0904234567', '123 Nguyễn Huệ', 'Phường Bến Nghé', 'Quận 1', 'TP. Hồ Chí Minh', 7490000, 30000, 0, 7520000, 'momo', 'paid', 'delivered', DATE_SUB(NOW(), INTERVAL 20 DAY)),
-('ORD240101004', 6, 'Lê Văn C', '0906234567', '321 Võ Văn Tần', 'Phường 5', 'Quận 3', 'TP. Hồ Chí Minh', 5990000, 30000, 0, 6020000, 'cod', 'paid', 'shipping', DATE_SUB(NOW(), INTERVAL 2 DAY)),
-('ORD240101005', 5, 'Trần Thị B', '0905234567', '789 Trần Hưng Đạo', 'Phường Cầu Kho', 'Quận 1', 'TP. Hồ Chí Minh', 18990000, 0, 0, 18990000, 'vnpay', 'paid', 'processing', NOW());
+INSERT INTO orders (
+    order_code, user_id, shipping_name, shipping_phone, shipping_address, shipping_ward, shipping_district, shipping_city,
+    subtotal, shipping_fee, discount_amount, total, payment_method, payment_status, payment_date, status,
+    customer_note, order_date, confirmed_at, shipped_at, delivered_at, updated_at
+) VALUES
+('ORD240101001', 4, 'Nguyễn Văn A', '0904234567', '123 Nguyễn Huệ', 'Phường Bến Nghé', 'Quận 1', 'TP. Hồ Chí Minh', 16990000, 0, 0, 16990000, 'cod', 'paid', DATE_SUB(NOW(), INTERVAL 26 DAY), 'delivered', 'Giao giờ hành chính', DATE_SUB(NOW(), INTERVAL 30 DAY), DATE_SUB(NOW(), INTERVAL 29 DAY), DATE_SUB(NOW(), INTERVAL 28 DAY), DATE_SUB(NOW(), INTERVAL 26 DAY), DATE_SUB(NOW(), INTERVAL 26 DAY)),
+('ORD240101002', 5, 'Trần Thị B', '0905234567', '789 Trần Hưng Đạo', 'Phường Cầu Kho', 'Quận 1', 'TP. Hồ Chí Minh', 28990000, 0, 2000000, 26990000, 'bank_transfer', 'paid', DATE_SUB(NOW(), INTERVAL 25 DAY), 'delivered', NULL, DATE_SUB(NOW(), INTERVAL 25 DAY), DATE_SUB(NOW(), INTERVAL 25 DAY), DATE_SUB(NOW(), INTERVAL 24 DAY), DATE_SUB(NOW(), INTERVAL 22 DAY), DATE_SUB(NOW(), INTERVAL 5 DAY)),
+('ORD240101003', 4, 'Nguyễn Văn A', '0904234567', '123 Nguyễn Huệ', 'Phường Bến Nghé', 'Quận 1', 'TP. Hồ Chí Minh', 7490000, 30000, 0, 7520000, 'momo', 'paid', DATE_SUB(NOW(), INTERVAL 20 DAY), 'delivered', 'Liên hệ trước khi giao', DATE_SUB(NOW(), INTERVAL 20 DAY), DATE_SUB(NOW(), INTERVAL 20 DAY), DATE_SUB(NOW(), INTERVAL 19 DAY), DATE_SUB(NOW(), INTERVAL 17 DAY), DATE_SUB(NOW(), INTERVAL 8 DAY)),
+('ORD240101004', 6, 'Lê Văn C', '0906234567', '321 Võ Văn Tần', 'Phường 5', 'Quận 3', 'TP. Hồ Chí Minh', 5990000, 30000, 0, 6020000, 'cod', 'pending', NULL, 'shipping', NULL, DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY), NULL, DATE_SUB(NOW(), INTERVAL 1 DAY)),
+('ORD240101005', 5, 'Trần Thị B', '0905234567', '789 Trần Hưng Đạo', 'Phường Cầu Kho', 'Quận 1', 'TP. Hồ Chí Minh', 18990000, 0, 0, 18990000, 'vnpay', 'paid', DATE_SUB(NOW(), INTERVAL 1 DAY), 'processing', NULL, DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY), NULL, NULL, NOW());
 
 -- ==================================================
--- 13. ORDER_DETAILS - Chi tiết đơn hàng
+-- 14. ORDER_DETAILS - Chi tiết đơn hàng
 -- ==================================================
 INSERT INTO order_details (order_id, product_id, product_name, sku, price, quantity, subtotal) VALUES
 (1, 3, 'iPhone 13', 'IP13-001', 16990000, 1, 16990000),
@@ -241,16 +297,73 @@ INSERT INTO order_details (order_id, product_id, product_name, sku, price, quant
 (5, 7, 'Xiaomi 14 Pro', 'XM14P-001', 18990000, 1, 18990000);
 
 -- ==================================================
--- 14. REVIEWS - Đánh giá sản phẩm
+-- 15. ORDER_EVENTS - Lịch sử đơn hàng
 -- ==================================================
-INSERT INTO reviews (product_id, user_id, order_id, rating, title, comment, is_verified_purchase, status) VALUES
-(3, 4, 1, 5, 'Sản phẩm tuyệt vời', 'iPhone 13 vẫn rất mượt, pin trâu, camera đẹp. Giá cả hợp lý!', TRUE, 'approved'),
-(1, 5, 2, 5, 'Đỉnh cao công nghệ', 'iPhone 15 Pro Max xứng đáng là flagship 2024. Camera xuất sắc, hiệu năng khủng!', TRUE, 'approved'),
-(8, 4, 3, 4, 'Tốt trong tầm giá', 'Camera 200MP rất ấn tượng, pin khỏe. Tuy nhiên màn hình hơi kém so với giá tiền.', TRUE, 'approved'),
-(13, 6, 4, 5, 'Tai nghe đáng mua', 'Chất lượng âm thanh tuyệt vời, chống ồn rất tốt. Xứng đáng!', TRUE, 'approved');
+INSERT INTO order_events (order_id, event_type, from_status, to_status, actor_user_id, actor_role, note, metadata, created_at) VALUES
+(1, 'order_created', NULL, 'pending', 4, 'customer', 'Đơn hàng được tạo từ website', JSON_OBJECT('paymentMethod', 'cod', 'itemCount', 1), DATE_SUB(NOW(), INTERVAL 30 DAY)),
+(1, 'status_changed', 'pending', 'confirmed', 1, 'admin', 'Xác nhận đơn hàng', NULL, DATE_SUB(NOW(), INTERVAL 29 DAY)),
+(1, 'status_changed', 'confirmed', 'shipping', 1, 'admin', 'Bàn giao cho đơn vị vận chuyển', NULL, DATE_SUB(NOW(), INTERVAL 28 DAY)),
+(1, 'payment_status_changed', 'pending', 'paid', 1, 'admin', 'Thu tiền COD thành công', NULL, DATE_SUB(NOW(), INTERVAL 26 DAY)),
+(1, 'status_changed', 'shipping', 'delivered', 1, 'admin', 'Khách đã nhận hàng', NULL, DATE_SUB(NOW(), INTERVAL 26 DAY)),
+(2, 'order_created', NULL, 'pending', 5, 'customer', 'Đơn hàng được tạo từ website', JSON_OBJECT('paymentMethod', 'bank_transfer', 'itemCount', 1), DATE_SUB(NOW(), INTERVAL 25 DAY)),
+(2, 'payment_status_changed', 'pending', 'paid', 5, 'customer', 'Khách thanh toán chuyển khoản', NULL, DATE_SUB(NOW(), INTERVAL 25 DAY)),
+(2, 'status_changed', 'pending', 'confirmed', 1, 'admin', 'Xác nhận đơn hàng', NULL, DATE_SUB(NOW(), INTERVAL 25 DAY)),
+(2, 'status_changed', 'confirmed', 'shipping', 1, 'admin', 'Đơn đã được đóng gói', NULL, DATE_SUB(NOW(), INTERVAL 24 DAY)),
+(2, 'status_changed', 'shipping', 'delivered', 1, 'admin', 'Giao hàng thành công', NULL, DATE_SUB(NOW(), INTERVAL 22 DAY)),
+(2, 'return_requested', NULL, NULL, 5, 'customer', 'Máy bị nóng bất thường', JSON_OBJECT('orderReturnId', 1, 'requestCode', 'RET240101001', 'itemCount', 1), DATE_SUB(NOW(), INTERVAL 5 DAY)),
+(3, 'order_created', NULL, 'pending', 4, 'customer', 'Đơn hàng được tạo từ website', JSON_OBJECT('paymentMethod', 'momo', 'itemCount', 1), DATE_SUB(NOW(), INTERVAL 20 DAY)),
+(3, 'payment_status_changed', 'pending', 'paid', 4, 'customer', 'Thanh toán MoMo thành công', NULL, DATE_SUB(NOW(), INTERVAL 20 DAY)),
+(3, 'status_changed', 'pending', 'confirmed', 1, 'admin', 'Xác nhận đơn hàng', NULL, DATE_SUB(NOW(), INTERVAL 20 DAY)),
+(3, 'status_changed', 'confirmed', 'shipping', 1, 'admin', 'Bắt đầu giao hàng', NULL, DATE_SUB(NOW(), INTERVAL 19 DAY)),
+(3, 'status_changed', 'shipping', 'delivered', 1, 'admin', 'Đã giao thành công', NULL, DATE_SUB(NOW(), INTERVAL 17 DAY)),
+(3, 'return_requested', NULL, NULL, 4, 'customer', 'Không đúng nhu cầu sử dụng', JSON_OBJECT('orderReturnId', 2, 'requestCode', 'RET240101002', 'itemCount', 1), DATE_SUB(NOW(), INTERVAL 10 DAY)),
+(3, 'return_rejected', NULL, NULL, 1, 'admin', 'Quá thời hạn đổi trả', JSON_OBJECT('orderReturnId', 2, 'requestCode', 'RET240101002'), DATE_SUB(NOW(), INTERVAL 9 DAY)),
+(3, 'return_closed', NULL, NULL, 1, 'admin', 'Đóng yêu cầu sau khi từ chối', JSON_OBJECT('orderReturnId', 2, 'requestCode', 'RET240101002'), DATE_SUB(NOW(), INTERVAL 8 DAY)),
+(4, 'order_created', NULL, 'pending', 6, 'customer', 'Đơn hàng được tạo từ website', JSON_OBJECT('paymentMethod', 'cod', 'itemCount', 1), DATE_SUB(NOW(), INTERVAL 2 DAY)),
+(4, 'status_changed', 'pending', 'confirmed', 1, 'admin', 'Xác nhận đơn hàng', NULL, DATE_SUB(NOW(), INTERVAL 2 DAY)),
+(4, 'status_changed', 'confirmed', 'shipping', 1, 'admin', 'Đã bàn giao vận chuyển', NULL, DATE_SUB(NOW(), INTERVAL 1 DAY)),
+(5, 'order_created', NULL, 'pending', 5, 'customer', 'Đơn hàng được tạo từ website', JSON_OBJECT('paymentMethod', 'vnpay', 'itemCount', 1), DATE_SUB(NOW(), INTERVAL 1 DAY)),
+(5, 'payment_status_changed', 'pending', 'paid', 5, 'customer', 'Thanh toán VNPay thành công', NULL, DATE_SUB(NOW(), INTERVAL 1 DAY)),
+(5, 'status_changed', 'pending', 'confirmed', 1, 'admin', 'Xác nhận đơn hàng', NULL, DATE_SUB(NOW(), INTERVAL 1 DAY)),
+(5, 'status_changed', 'confirmed', 'processing', 1, 'admin', 'Đang chuẩn bị hàng', NULL, DATE_SUB(NOW(), INTERVAL 12 HOUR));
 
 -- ==================================================
--- 15. POSTS - Bài viết
+-- 16. ORDER_RETURNS - Yêu cầu hoàn trả mẫu
+-- ==================================================
+INSERT INTO order_returns (
+    order_return_id, order_id, request_code, requested_by, status, reason, customer_note, admin_note,
+    requested_at, approved_at, rejected_at, received_at, refunded_at, closed_at, updated_at
+) VALUES
+(1, 2, 'RET240101001', 5, 'requested', 'Máy bị nóng bất thường', 'Muốn kiểm tra để đổi/trả', NULL, DATE_SUB(NOW(), INTERVAL 5 DAY), NULL, NULL, NULL, NULL, NULL, DATE_SUB(NOW(), INTERVAL 5 DAY)),
+(2, 3, 'RET240101002', 4, 'closed', 'Không đúng nhu cầu sử dụng', 'Muốn đổi sang mẫu khác', 'Từ chối do quá thời hạn hỗ trợ đổi trả', DATE_SUB(NOW(), INTERVAL 10 DAY), NULL, DATE_SUB(NOW(), INTERVAL 9 DAY), NULL, NULL, DATE_SUB(NOW(), INTERVAL 8 DAY), DATE_SUB(NOW(), INTERVAL 8 DAY));
+
+-- ==================================================
+-- 17. ORDER_RETURN_ITEMS - Chi tiết yêu cầu hoàn trả
+-- ==================================================
+INSERT INTO order_return_items (order_return_id, order_detail_id, quantity, reason, restock_action, created_at) VALUES
+(1, 2, 1, 'Thiết bị nóng lên nhanh khi sử dụng', 'inspect', DATE_SUB(NOW(), INTERVAL 5 DAY)),
+(2, 3, 1, 'Muốn đổi sang phân khúc khác', 'restock', DATE_SUB(NOW(), INTERVAL 10 DAY));
+
+-- ==================================================
+-- 18. ORDER_FEEDBACKS - Đánh giá đơn hàng
+-- ==================================================
+INSERT INTO order_feedbacks (order_id, user_id, rating, title, comment, created_at, updated_at) VALUES
+(1, 4, 5, 'Giao nhanh, đóng gói ổn', 'Nhân viên giao hàng hỗ trợ tốt, sản phẩm đúng mô tả.', DATE_SUB(NOW(), INTERVAL 25 DAY), DATE_SUB(NOW(), INTERVAL 25 DAY)),
+(2, 5, 4, 'Trải nghiệm nhìn chung tốt', 'Thanh toán nhanh nhưng phần hỗ trợ sau bán hàng cần phản hồi sớm hơn.', DATE_SUB(NOW(), INTERVAL 21 DAY), DATE_SUB(NOW(), INTERVAL 21 DAY));
+
+-- ==================================================
+-- 19. REVIEWS - Đánh giá sản phẩm
+-- ==================================================
+INSERT INTO reviews (
+    product_id, user_id, order_id, order_detail_id, rating, title, comment, is_verified_purchase, status
+) VALUES
+(3, 4, 1, 1, 5, 'Sản phẩm tuyệt vời', 'iPhone 13 vẫn rất mượt, pin trâu, camera đẹp. Giá cả hợp lý!', TRUE, 'approved'),
+(1, 5, 2, 2, 5, 'Đỉnh cao công nghệ', 'iPhone 15 Pro Max xứng đáng là flagship 2024. Camera xuất sắc, hiệu năng khủng!', TRUE, 'approved'),
+(8, 4, 3, 3, 4, 'Tốt trong tầm giá', 'Camera 200MP rất ấn tượng, pin khỏe. Tuy nhiên màn hình hơi kém so với giá tiền.', TRUE, 'approved'),
+(13, 6, 4, 4, 5, 'Tai nghe đáng mua', 'Chất lượng âm thanh tuyệt vời, chống ồn rất tốt. Xứng đáng!', TRUE, 'approved');
+
+-- ==================================================
+-- 20. POSTS - Bài viết
 -- ==================================================
 INSERT INTO posts (title, slug, content, excerpt, author_id, category, is_published, published_at) VALUES
 ('iPhone 15 Pro Max: Đánh giá chi tiết sau 1 tháng sử dụng', 'iphone-15-pro-max-danh-gia-chi-tiet', 
@@ -269,7 +382,7 @@ INSERT INTO posts (title, slug, content, excerpt, author_id, category, is_publis
 1, 'promotion', TRUE, DATE_SUB(NOW(), INTERVAL 1 DAY));
 
 -- ==================================================
--- 16. WISHLISTS - Yêu thích
+-- 21. WISHLISTS - Yêu thích
 -- ==================================================
 INSERT INTO wishlists (user_id, product_id) VALUES
 (4, 1), (4, 4), (4, 11),
@@ -277,7 +390,7 @@ INSERT INTO wishlists (user_id, product_id) VALUES
 (6, 1), (6, 5), (6, 13);
 
 -- ==================================================
--- 17. PRODUCT_VIEWS - Lượt xem
+-- 22. PRODUCT_VIEWS - Lượt xem
 -- ==================================================
 INSERT INTO product_views (user_id, product_id, viewed_at) VALUES
 (4, 1, DATE_SUB(NOW(), INTERVAL 1 HOUR)),
@@ -287,7 +400,7 @@ INSERT INTO product_views (user_id, product_id, viewed_at) VALUES
 (6, 3, DATE_SUB(NOW(), INTERVAL 1 DAY));
 
 -- ==================================================
--- 18. SETTINGS - Cấu hình hệ thống
+-- 23. SETTINGS - Cấu hình hệ thống
 -- ==================================================
 INSERT INTO settings (setting_key, setting_value, description, data_type, is_public) VALUES
 ('site_name', 'Mobile Shop', 'Tên website', 'string', TRUE),
