@@ -91,27 +91,23 @@ export const Header = () => {
               </Link>
             </li>
             <li>
-              <Link to="/products?category=iPhone" className="text-gray-700 hover:text-primary-600">
-                iPhone
+              <Link to="/about" className="text-gray-700 hover:text-primary-600">
+                Giới Thiệu
               </Link>
             </li>
             <li>
-              <Link to="/products?category=Samsung" className="text-gray-700 hover:text-primary-600">
-                Samsung
+              <Link to="/news" className="text-gray-700 hover:text-primary-600">
+                Tin Tức
               </Link>
             </li>
             <li>
-              <Link to="/products?category=Xiaomi" className="text-gray-700 hover:text-primary-600">
-                Xiaomi
+              <Link to="/contact" className="text-gray-700 hover:text-primary-600">
+                Liên Hệ
               </Link>
             </li>
+           
             <li>
-              <Link to="/products?category=OPPO" className="text-gray-700 hover:text-primary-600">
-                OPPO
-              </Link>
-            </li>
-            <li>
-              <Link to="/products?featured=true" className="text-gray-700 hover:text-primary-600">
+              <Link to="/products" className="text-gray-700 hover:text-primary-600">
                 Sản phẩm nổi bật
               </Link>
             </li>

@@ -62,7 +62,6 @@ export const ProductListPage = () => {
 
   }, [category, brand, minPrice, maxPrice, page]);
 
-  /* FILTER FUNCTIONS */
   const handleCategoryFilter = (value: string) => {
     navigate(`?category=${value}`);
   };
@@ -83,10 +82,8 @@ export const ProductListPage = () => {
 
         <div className="flex gap-8">
 
-          {/* SIDEBAR */}
           <div className="w-64 space-y-6">
 
-            {/* DANH MỤC */}
             <div>
 
               <div className="bg-blue-600 text-white p-2 font-semibold flex items-center gap-2">
@@ -145,7 +142,6 @@ export const ProductListPage = () => {
 
             </div>
 
-            {/* THƯƠNG HIỆU */}
             <div>
               <div className="bg-blue-600 text-white p-2 font-semibold flex items-center gap-2">
                 <FaTag />
@@ -162,7 +158,7 @@ export const ProductListPage = () => {
                   }`}
                 >
                   <img
-                    src="/brands/thuong-hieu-apple.png"
+                    src="/categories/thuong-hieu-apple.png"
                     alt="Apple"
                     className="h-80 object-contain"
                   />
@@ -176,7 +172,7 @@ export const ProductListPage = () => {
                   }`}
                 >
                   <img
-                    src="/brands/thuong-hieu-samsung.png"
+                    src="/categories/thuong-hieu-samsung.png"
                     alt="Samsung"
                     className="h-80 object-contain"
                   />
@@ -190,7 +186,7 @@ export const ProductListPage = () => {
                   }`}
                 >
                   <img
-                    src="/brands/thuong-hieu-xiaomi.png"
+                    src="/categories/thuong-hieu-xiaomi.png"
                     alt="Xiaomi"
                     className="h-10 object-contain"
                   />
@@ -204,7 +200,7 @@ export const ProductListPage = () => {
                   }`}
                 >
                   <img
-                    src="/brands/thuong-hieu-oppo.png"
+                    src="/categories/thuong-hieu-oppo.png"
                     alt="Oppo"
                     className="h-12 object-contain"
                   />
@@ -218,7 +214,7 @@ export const ProductListPage = () => {
                   }`}
                 >
                   <img
-                    src="/brands/thuong-hieu-vivo.png"
+                    src="/categories/thuong-hieu-vivo.png"
                     alt="Vivo"
                     className="h-5 object-contain"
                   />

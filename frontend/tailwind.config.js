@@ -19,6 +19,7 @@ export default {
           800: '#1e40af',
           900: '#1e3a8a',
         },
+        
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
