@@ -11,7 +11,6 @@ import {
   UpdateProductDTO,
 } from '../../domain/entities/Product';
 import pool from '../database/connection';
-import pool from '../database/connection';
 
 type PublicFilters = {
   categoryId?: number;
@@ -295,6 +294,8 @@ export class ProductRepository implements IProductRepository {
         stockQuantity: r.stock_quantity,
       })),
     };
+  }
+
   async findVariantById(variantId: number): Promise<ProductVariant | null> {
     const [rows] = await pool.execute<RowDataPacket[]>(
       'SELECT * FROM product_variants WHERE variant_id = ?',
