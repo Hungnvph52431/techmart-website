@@ -1,5 +1,6 @@
 export interface Product {
-  id: string;
+  id: number;
+  productId?: number;
   name: string;
   slug: string;
   description: string;
@@ -9,19 +10,21 @@ export interface Product {
   category: string;
   stock: number;
   images: string[];
-  specifications: {
-    screen?: string;
-    os?: string;
-    camera?: string;
-    processor?: string;
-    ram?: string;
-    storage?: string;
-    battery?: string;
-    [key: string]: string | undefined;
-  };
+  specifications: Record<string, string>;
   featured: boolean;
   rating: number;
   reviewCount: number;
+  status?: 'draft' | 'active' | 'inactive' | 'out_of_stock' | 'pre_order' | 'archived';
+  variants?: Array<{
+    id: number;
+    variantId: number;
+    name: string;
+    sku: string;
+    attributes: Record<string, string>;
+    price: number;
+    stock: number;
+    image?: string;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -57,7 +60,7 @@ export interface Order {
 }
 
 export interface OrderItem {
-  productId: string;
+  productId: number;
   productName: string;
   productImage: string;
   quantity: number;

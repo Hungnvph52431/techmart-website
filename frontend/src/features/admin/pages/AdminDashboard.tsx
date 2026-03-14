@@ -10,6 +10,8 @@ import {
   Title,
 } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
+import { adminProductService } from '@/services/admin/product.service';
+import { adminOrderService } from '@/services/admin/order.service';
 import { Link } from 'react-router-dom';
 import { orderService, OrderStats } from '@/services/order.service';
 import { productService, ProductStats } from '@/services/product.service';
@@ -457,6 +459,18 @@ export const AdminDashboard = () => {
             className="flex items-center justify-center gap-2 px-5 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
           >
             <Package className="w-4 h-4" /> Thêm sản phẩm mới
+          </Link>
+          <Link
+            to="/admin/categories"
+            className="flex items-center justify-center px-6 py-4 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"
+          >
+            🗂️ Quản lý danh mục
+          </Link>
+          <Link
+            to="/admin/attributes"
+            className="flex items-center justify-center px-6 py-4 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+          >
+            🧩 Quản lý thuộc tính
           </Link>
           <Link
             to="/admin/orders"
