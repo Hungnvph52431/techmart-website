@@ -1,6 +1,6 @@
-import { useEffect, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react'; // Dọn dẹp ChangeEvent và KeyboardEvent
 import toast from 'react-hot-toast';
-import { Users, UserPlus, Edit2, Trash2, Search, Filter, X } from 'lucide-react';
+import { Users, UserPlus, Edit2, Trash2, Search, X } from 'lucide-react'; // Dọn dẹp Filter icon
 import {
     userService,
     type User,
@@ -44,27 +44,25 @@ export const AdminUsers = () => {
     }, [filters]);
 
     const fetchUsers = async () => {
-  try {
-    setLoading(true);
-    const response = await userService.getAllUsers(filters);
-
-    setUsers(response); 
-    
-  } catch (error) {
-    console.error('Failed to fetch users:', error);
-    toast.error('Không thể tải danh sách người dùng');
-  } finally {
-    setLoading(false);
-  }
-};
+        try {
+            setLoading(true);
+            const data = await userService.getAllUsers(filters);
+            setUsers(data);
+        } catch (error) {
+            toast.error('Không thể tải danh sách người dùng');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleSearch = () => {
-        setFilters((previous) => ({
-            ...previous,
+        setFilters((prev) => ({
+            ...prev,
             search: searchTerm.trim() || undefined,
         }));
     };
 
+    // FIX LỖI 6133: Tận dụng hàm này để xóa bộ lọc nhanh
     const handleClearFilters = () => {
         setSearchTerm('');
         setFilters({});
@@ -81,29 +79,14 @@ export const AdminUsers = () => {
     };
 
     const handleDelete = async (userId: number, name: string) => {
-        if (!window.confirm(`Bạn có chắc muốn xóa người dùng ${name}?`)) {
-            return;
-        }
-
+        if (!window.confirm(`Bạn có chắc muốn xóa người dùng ${name}?`)) return;
         try {
             setDeleteLoading(userId);
-            const result = await userService.deleteUser(userId);
-
-            if (result.action === 'deleted') {
-                toast.success('Xóa người dùng thành công');
-            } else {
-                toast.success('Người dùng có đơn hàng liên quan, đã được chuyển sang trạng thái không hoạt động');
-            }
-
-            await fetchUsers();
-        } catch (error: unknown) {
-            console.error('Failed to delete user:', error);
-            const errorMessage =
-                typeof error === 'object' && error !== null && 'response' in error
-                    ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message ??
-                        'Không thể xóa người dùng')
-                    : 'Không thể xóa người dùng';
-            toast.error(errorMessage);
+            await userService.deleteUser(userId);
+            toast.success('Xóa người dùng thành command');
+            fetchUsers();
+        } catch (error) {
+            toast.error('Lỗi khi xóa người dùng');
         } finally {
             setDeleteLoading(null);
         }
@@ -113,209 +96,136 @@ export const AdminUsers = () => {
         try {
             await userService.updateUser(userId, { status });
             toast.success('Cập nhật trạng thái thành công');
-            await fetchUsers();
-        } catch (error: unknown) {
-            console.error('Failed to update user status:', error);
+            fetchUsers();
+        } catch (error) {
             toast.error('Không thể cập nhật trạng thái');
         }
     };
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-64">
-                <div className="text-xl text-gray-600">Đang tải...</div>
-            </div>
-        );
-    }
+    if (loading && users.length === 0) return (
+        <div className="flex items-center justify-center h-64">
+            <div className="text-xl text-blue-600 font-bold animate-pulse uppercase italic">Đang tải dữ liệu người dùng...</div>
+        </div>
+    );
 
     return (
-        <div>
-            <div className="flex items-center justify-between mb-8">
+        <div className="space-y-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex items-center gap-3">
                     <Users className="w-8 h-8 text-blue-600" />
-                    <h1 className="text-3xl font-bold text-gray-800">Quản lý người dùng</h1>
+                    <h1 className="text-3xl font-black text-gray-800 uppercase italic tracking-tight">Người dùng</h1>
                 </div>
                 <button
                     onClick={() => handleOpenModal()}
-                    className="flex items-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                    className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all active:scale-95"
                 >
-                    <UserPlus className="w-5 h-5" />
-                    Thêm người dùng
+                    <UserPlus size={20} /> Thêm mới
                 </button>
             </div>
 
-            <div className="bg-white rounded-lg shadow p-4 mb-6">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            <Search className="w-4 h-4 inline mr-1" /> Tìm kiếm
-                        </label>
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
-                                value={searchTerm}
-                                onChange={(event: ChangeEvent<HTMLInputElement>) => setSearchTerm(event.target.value)}
-                                onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
-                                    if (event.key === 'Enter') {
-                                        handleSearch();
-                                    }
-                                }}
-                                placeholder="Tìm theo tên, email, số điện thoại..."
-                                className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                            <button
-                                onClick={handleSearch}
-                                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-                            >
-                                Tìm kiếm
-                            </button>
-                        </div>
+            {/* THANH CÔNG CỤ LỌC */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="col-span-2 flex gap-2">
+                    <div className="relative flex-1">
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                            placeholder="Tìm tên, email..."
+                            className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                        <Search className="absolute left-3 top-3 text-gray-400" size={18} />
                     </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            <Filter className="w-4 h-4 inline mr-1" /> Vai trò
-                        </label>
-                        <select
-                            value={filters.role ?? ''}
-                            onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-                                const value = event.target.value as UserRole | '';
-                                setFilters((previous) => ({
-                                    ...previous,
-                                    role: value || undefined,
-                                }));
-                            }}
-                            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="">Tất cả</option>
-                            <option value="customer">Khách hàng</option>
-                            <option value="admin">Quản trị viên</option>
-                            <option value="staff">Nhân viên</option>
-                            <option value="warehouse">Kho</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            <Filter className="w-4 h-4 inline mr-1" /> Trạng thái
-                        </label>
-                        <select
-                            value={filters.status ?? ''}
-                            onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-                                const value = event.target.value as UserStatus | '';
-                                setFilters((previous) => ({
-                                    ...previous,
-                                    status: value || undefined,
-                                }));
-                            }}
-                            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="">Tất cả</option>
-                            <option value="active">Hoạt động</option>
-                            <option value="inactive">Không hoạt động</option>
-                            <option value="banned">Bị cấm</option>
-                        </select>
-                    </div>
+                    {/* Nút xóa bộ lọc để dùng handleClearFilters */}
+                    { (searchTerm || filters.role || filters.status) && (
+                        <button onClick={handleClearFilters} className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-all">
+                            <X size={20} />
+                        </button>
+                    )}
+                    <button onClick={handleSearch} className="px-5 py-2.5 bg-gray-800 text-white rounded-xl font-bold text-sm hover:bg-gray-900 transition-all">Tìm</button>
                 </div>
 
-                {(filters.search || filters.role || filters.status) && (
-                    <div className="mt-4 flex items-center gap-2">
-                        <button
-                            onClick={handleClearFilters}
-                            className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:bg-gray-50 rounded-lg"
-                        >
-                            <X className="w-4 h-4" /> Xóa bộ lọc
-                        </button>
-                        <span className="text-sm text-gray-500">Tìm thấy {users.length} người dùng</span>
-                    </div>
-                )}
+                <select
+                    value={filters.role ?? ''}
+                    onChange={(e) => setFilters(prev => ({ ...prev, role: (e.target.value as UserRole) || undefined }))}
+                    className="w-full px-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none font-bold text-gray-600"
+                >
+                    <option value="">Tất cả vai trò</option>
+                    <option value="customer">Khách hàng</option>
+                    <option value="admin">Quản trị viên</option>
+                    <option value="staff">Nhân viên</option>
+                </select>
+
+                <select
+                    value={filters.status ?? ''}
+                    onChange={(e) => setFilters(prev => ({ ...prev, status: (e.target.value as UserStatus) || undefined }))}
+                    className="w-full px-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none font-bold text-gray-600"
+                >
+                    <option value="">Tất cả trạng thái</option>
+                    <option value="active">Hoạt động</option>
+                    <option value="inactive">Tạm ngưng</option>
+                    <option value="banned">Bị cấm</option>
+                </select>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+            {/* BẢNG DANH SÁCH */}
+            <div className="bg-white rounded-[24px] shadow-sm border border-gray-100 overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full">
-                        <thead className="bg-gray-50 border-b">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Người dùng
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Vai trò
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Trạng thái
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Thành viên
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Điểm
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Ngày tạo
-                                </th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Thao tác
-                                </th>
+                        <thead className="bg-gray-50/50 border-b border-gray-100">
+                            <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                <th className="px-6 py-4 text-left">Người dùng</th>
+                                <th className="px-6 py-4 text-left">Vai trò</th>
+                                <th className="px-6 py-4 text-left">Trạng thái</th>
+                                <th className="px-6 py-4 text-left">Hạng & Điểm</th>
+                                <th className="px-6 py-4 text-right">Thao tác</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-200">
+                        <tbody className="divide-y divide-gray-50">
                             {users.map((user) => (
-                                <tr key={user.userId} className="hover:bg-gray-50">
+                                <tr key={user.userId} className="hover:bg-blue-50/20 transition-colors">
                                     <td className="px-6 py-4">
-                                        <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                                        <div className="text-sm text-gray-500">{user.email}</div>
-                                        {user.phone && <div className="text-xs text-gray-400">{user.phone}</div>}
+                                        <div className="text-sm font-bold text-gray-900">{user.name}</div>
+                                        <div className="text-[10px] text-gray-400 font-bold uppercase">{user.email}</div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {roleLabels[user.role]}
+                                    <td className="px-6 py-4">
+                                        <span className="text-[10px] font-black text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg uppercase">
+                                            {roleLabels[user.role]}
+                                        </span>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-6 py-4">
                                         <select
                                             value={user.status}
-                                            onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-                                                void handleStatusChange(user.userId, event.target.value as UserStatus);
-                                            }}
-                                            className={`px-2 py-1 text-xs font-semibold rounded-full border-0 ${statusColors[user.status]}`}
+                                            onChange={(e) => void handleStatusChange(user.userId, e.target.value as UserStatus)}
+                                            className={`px-3 py-1 text-[10px] font-black uppercase rounded-full border-none focus:ring-2 focus:ring-blue-500 ${statusColors[user.status]}`}
                                         >
                                             <option value="active">Hoạt động</option>
-                                            <option value="inactive">Không hoạt động</option>
+                                            <option value="inactive">Tạm ngưng</option>
                                             <option value="banned">Bị cấm</option>
                                         </select>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {membershipLabels[user.membershipLevel]}
+                                    <td className="px-6 py-4">
+                                        <div className="text-xs font-bold text-gray-700">{membershipLabels[user.membershipLevel]}</div>
+                                        <div className="text-[10px] text-orange-500 font-black italic">{user.points} points</div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                        {user.points}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {new Date(user.createdAt).toLocaleDateString('vi-VN')}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button
-                                            onClick={() => handleOpenModal(user)}
-                                            className="text-blue-600 hover:text-blue-900 mr-4 inline-flex items-center gap-1"
-                                        >
-                                            <Edit2 className="w-4 h-4" /> Sửa
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                void handleDelete(user.userId, user.name);
-                                            }}
-                                            disabled={deleteLoading === user.userId}
-                                            className="text-red-600 hover:text-red-900 disabled:opacity-50 inline-flex items-center gap-1"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                            {deleteLoading === user.userId ? 'Đang xóa...' : 'Xóa'}
-                                        </button>
+                                    <td className="px-6 py-4 text-right">
+                                        <div className="flex justify-end gap-2">
+                                            <button onClick={() => handleOpenModal(user)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 size={16} /></button>
+                                            <button 
+                                                onClick={() => void handleDelete(user.userId, user.name)} 
+                                                disabled={deleteLoading === user.userId}
+                                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
-                {users.length === 0 && <div className="p-8 text-center text-gray-500">Chưa có người dùng nào.</div>}
             </div>
 
             {showModal && (
@@ -332,25 +242,9 @@ export const AdminUsers = () => {
     );
 };
 
-interface UserModalProps {
-    user: User | null;
-    onClose: () => void;
-    onSuccess: () => void;
-}
-
-interface UserFormData {
-    email: string;
-    password: string;
-    name: string;
-    phone: string;
-    role: UserRole;
-    status: UserStatus;
-    points: number;
-    membershipLevel: MembershipLevel;
-}
-
-const UserModal = ({ user, onClose, onSuccess }: UserModalProps) => {
-    const [formData, setFormData] = useState<UserFormData>({
+// MODAL Component - Giữ nguyên logic UI Streetwear đã gộp
+const UserModal = ({ user, onClose, onSuccess }: any) => {
+    const [formData, setFormData] = useState({
         email: user?.email ?? '',
         password: '',
         name: user?.name ?? '',
@@ -364,221 +258,66 @@ const UserModal = ({ user, onClose, onSuccess }: UserModalProps) => {
 
     const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-
-        if (!formData.email || !formData.name || (!user && !formData.password)) {
-            toast.error('Vui lòng điền đầy đủ thông tin bắt buộc');
-            return;
-        }
-
         try {
             setSaving(true);
             if (user) {
-                await userService.updateUser(user.userId, {
-                    email: formData.email.trim().toLowerCase(),
-                    name: formData.name.trim(),
-                    phone: formData.phone.trim() || undefined,
-                    role: formData.role,
-                    status: formData.status,
-                    points: formData.points,
-                    membershipLevel: formData.membershipLevel,
-                });
-                toast.success('Cập nhật người dùng thành công');
+                await userService.updateUser(user.userId, formData);
+                toast.success('Đã cập nhật');
             } else {
-                await userService.createUser({
-                    email: formData.email.trim().toLowerCase(),
-                    password: formData.password.trim(),
-                    name: formData.name.trim(),
-                    phone: formData.phone.trim() || undefined,
-                    role: formData.role,
-                });
-                toast.success('Tạo người dùng thành công');
+                await userService.createUser(formData as any);
+                toast.success('Đã tạo mới');
             }
             onSuccess();
-        } catch (error: unknown) {
-            console.error('Failed to save user:', error);
-            const errorMessage =
-                typeof error === 'object' && error !== null && 'response' in error
-                    ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message ??
-                        'Không thể lưu thông tin người dùng')
-                    : 'Không thể lưu thông tin người dùng';
-            toast.error(errorMessage);
+        } catch (error: any) {
+            toast.error('Lỗi khi lưu dữ liệu');
         } finally {
             setSaving(false);
         }
     };
 
     return (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="flex items-center justify-center min-h-screen px-4 py-8">
-                <div className="fixed inset-0 bg-gray-500 bg-opacity-75" onClick={onClose} />
-                <div className="relative w-full max-w-2xl p-6 bg-white shadow-xl rounded-2xl">
-                    <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-2xl font-bold text-gray-900">
-                            {user ? 'Chỉnh sửa người dùng' : 'Thêm người dùng mới'}
-                        </h3>
-                        <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-                            <X className="h-6 w-6" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
+            <div className="bg-white rounded-[32px] w-full max-w-lg p-8 shadow-2xl animate-in zoom-in duration-200">
+                <div className="flex items-center justify-between mb-8">
+                    <h3 className="text-2xl font-black text-gray-800 uppercase italic tracking-tight">
+                        {user ? 'Sửa thông tin' : 'Tạo tài khoản'}
+                    </h3>
+                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X size={24} /></button>
+                </div>
+                <form onSubmit={handleSubmit} className="space-y-5">
+                    <input
+                        type="email"
+                        placeholder="Email tài khoản"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        className="w-full px-4 py-3 bg-gray-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        required
+                    />
+                    {!user && (
+                        <input
+                            type="password"
+                            placeholder="Mật khẩu bí mật"
+                            value={formData.password}
+                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                            className="w-full px-4 py-3 bg-gray-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                            required
+                        />
+                    )}
+                    <input
+                        type="text"
+                        placeholder="Tên hiển thị"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        className="w-full px-4 py-3 bg-gray-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        required
+                    />
+                    <div className="flex gap-3">
+                        <button type="button" onClick={onClose} className="flex-1 px-6 py-3 bg-gray-100 text-gray-600 rounded-2xl font-bold">Hủy</button>
+                        <button type="submit" disabled={saving} className="flex-[2] px-6 py-3 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 shadow-lg transition-all disabled:opacity-50">
+                            {saving ? 'Đang lưu...' : 'Xác nhận'}
                         </button>
                     </div>
-
-                    <form onSubmit={handleSubmit}>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Email <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="email"
-                                    value={formData.email}
-                                    onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                                        setFormData((previous) => ({ ...previous, email: event.target.value }));
-                                    }}
-                                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    required
-                                />
-                            </div>
-
-                            {!user && (
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Mật khẩu <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="password"
-                                        value={formData.password}
-                                        onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                                            setFormData((previous) => ({ ...previous, password: event.target.value }));
-                                        }}
-                                        autoComplete="current-password"
-                                        className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        required
-                                        minLength={6}
-                                    />
-                                </div>
-                            )}
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Tên người dùng <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formData.name}
-                                    onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                                        setFormData((previous) => ({ ...previous, name: event.target.value }));
-                                    }}
-                                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Số điện thoại</label>
-                                <input
-                                    type="tel"
-                                    value={formData.phone}
-                                    onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                                        setFormData((previous) => ({ ...previous, phone: event.target.value }));
-                                    }}
-                                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Vai trò</label>
-                                <select
-                                    value={formData.role}
-                                    onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-                                        setFormData((previous) => ({
-                                            ...previous,
-                                            role: event.target.value as UserRole,
-                                        }));
-                                    }}
-                                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                >
-                                    <option value="customer">Khách hàng</option>
-                                    <option value="admin">Quản trị viên</option>
-                                    <option value="staff">Nhân viên</option>
-                                    <option value="warehouse">Kho</option>
-                                </select>
-                            </div>
-
-                            {user && (
-                                <>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Trạng thái</label>
-                                        <select
-                                            value={formData.status}
-                                            onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-                                                setFormData((previous) => ({
-                                                    ...previous,
-                                                    status: event.target.value as UserStatus,
-                                                }));
-                                            }}
-                                            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        >
-                                            <option value="active">Hoạt động</option>
-                                            <option value="inactive">Không hoạt động</option>
-                                            <option value="banned">Bị cấm</option>
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Cấp độ thành viên</label>
-                                        <select
-                                            value={formData.membershipLevel}
-                                            onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-                                                setFormData((previous) => ({
-                                                    ...previous,
-                                                    membershipLevel: event.target.value as MembershipLevel,
-                                                }));
-                                            }}
-                                            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        >
-                                            <option value="bronze">Đồng</option>
-                                            <option value="silver">Bạc</option>
-                                            <option value="gold">Vàng</option>
-                                            <option value="platinum">Bạch kim</option>
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Điểm tích lũy</label>
-                                        <input
-                                            type="number"
-                                            value={formData.points}
-                                            onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                                                setFormData((previous) => ({
-                                                    ...previous,
-                                                    points: Number(event.target.value) || 0,
-                                                }));
-                                            }}
-                                            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            min={0}
-                                        />
-                                    </div>
-                                </>
-                            )}
-                        </div>
-
-                        <div className="flex items-center justify-end mt-6 gap-3">
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
-                            >
-                                Hủy
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={saving}
-                                className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
-                            >
-                                {saving ? 'Đang lưu...' : 'Lưu'}
-                            </button>
-                        </div>
-                    </form>
-                </div>
+                </form>
             </div>
         </div>
     );

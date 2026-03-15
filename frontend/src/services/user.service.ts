@@ -1,5 +1,7 @@
 import api from './api';
 
+// --- INTERFACES & TYPES ---
+
 export interface User {
   // Khớp với user_id trong DB
   userId: number; 
@@ -8,8 +10,8 @@ export interface User {
   phone?: string;
   
   // ENUM khớp 100% với DB
-role: 'customer' | 'admin' | 'staff' | 'warehouse';  
-status: 'active' | 'inactive' | 'banned';  
+  role: 'customer' | 'admin' | 'staff' | 'warehouse';  
+  status: 'active' | 'inactive' | 'banned';  
   points: number;
   
   // membership_level trong DB
@@ -26,8 +28,8 @@ export type MembershipLevel = User['membershipLevel'];
 
 export interface UserFilters {
   search?: string;
-  role?: 'customer' | 'admin' | 'staff' | 'warehouse';
-  status?: 'active' | 'inactive' | 'banned';
+  role?: UserRole;
+  status?: UserStatus;
 }
 
 export interface CreateUserPayload {
@@ -35,17 +37,17 @@ export interface CreateUserPayload {
   password: string;
   name: string;
   phone?: string;
-  role?: 'customer' | 'admin' | 'staff' | 'warehouse';
+  role?: UserRole;
 }
 
 export interface UpdateUserPayload {
   email?: string;
   name?: string;
   phone?: string;
-  role?: 'customer' | 'admin' | 'staff' | 'warehouse';
-  status?: 'active' | 'inactive' | 'banned';
+  role?: UserRole;
+  status?: UserStatus;
   points?: number;
-  membershipLevel?: 'bronze' | 'silver' | 'gold' | 'platinum';
+  membershipLevel?: MembershipLevel;
 }
 
 export interface UserStats {
@@ -61,12 +63,15 @@ export interface DeleteUserResponse {
   action: 'deleted' | 'deactivated';
 }
 
+// --- HELPER FUNCTIONS ---
+
 type ApiEnvelope<T> = {
   success?: boolean;
   data?: T;
   message?: string;
 };
 
+// Hàm bóc tách dữ liệu từ API
 const unwrapData = <T>(payload: T | ApiEnvelope<T>): T => {
   if (payload && typeof payload === 'object' && 'data' in (payload as ApiEnvelope<T>)) {
     const envelope = payload as ApiEnvelope<T>;
@@ -77,7 +82,6 @@ const unwrapData = <T>(payload: T | ApiEnvelope<T>): T => {
 
 const buildQueryString = (filters?: UserFilters): string => {
   const params = new URLSearchParams();
-
   if (filters) {
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
@@ -85,9 +89,10 @@ const buildQueryString = (filters?: UserFilters): string => {
       }
     });
   }
-
   return params.toString();
 };
+
+// --- SERVICE OBJECT ---
 
 export const userService = {
   getAllUsers: async (filters?: UserFilters): Promise<User[]> => {
@@ -116,8 +121,7 @@ export const userService = {
     return unwrapData<DeleteUserResponse>(response.data);
   },
 
-  async updateUserStatus(userId: number, status: 'active' | 'inactive' | 'banned'): Promise<User> {
-
+  async updateUserStatus(userId: number, status: UserStatus): Promise<User> {
     const response = await api.patch(`/users/${userId}/status`, { status });
     return unwrapData<User>(response.data);
   },

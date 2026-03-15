@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { authService } from '@/services/auth.service';
 import { useAuthStore } from '@/store/authStore';
@@ -11,6 +11,7 @@ export const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const { setAuth } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,17 +19,21 @@ export const LoginPage = () => {
 
     try {
       const result = await authService.login(email, password);
+      // Lưu thông tin vào Zustand Store
       setAuth(result.user, result.token);
       toast.success('Đăng nhập thành công!');
       
-      // Redirect based on user role
+      // LOGIC ĐIỀU HƯỚNG THÔNG MINH:
+      // 1. Nếu là Admin/Staff -> Vào thẳng trang quản trị
+      // 2. Nếu là Khách -> Quay lại trang trước đó (ví dụ: Checkout) hoặc vào trang Đơn hàng
       if (result.user.role !== 'customer') {
         navigate('/admin');
       } else {
-        navigate('/');
+        const redirectTarget = (location.state as any)?.from || '/';
+        navigate(redirectTarget);
       }
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Đăng nhập thất bại');
+      toast.error(error.response?.data?.message || 'Email hoặc mật khẩu không chính xác');
     } finally {
       setLoading(false);
     }
@@ -37,36 +42,41 @@ export const LoginPage = () => {
   return (
     <Layout>
       <div className="container mx-auto px-4 py-12">
-        <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-8">
-          <h1 className="text-3xl font-bold text-center mb-8">Đăng nhập</h1>
+        <div className="max-w-md mx-auto bg-white rounded-[32px] shadow-xl border border-gray-100 p-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="text-center mb-10">
+            <h1 className="text-4xl font-black text-gray-800 uppercase italic tracking-tighter">Đăng nhập</h1>
+            <p className="text-gray-400 text-sm font-medium mt-2">Chào mừng bạn trở lại với TechMart</p>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email
+              <label htmlFor="email" className="text-[10px] font-black text-gray-400 uppercase ml-1">
+                Email tài khoản
               </label>
               <input
                 type="email"
                 id="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                autoComplete="username"
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                placeholder="example@email.com"
+                className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                placeholder="khanh@example.com"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Mật khẩu
+              <label htmlFor="password" className="text-[10px] font-black text-gray-400 uppercase ml-1">
+                Mật khẩu bảo mật
               </label>
               <input
                 type="password"
                 id="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                 placeholder="••••••••"
               />
             </div>
@@ -74,16 +84,16 @@ export const LoginPage = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+              className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all active:scale-[0.98] disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
-              {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
+              {loading ? 'Đang xác thực...' : 'Vào hệ thống'}
             </button>
           </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-gray-600">
-              Chưa có tài khoản?{' '}
-              <Link to="/register" className="text-primary-600 hover:text-primary-700 font-semibold">
+          <div className="mt-8 text-center pt-6 border-t border-gray-50">
+            <p className="text-gray-500 text-sm font-medium">
+              Chưa có tài khoản TechMart?{' '}
+              <Link to="/register" className="text-blue-600 hover:text-blue-700 font-bold underline-offset-4 hover:underline">
                 Đăng ký ngay
               </Link>
             </p>

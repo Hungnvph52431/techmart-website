@@ -109,21 +109,24 @@ export class UserRepository implements IUserRepository {
 
     return this.findById(user.userId);
   }
-// Thêm hàm này vào bên trong class UserRepository của bạn
-async updatePassword(userId: number, password: string): Promise<boolean> {
-  try {
-    // password truyền vào đây nên là mật khẩu ĐÃ HASH từ UseCase
-    const [result] = await pool.execute<ResultSetHeader>(
-      'UPDATE users SET password = ?, updated_at = ? WHERE user_id = ?',
-      [password, new Date(), userId]
-    );
-    
-    return result.affectedRows > 0;
-  } catch (error) {
-    console.error('Error in updatePassword repository:', error);
-    return false;
+
+  /**
+   * Cập nhật mật khẩu mới (đã hash) cho người dùng
+   */
+  async updatePassword(userId: number, hashedPassword: string): Promise<boolean> {
+    try {
+      const [result] = await pool.execute<ResultSetHeader>(
+        'UPDATE users SET password = ?, updated_at = ? WHERE user_id = ?',
+        [hashedPassword, new Date(), userId]
+      );
+      
+      return result.affectedRows > 0;
+    } catch (error) {
+      console.error('Error in updatePassword repository:', error);
+      return false;
+    }
   }
-}
+
   async delete(userId: number): Promise<boolean> {
     const [result] = await pool.execute<ResultSetHeader>('DELETE FROM users WHERE user_id = ?', [userId]);
     return result.affectedRows > 0;

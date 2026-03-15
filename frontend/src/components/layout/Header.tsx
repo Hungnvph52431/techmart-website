@@ -1,14 +1,34 @@
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingCart, User, Search } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useCartStore } from '@/store/cartStore';
 
 export const Header = () => {
+  // Lấy các hàm và dữ liệu từ Store
+  // Lưu ý: isAuthenticated ở đây là một hàm
   const { user, isAuthenticated, clearAuth } = useAuthStore();
-  const { getTotalItems } = useCartStore();
+  const { totalItems } = useCartStore();
+  
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // SỬA LỖI 2339: Dùng fullName thay vì name
+  const displayName = user?.fullName || user?.email || 'Tài khoản';
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleLogout = () => {
-    clearAuth();
+    setIsUserMenuOpen(false);
+    clearAuth(); // Dùng hàm logout từ store
     window.location.href = '/';
   };
 
@@ -27,7 +47,7 @@ export const Header = () => {
               <input
                 type="text"
                 placeholder="Tìm kiếm sản phẩm..."
-                className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-4 py-2 pl-10 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
               <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
             </div>
@@ -35,100 +55,65 @@ export const Header = () => {
 
           {/* Actions */}
           <div className="flex items-center space-x-6">
-            <Link to="/cart" className="relative">
-              <ShoppingCart className="h-6 w-6 text-gray-700 hover:text-primary-600" />
-              {getTotalItems() > 0 && (
-                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {getTotalItems()}
+            <Link to="/cart" className="relative p-2 hover:bg-gray-50 rounded-full transition-colors">
+              <ShoppingCart className="h-6 w-6 text-gray-700" />
+              {/* SỬA LỖI: Gọi hàm totalItems() để lấy số lượng */}
+              {totalItems() > 0 && (
+                <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-white">
+                  {totalItems()}
                 </span>
               )}
             </Link>
 
+            {/* SỬA LỖI 2774: Phải gọi isAuthenticated() như một hàm */}
             {isAuthenticated() ? (
-              <div className="relative group">
-                {/* Thêm py-2 để tăng diện tích nhận chuột cho button */}
-                <button className="flex items-center space-x-2 py-2 outline-none">
+              <div ref={userMenuRef} className="relative">
+                <button
+                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                  className="flex items-center space-x-2 py-1.5 px-3 rounded-xl hover:bg-gray-50 transition-colors"
+                >
                   <User className="h-6 w-6 text-gray-700" />
-                  <span className="text-sm font-medium text-gray-700">{user?.fullName}</span>
+                  <span className="text-sm font-semibold text-gray-700 hidden md:block">
+                    {displayName}
+                  </span>
                 </button>
                 
-                {/* FIX LỖI DROPDOWN: 
-                  - Thay 'mt-2' bằng 'pt-2' để tạo cầu nối tàng hình.
-                  - Dùng 'top-full' để menu bắt đầu ngay sát dưới nút User.
-                */}
-                <div className="absolute right-0 top-full pt-2 w-48 hidden group-hover:block animate-in fade-in zoom-in duration-150">
-                  <div className="bg-white rounded-xl shadow-xl py-1 border border-gray-100 overflow-hidden">
+                {isUserMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-2xl py-2 border border-gray-100 animate-in fade-in zoom-in duration-150">
                     <Link
                       to="/profile"
+                      onClick={() => setIsUserMenuOpen(false)}
                       className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                     >
                       Thông tin cá nhân
                     </Link>
                     <Link
                       to="/orders"
+                      onClick={() => setIsUserMenuOpen(false)}
                       className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                     >
                       Đơn hàng của tôi
                     </Link>
-                    
-                    {/* Đường kẻ phân cách */}
                     <div className="border-t border-gray-50 my-1"></div>
-                    
                     <button
                       onClick={handleLogout}
-                      className="block w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors font-medium"
+                      className="block w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors font-bold"
                     >
                       Đăng xuất
                     </button>
                   </div>
-                </div>
+                )}
               </div>
             ) : (
               <Link
                 to="/login"
-                className="bg-primary-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-primary-700 transition-all active:scale-95"
+                className="bg-primary-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-primary-700 shadow-md transition-all active:scale-95"
               >
                 Đăng nhập
               </Link>
             )}
           </div>
         </div>
-
-        {/* Categories */}
-        <nav className="border-t border-gray-100 py-3">
-          <ul className="flex space-x-8 text-sm font-semibold">
-            <li>
-              <Link to="/" className="text-gray-600 hover:text-primary-600 transition-colors">
-                Trang chủ
-              </Link>
-            </li>
-            <li>
-              <Link to="/products?category=iPhone" className="text-gray-600 hover:text-primary-600 transition-colors">
-                iPhone
-              </Link>
-            </li>
-            <li>
-              <Link to="/products?category=Samsung" className="text-gray-600 hover:text-primary-600 transition-colors">
-                Samsung
-              </Link>
-            </li>
-            <li>
-              <Link to="/products?category=Xiaomi" className="text-gray-600 hover:text-primary-600 transition-colors">
-                Xiaomi
-              </Link>
-            </li>
-            <li>
-              <Link to="/products?category=OPPO" className="text-gray-600 hover:text-primary-600 transition-colors">
-                OPPO
-              </Link>
-            </li>
-            <li>
-              <Link to="/products?featured=true" className="text-blue-600 hover:text-blue-700 font-bold">
-                Sản phẩm nổi bật
-              </Link>
-            </li>
-          </ul>
-        </nav>
       </div>
     </header>
   );
