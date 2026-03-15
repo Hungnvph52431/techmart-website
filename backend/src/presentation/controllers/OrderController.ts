@@ -1,48 +1,103 @@
 import { Request, Response } from 'express';
 import { OrderUseCase } from '../../application/use-cases/OrderUseCase';
+import { AuthRequest } from '../middlewares/auth.middleware';
+import { toOrderDetail, toOrderListItem } from '../../application/mappers/OrderPresenter';
 
 export class OrderController {
   constructor(private orderUseCase: OrderUseCase) {}
 
-  getAll = async (req: Request, res: Response) => {
+  // --- DÀNH CHO KHÁCH HÀNG (MY ORDERS) ---
+
+  /** Lấy danh sách đơn hàng của tôi */
+  getMine = async (req: AuthRequest, res: Response) => {
     try {
-      const orders = await this.orderUseCase.getAllOrders();
-      res.json(orders);
+      const orders = await this.orderUseCase.getMyOrders(
+        req.user.userId,
+        req.query.status as any
+      );
+      // Sử dụng Mapper để trả về định dạng chuẩn cho khách hàng
+      res.json(orders.map((order) => toOrderListItem(order, 'customer')));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   };
 
-  getById = async (req: Request, res: Response) => {
+  /** Lấy chi tiết đơn hàng của tôi */
+  getMyById = async (req: AuthRequest, res: Response) => {
     try {
-      const order = await this.orderUseCase.getOrderById(Number(req.params.id));
-      
-      if (!order) {
-        return res.status(404).json({ message: 'Order not found' });
+      const aggregate = await this.orderUseCase.getMyOrderDetail(
+        Number(req.params.id),
+        req.user.userId
+      );
+
+      if (!aggregate) {
+        return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
       }
 
-      res.json(order);
+      res.json(toOrderDetail(aggregate, 'customer'));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   };
 
-  getByUser = async (req: Request, res: Response) => {
+  /** Lấy dòng thời gian (Timeline) đơn hàng của tôi */
+  getMyTimeline = async (req: AuthRequest, res: Response) => {
     try {
-      const userId = (req as any).user.userId;
-      const orders = await this.orderUseCase.getOrdersByUserId(userId);
-      res.json(orders);
+      const timeline = await this.orderUseCase.getMyOrderTimeline(
+        Number(req.params.id),
+        req.user.userId
+      );
+
+      if (!timeline) {
+        return res.status(404).json({ message: 'Không tìm thấy lịch sử đơn hàng' });
+      }
+
+      res.json(timeline);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   };
-
-  create = async (req: Request, res: Response) => {
+getReturns = async (req: AuthRequest, res: Response) => {
     try {
-      const userId = (req as any).user.userId;
+      const returns = await this.orderUseCase.getOrderReturns(
+        Number(req.params.id),
+        req.user.userId
+      );
+
+      if (!returns) {
+        return res.status(404).json({ message: 'Không tìm thấy thông tin hoàn trả' });
+      }
+
+      res.json(returns);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  };
+  getReturnById = async (req: AuthRequest, res: Response) => {
+    try {
+      const orderReturn = await this.orderUseCase.getOrderReturn(
+        Number(req.params.id),
+        Number(req.params.returnId),
+        req.user.userId
+      );
+
+      if (!orderReturn) {
+        return res.status(404).json({ message: 'Không tìm thấy phiếu hoàn trả' });
+      }
+
+      res.json(orderReturn);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  };
+  // --- THAO TÁC ĐƠN HÀNG ---
+
+  /** Tạo đơn hàng mới */
+  create = async (req: AuthRequest, res: Response) => {
+    try {
       const order = await this.orderUseCase.createOrder({
         ...req.body,
-        userId,
+        userId: req.user.userId, // Lấy userId từ Token đã authenticate
       });
       res.status(201).json(order);
     } catch (error: any) {
@@ -50,31 +105,87 @@ export class OrderController {
     }
   };
 
-  updateStatus = async (req: Request, res: Response) => {
+  /** Hủy đơn hàng (dành cho khách hàng) */
+  cancelMine = async (req: AuthRequest, res: Response) => {
     try {
-      const { status } = req.body;
-      const success = await this.orderUseCase.updateOrderStatus(Number(req.params.id), status);
+      const order = await this.orderUseCase.cancelOrder(
+        Number(req.params.id),
+        req.user.userId,
+        req.user.role,
+        req.body.reason || '',
+        req.body.adminNote
+      );
 
-      if (!success) {
-        return res.status(404).json({ message: 'Order not found' });
+      if (!order) {
+        return res.status(404).json({ message: 'Không tìm thấy đơn hàng để hủy' });
       }
 
-      res.json({ message: 'Order status updated' });
+      res.json(order);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
   };
 
-  updatePaymentStatus = async (req: Request, res: Response) => {
+  /** Yêu cầu hoàn trả hàng */
+  createReturn = async (req: AuthRequest, res: Response) => {
     try {
-      const { status } = req.body;
-      const success = await this.orderUseCase.updatePaymentStatus(Number(req.params.id), status);
+      const orderReturn = await this.orderUseCase.requestReturn(
+        Number(req.params.id),
+        req.user.userId,
+        req.body
+      );
 
-      if (!success) {
-        return res.status(404).json({ message: 'Order not found' });
+      if (!orderReturn) {
+        return res.status(404).json({ message: 'Yêu cầu trả hàng không hợp lệ' });
       }
 
-      res.json({ message: 'Payment status updated' });
+      res.status(201).json(orderReturn);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  };
+
+  // --- DÀNH CHO QUẢN TRỊ (ADMIN) ---
+
+  /** Lấy tất cả đơn hàng (Admin) */
+  getAll = async (req: Request, res: Response) => {
+  try {
+    console.log(">>> Đã nhận yêu cầu lấy danh sách đơn hàng Admin"); // Thêm dòng này
+    const orders = await this.orderUseCase.getAdminOrders(req.query as any);
+    res.json(orders);
+  } catch (error: any) {
+    console.error("!!! LỖI NGHIÊM TRỌNG TẠI CONTROLLER:", error); // Đảm bảo có dòng này để Docker hiện chữ đỏ
+    res.status(500).json({ message: error.message });
+  }
+};  
+
+  /** Lấy thống kê đơn hàng cho Dashboard */
+  getStats = async (_req: Request, res: Response) => {
+    try {
+      const stats = await this.orderUseCase.getOrderStats();
+      res.json({ success: true, data: stats });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  };
+
+  /** Cập nhật trạng thái đơn hàng (Admin) */
+  updateStatus = async (req: Request, res: Response) => {
+    try {
+      const { status, actorUserId, actorRole, note } = req.body;
+      const order = await this.orderUseCase.transitionOrderStatus(
+        Number(req.params.id),
+        status,
+        actorUserId,
+        actorRole,
+        note
+      );
+
+      if (!order) {
+        return res.status(404).json({ message: 'Không thể cập nhật trạng thái' });
+      }
+
+      res.json({ message: 'Trạng thái đơn hàng đã được cập nhật', order });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }

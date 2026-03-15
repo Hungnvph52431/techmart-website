@@ -6,10 +6,11 @@ export class AuthController {
 
   login = async (req: Request, res: Response) => {
     try {
+      // req.body chứa email và password
       const result = await this.authUseCase.login(req.body);
       
       if (!result) {
-        return res.status(401).json({ message: 'Invalid credentials' });
+        return res.status(401).json({ message: 'Email hoặc mật khẩu không chính xác' });
       }
 
       res.json(result);
@@ -27,9 +28,25 @@ export class AuthController {
     }
   };
 
+  /**
+   * Lấy thông tin cá nhân mới nhất từ Database
+   */
   getProfile = async (req: Request, res: Response) => {
     try {
-      res.json({ user: (req as any).user });
+      // authUser được đính kèm vào request thông qua AuthMiddleware
+      const authUser = (req as any).user;
+
+      if (!authUser || !authUser.userId) {
+        return res.status(401).json({ message: 'Bạn chưa đăng nhập' });
+      }
+
+      const user = await this.authUseCase.getProfile(authUser.userId);
+
+      if (!user) {
+        return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+      }
+
+      res.json({ user });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

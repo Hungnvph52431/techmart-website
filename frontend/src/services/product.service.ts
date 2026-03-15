@@ -1,29 +1,27 @@
 import api from './api';
-import { Product, ProductFilter, ProductResponse } from '@/types';
+import { Product, ProductFilter, ProductStats } from '@/types';
 
 export const productService = {
-  getAll: async (filters?: ProductFilter): Promise<ProductResponse> => {
-  const params = new URLSearchParams();
+  // 1. LẤY DANH SÁCH SẢN PHẨM (Hỗ trợ bộ lọc Samsung/Apple, Giá, Tìm kiếm)
+  //
+  getAll: async (filters?: ProductFilter): Promise<Product[]> => {
+    const params = new URLSearchParams();
 
-  if (filters) {
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        params.append(key, String(value));
-      }
-    });
-  }
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          params.append(key, String(value));
+        }
+      });
+    }
 
-  const response = await api.get(`/products?${params.toString()}`);
-
-  return response.data;
-  },
-
-  getProducts: async (): Promise<Product[]> => {
-    const response = await api.get('/products');
+    const response = await api.get(`/products?${params.toString()}`);
+    // Backend hiện đang trả về mảng Product[] trực tiếp
     return response.data;
   },
 
-  getById: async (id: string): Promise<Product> => {
+  // 2. TÌM KIẾM CHI TIẾT
+  getById: async (id: string | number): Promise<Product> => {
     const response = await api.get(`/products/${id}`);
     return response.data;
   },
@@ -33,6 +31,7 @@ export const productService = {
     return response.data;
   },
 
+  // 3. CÁC HÀM QUẢN TRỊ (ADMIN)
   createProduct: async (productData: any): Promise<Product> => {
     const response = await api.post('/products', productData);
     return response.data;
@@ -45,5 +44,12 @@ export const productService = {
 
   deleteProduct: async (id: number): Promise<void> => {
     await api.delete(`/products/${id}`);
+  },
+
+  // 4. THỐNG KÊ (Dành cho Dashboard Admin)
+  getStats: async (): Promise<ProductStats> => {
+    const response = await api.get('/products/stats');
+    // Tùy vào cấu trúc trả về của API, có thể là response.data hoặc response.data.data
+    return response.data.data || response.data;
   },
 };

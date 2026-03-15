@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { voucherService, Voucher, CreateVoucherPayload } from '@/services/voucher.service';
 import { Ticket, Plus, X, Save, Loader2, AlertCircle, Trash2 } from 'lucide-react';
 
-export const AdminVouchers = () => {
+export const AdminVoucher = () => {
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);

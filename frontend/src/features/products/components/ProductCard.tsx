@@ -11,94 +11,90 @@ interface ProductCardProps {
 export const ProductCard = ({ product }: ProductCardProps) => {
   const { addItem } = useCartStore();
 
-  // Tính toán giá dựa trên CSDL của bạn (price = giá gốc, salePrice = giá khuyến mãi)
-  const originalPrice = product.price ?? 0;
-  const currentPrice = product.salePrice ?? originalPrice;
-
-  const discount =
-    product.salePrice && originalPrice > product.salePrice
-      ? Math.round(((originalPrice - product.salePrice) / originalPrice) * 100)
-      : 0;
-
-  const handleAddToCart = (e: React.MouseEvent<HTMLButtonElement>) => {
+  const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
-    e.stopPropagation();
-
+    e.stopPropagation(); // Ngăn chặn sự kiện click lan ra thẻ Link bên ngoài
     addItem(product);
     toast.success("Đã thêm vào giỏ hàng!");
   };
 
-  return (  
+  // 1. Logic tính toán giá từ Database chuẩn
+  const originalPrice = product.price ?? 0;
+  const currentPrice = product.salePrice ?? originalPrice;
+
+  const discount = (product.salePrice && originalPrice > product.salePrice)
+    ? Math.round(((originalPrice - product.salePrice) / originalPrice) * 100)
+    : 0;
+
+  return (
     <Link
       to={`/products/${product.slug}`}
-      className="group block overflow-hidden rounded-xl border bg-white shadow-sm transition duration-300 hover:shadow-lg"
+      className="group flex h-full flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all duration-300 hover:shadow-xl"
     >
-      <div className="relative overflow-hidden">
-        {/* Dùng mainImage theo đúng CSDL */}
+      {/* 2. Container Ảnh - Dùng giao diện bo tròn hiện đại của bản Incoming */}
+      <div className="relative pt-[100%] overflow-hidden bg-gray-50">
         <img
-          src={product.mainImage ?? "/placeholder.jpg"}
+          src={product.mainImage || (product.images && product.images[0]?.imageUrl) || "/placeholder.jpg"}
           alt={product.name}
-          className="h-60 w-full object-cover transition duration-300 group-hover:scale-105"
+          className="absolute inset-0 h-full w-full object-contain p-4 transition-transform duration-500 group-hover:scale-110"
+          onError={(e) => (e.currentTarget.src = "https://placehold.co/400x400?text=" + product.name)}
         />
-
-        {discount > 0 && (
-          <span className="absolute right-2 top-2 rounded bg-red-500 px-2 py-1 text-xs text-white">
-            -{discount}%
-          </span>
-        )}
-
-        {/* Dùng isFeatured theo đúng CSDL */}
-        {product.isFeatured && (
-          <span className="absolute left-2 top-2 rounded bg-yellow-500 px-2 py-1 text-xs text-white">
-            Nổi bật
-          </span>
-        )}
+        
+        {/* Badges - Kết hợp thông tin Nổi bật và Giảm giá */}
+        <div className="absolute left-3 top-3 flex flex-col gap-2">
+          {discount > 0 && (
+            <span className="rounded-lg bg-red-600 px-2 py-1 text-xs font-bold text-white shadow-sm">
+              Giảm {discount}%
+            </span>
+          )}
+          {product.isFeatured && (
+            <span className="rounded-lg bg-blue-600 px-2 py-1 text-xs font-bold text-white shadow-sm">
+              Hot
+            </span>
+          )}
+        </div>
       </div>
 
-      <div className="p-4">
-        {/* Tuỳ chọn: Hiện tên hãng nếu bạn muốn */}
+      {/* 3. Phần nội dung - Hiển thị đầy đủ Brand và Đánh giá */}
+      <div className="flex flex-1 flex-col p-4">
         {product.brandName && (
-          <div className="mb-1 text-xs font-bold uppercase tracking-wider text-blue-600">
+          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-blue-600">
             {product.brandName}
           </div>
         )}
 
-        <h3 className="mb-2 line-clamp-2 text-sm font-semibold text-gray-800 transition group-hover:text-primary-600">
+        <h3 className="mb-2 line-clamp-2 min-h-[40px] text-sm font-bold text-gray-800 transition-colors group-hover:text-primary-600">
           {product.name}
         </h3>
 
-        <div className="mb-3 flex items-center text-sm text-gray-500">
-          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-
-          {/* Dùng ratingAvg thay cho rating */}
-          <span className="ml-1">{product.ratingAvg ?? 0}</span>
-          <span className="mx-2">|</span>
-
-          <span>{product.reviewCount ?? 0} đánh giá</span>
+        <div className="mb-3 flex items-center gap-3">
+          <div className="flex items-center rounded bg-yellow-50 px-2 py-0.5">
+            <Star className="h-3 w-3 fill-current text-yellow-500" />
+            <span className="ml-1 text-xs font-bold text-yellow-700">{product.ratingAvg || 0}</span>
+          </div>
+          <span className="text-xs text-gray-400">Đã bán {product.reviewCount || 0}</span>
         </div>
 
-        <div className="mb-3 flex items-end justify-between">
-          <div>
-            <div className="text-lg font-bold text-red-600">
+        <div className="mt-auto">
+          <div className="mb-4 flex flex-col">
+            <span className="text-lg font-black text-red-600">
               {currentPrice.toLocaleString("vi-VN")}₫
-            </div>
-
+            </span>
             {discount > 0 && (
-              <div className="text-xs text-gray-400 line-through">
+              <span className="text-xs text-gray-400 decoration-gray-300 line-through">
                 {originalPrice.toLocaleString("vi-VN")}₫
-              </div>
+              </span>
             )}
           </div>
+
+          <button
+            onClick={handleAddToCart}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-100 bg-gray-50 py-2.5 text-xs font-bold text-gray-700 transition-all hover:border-primary-600 hover:bg-primary-600 hover:text-white"
+          >
+            <ShoppingCart size={16} />
+            Mua ngay
+          </button>
         </div>
-
-        <button
-          onClick={handleAddToCart}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 py-2 text-white transition hover:bg-primary-700"
-        >
-          <ShoppingCart size={16} />
-          Thêm vào giỏ
-        </button>
-
       </div>
     </Link>
   );

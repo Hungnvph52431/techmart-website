@@ -1,7 +1,6 @@
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useEffect } from 'react';
-// Sử dụng Lucide React để giao diện xịn như các web thương mại điện tử lớn
 import { 
   LayoutDashboard, 
   Package, 
@@ -10,7 +9,9 @@ import {
   Ticket, 
   LogOut, 
   ExternalLink,
-  User as UserIcon
+  User as UserIcon,
+  Layers,
+  Settings2
 } from 'lucide-react';
 
 export const AdminLayout = () => {
@@ -18,6 +19,7 @@ export const AdminLayout = () => {
   const location = useLocation();
   const { user, clearAuth } = useAuthStore();
 
+  // Kiểm tra quyền truy cập Admin
   useEffect(() => {
     if (!user || user.role !== 'admin') {
       navigate('/login');
@@ -36,6 +38,9 @@ export const AdminLayout = () => {
 
   if (!user || user.role !== 'admin') return null;
 
+  // FIX LỖI 2339: Bỏ user.name vì Type User chỉ có fullName
+  const displayName = user.fullName || user.email;
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* --- TOP HEADER --- */}
@@ -53,7 +58,7 @@ export const AdminLayout = () => {
           <div className="flex items-center space-x-6">
             <div className="flex items-center space-x-2 text-gray-600 bg-gray-100 px-3 py-1.5 rounded-full text-sm">
               <UserIcon size={16} />
-              <span className="font-medium">{user.fullName || user.email}</span>
+              <span className="font-medium">{displayName}</span>
             </div>
             
             <Link to="/" className="text-gray-500 hover:text-blue-600 flex items-center gap-1 text-sm transition-colors">
@@ -75,16 +80,17 @@ export const AdminLayout = () => {
         <aside className="w-64 bg-white border-r border-gray-200 sticky top-16 h-[calc(100vh-64px)] overflow-y-auto p-4">
           <nav className="space-y-1.5">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4 mb-2">Chính</p>
-            
             <SidebarLink to="/admin" icon={<LayoutDashboard size={20} />} label="Dashboard" active={isActive('/admin')} />
             
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4 mt-6 mb-2">Cấu hình hệ thống</p>
+            <SidebarLink to="/admin/categories" icon={<Layers size={20} />} label="Danh mục" active={isActive('/admin/categories')} />
+            <SidebarLink to="/admin/attributes" icon={<Settings2 size={20} />} label="Thuộc tính" active={isActive('/admin/attributes')} />
+
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4 mt-6 mb-2">Quản lý nội dung</p>
-            
             <SidebarLink to="/admin/products" icon={<Package size={20} />} label="Sản phẩm" active={isActive('/admin/products')} />
             <SidebarLink to="/admin/orders" icon={<ShoppingCart size={20} />} label="Đơn hàng" active={isActive('/admin/orders')} />
             <SidebarLink to="/admin/users" icon={<Users size={20} />} label="Người dùng" active={isActive('/admin/users')} />
             
-            {/* MỤC VOUCHER */}
             <SidebarLink to="/admin/vouchers" icon={<Ticket size={20} />} label="Quản lý Voucher" active={isActive('/admin/vouchers')} />
           </nav>
         </aside>
@@ -98,7 +104,6 @@ export const AdminLayout = () => {
   );
 };
 
-// Component con để code Sidebar gọn hơn
 const SidebarLink = ({ to, icon, label, active }: { to: string, icon: React.ReactNode, label: string, active: boolean }) => (
   <Link
     to={to}

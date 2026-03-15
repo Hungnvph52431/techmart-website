@@ -5,6 +5,15 @@ export interface ICategoryRepository {
   findById(categoryId: number): Promise<Category | null>;
   findBySlug(slug: string): Promise<Category | null>;
   findByParentId(parentId: number | null): Promise<Category[]>;
+  
+  // --- CÁC PHƯƠNG THỨC KIỂM TRA RÀNG BUỘC ---
+  /** Kiểm tra xem danh mục có danh mục con hay không */
+  hasChildren(categoryId: number): Promise<boolean>;
+  
+  /** Kiểm tra xem danh mục có chứa sản phẩm nào không */
+  hasProducts(categoryId: number): Promise<boolean>;
+
+  // --- THAO TÁC DỮ LIỆU ---
   create(category: CreateCategoryDTO): Promise<Category>;
   update(category: UpdateCategoryDTO): Promise<Category | null>;
   delete(categoryId: number): Promise<boolean>;
