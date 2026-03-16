@@ -31,14 +31,19 @@ export const toStorefrontProduct = (product: Product) => {
     description: product.description || '',
     price: product.salePrice ?? product.price,
     originalPrice: product.price,
+    salePrice: product.salePrice,          // ✅ thêm
+    mainImage: product.mainImage || '',    // ✅ thêm
     brand: product.brandName || '',
+    brandName: product.brandName || '',    // ✅ thêm
     category: product.categoryName || '',
     stock: product.stockQuantity,
+    stockQuantity: product.stockQuantity,  // ✅ thêm
+    ratingAvg: product.ratingAvg,          // ✅ thêm
+    reviewCount: product.reviewCount,      // ✅ thêm
     images,
     specifications: toValueMap(product.specifications),
     featured: product.isFeatured,
     rating: product.ratingAvg,
-    reviewCount: product.reviewCount,
     status: product.status,
     createdAt: product.createdAt,
     updatedAt: product.updatedAt,

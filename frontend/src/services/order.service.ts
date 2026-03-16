@@ -2,8 +2,7 @@ import api from './api';
 import { 
   Order, 
   OrderStats, 
-  OrderItem, 
-  ShippingAddress 
+  OrderItem,  
 } from '@/types';
 
 // Các type bổ trợ cho tính năng Đơn hàng nâng cao
@@ -12,7 +11,6 @@ export type OrderStatus = 'pending' | 'confirmed' | 'processing' | 'shipping' | 
 export interface CreateOrderPayload {
   items: OrderItem[];
   totalAmount: number;
-  shippingAddress: ShippingAddress;
   paymentMethod: 'cod' | 'online';
   note?: string;
 }
@@ -57,9 +55,14 @@ export const orderService = {
   },
 
   updateStatus: async (orderId: number, status: string): Promise<Order> => {
-    const response = await api.patch(`/orders/${orderId}/status`, { status });
-    return response.data;
-  },
+  const response = await api.patch(`/orders/${orderId}/status`, {
+    status,
+    actorUserId: null,   // Admin action, không cần userId cụ thể
+    actorRole: 'admin',
+    note: '',
+  });
+  return response.data;
+},
 
   updatePaymentStatus: async (orderId: number, paymentStatus: string): Promise<Order> => {
     const response = await api.patch(`/orders/${orderId}/payment-status`, { paymentStatus });

@@ -5,11 +5,11 @@ import { authMiddleware, adminMiddleware } from "../middlewares/auth.middleware"
 
 export const createVoucherRoutes = (voucherController: VoucherController) => {
     const router = Router();
-    
+    router.post('/validate', authMiddleware, (req, res) => 
+        voucherController.validate(req, res)
+    );
     // Yêu cầu đăng nhập và phải là Admin mới được thao tác Voucher
     router.use(authMiddleware, adminMiddleware);
-
-    // Dùng bind() hoặc arrow function để không bị mất context 'this'
     router.get('/', (req, res) => voucherController.getAll(req, res));
     router.post('/', (req, res) => voucherController.create(req, res));
     router.delete('/:id', (req, res) => voucherController.delete(req, res));

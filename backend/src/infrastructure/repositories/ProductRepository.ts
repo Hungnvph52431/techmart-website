@@ -1,25 +1,54 @@
-import { IProductRepository, ProductStats } from '../../domain/repositories/IProductRepository';
-import { RowDataPacket, ResultSetHeader } from 'mysql2';
-import {
-  CreateProductDTO,
-  Product,
-  ProductStatus,
-  ProductVariant,
-  SaveProductPayload,
-  UpdateProductDTO,
+import { IProductRepository, ProductFilters, PaginatedResult, ProductStats } from '../../domain/repositories/IProductRepository';
+import { 
+  Product, 
+  CreateProductDTO, 
+  UpdateProductDTO, 
+  ProductStatus, 
+  ProductVariant, 
+  SaveProductPayload 
 } from '../../domain/entities/Product';
+import { ProductImage, CreateProductImageDTO } from '../../domain/entities/ProductImage';
+import { CreateProductVariantDTO, UpdateProductVariantDTO } from '../../domain/entities/ProductVariant';
+import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import pool from '../database/connection';
 
 export class ProductRepository implements IProductRepository {
+  private pool = pool; // Khai báo pool để thực thi SQL
+  // --- 1. TRUY VẤN DANH SÁCH (FRONTEND & ADMIN) ---
   
-  // --- 1. LẤY DANH SÁCH (FRONTEND & ADMIN) ---
+ async findAll(filters?: any): Promise<Product[]> {
+  const { query, params } = this.buildBaseListQuery(true, filters);
+  // PHẢI GHÉP CHỮ SELECT VÀO ĐẦY ĐỦ NHƯ THẾ NÀY
+  const fullSql = `SELECT p.*, c.name as categoryName, b.name as brandName ${query} ORDER BY p.created_at DESC`;
   
-  async findAll(filters?: any): Promise<Product[]> {
-    const { query, params } = this.buildBaseListQuery(true, filters);
-    const [rows] = await pool.query<RowDataPacket[]>(query, params); 
-    const products = rows.map((row) => this.mapRowToProduct(row));
-    return this.attachRelations(products, { includeVariants: false });
-  }
+  const [rows] = await this.pool.query<RowDataPacket[]>(fullSql, params);
+  return rows.map(row => this.mapRowToProduct(row));
+}
+
+  // Thêm tính năng phân trang từ bản Tuấn Anh
+ async findAllPaginated(filters: any, page: number, limit: number): Promise<PaginatedResult<Product>> {
+  const offset = (Number(page) - 1) * Number(limit);
+  // publicOnly = true để trang Client chỉ hiện hàng 'Đang bán'
+  const { query, params } = this.buildBaseListQuery(true, filters);
+
+  // 1. Lấy dữ liệu (Dùng .query để tránh lỗi Incorrect arguments với LIMIT/OFFSET)
+  const dataSql = `SELECT p.*, c.name as categoryName, b.name as brandName ${query} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`;
+  const [rows] = await this.pool.query<RowDataPacket[]>(dataSql, [...params, Number(limit), Number(offset)]);
+
+  // 2. Đếm tổng số máy thỏa mãn bộ lọc
+  const countSql = `SELECT COUNT(*) as total ${query}`;
+  const [countResult]: any = await this.pool.query(countSql, params);
+  const total = countResult[0].total;
+
+  return {
+    // QUAN TRỌNG: Phải dùng mapRowToProduct để đổi snake_case sang camelCase cho Frontend
+    data: rows.map(row => this.mapRowToProduct(row)), 
+    total,
+    page: Number(page),
+    limit: Number(limit),
+    totalPages: Math.ceil(total / limit)
+  };
+}
 
   async findAdminList(filters?: any): Promise<Product[]> {
     const { query, params } = this.buildBaseListQuery(false, filters);
@@ -30,72 +59,118 @@ export class ProductRepository implements IProductRepository {
 
   // --- 2. TÌM CHI TIẾT (ID & SLUG) ---
 
-  async findById(productId: number): Promise<Product | null> {
-    const [rows] = await pool.execute<RowDataPacket[]>(
-      `${this.baseProductSelect()} WHERE p.product_id = ?`, [productId]
-    );
-    if (rows.length === 0) return null;
-    const [product] = await this.attachRelations(rows.map(r => this.mapRowToProduct(r)), { includeVariants: true });
-    return product;
+  async findById(id: number): Promise<Product | null> {
+    const [rows]: any = await this.pool.execute('SELECT * FROM products WHERE product_id = ?', [id]);
+    return rows.length > 0 ? rows[0] : null;
   }
 
   async findAdminById(productId: number): Promise<Product | null> {
     return this.findById(productId);
   }
 
-  /**
-   * FIX LỖI TS2366: Đảm bảo luôn có giá trị trả về
-   * FIX LỖI 404: Lấy đầy đủ quan hệ để trang chi tiết không bị trắng
-   */
   async findBySlug(slug: string): Promise<Product | null> {
-    try {
-      const [rows] = await pool.execute<RowDataPacket[]>(
-        `${this.baseProductSelect()} WHERE p.slug = ?`, 
-        [slug]
-      );
+  const [rows] = await this.pool.execute<RowDataPacket[]>(
+    `SELECT p.*, c.name as categoryName, b.name as brandName 
+     FROM products p
+     LEFT JOIN categories c ON p.category_id = c.category_id
+     LEFT JOIN brands b ON p.brand_id = b.brand_id
+     WHERE p.slug = ?`,
+    [slug]
+  );
+  
+  if (rows.length === 0) return null;
+  
+  const product = this.mapRowToProduct(rows[0]);
+  
+  // Load ảnh và variants
+  const [images] = await this.pool.execute<RowDataPacket[]>(
+    'SELECT * FROM product_images WHERE product_id = ? ORDER BY display_order ASC',
+    [product.productId]
+  );
+  
+  const [variants] = await this.pool.execute<RowDataPacket[]>(
+    'SELECT * FROM product_variants WHERE product_id = ? AND is_active = 1',
+    [product.productId]
+  );
 
-      if (rows.length === 0) {
-        console.log(`!!! KHÔNG TÌM THẤY SLUG: ${slug} TRONG DATABASE`);
-        return null;
-      }
+  return {
+    ...product,
+    images: images.map(this.mapRowToProductImage),
+    variants: variants.map(this.mapRowToProductVariant),
+  } as any;
+}
 
-      const products = rows.map(r => this.mapRowToProduct(r));
-      const [productWithRelations] = await this.attachRelations(products, { 
-        includeVariants: true 
-      });
+  // --- 3. QUẢN LÝ ẢNH (BÍ QUYẾT HIỆN ẢNH CỦA TUẤN ANH) ---
 
-      return productWithRelations || null;
-    } catch (error) {
-      console.error("Lỗi tại ProductRepository.findBySlug:", error);
-      return null; 
-    }
+  async findImages(productId: number): Promise<ProductImage[]> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      'SELECT * FROM product_images WHERE product_id = ? ORDER BY display_order ASC', [productId]
+    );
+    return rows.map(this.mapRowToProductImage);
   }
 
-  // --- 3. QUẢN LÝ KHO & TRẠNG THÁI ---
-
-  async archive(productId: number): Promise<boolean> {
-    const [result] = await pool.execute<ResultSetHeader>(
-      `UPDATE products SET status = 'archived', updated_at = ? WHERE product_id = ?`,
-      [new Date(), productId]
-    );
+  async deleteImage(imageId: number): Promise<boolean> {
+    const [result] = await pool.execute<ResultSetHeader>('DELETE FROM product_images WHERE image_id = ?', [imageId]);
     return result.affectedRows > 0;
   }
 
-  async updateStock(id: number, q: number): Promise<boolean> {
-    const [res] = await pool.execute<ResultSetHeader>(
-      'UPDATE products SET stock_quantity = stock_quantity + ?, updated_at = ? WHERE product_id = ?', 
-      [q, new Date(), id]
+  // --- 4. QUẢN LÝ BIẾN THỂ (VARIANTS) ---
+
+  async findVariants(productId: number): Promise<ProductVariant[]> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      'SELECT * FROM product_variants WHERE product_id = ? AND is_active = 1', [productId]
     );
+    return rows.map(this.mapRowToProductVariant);
+  }
+
+  async findVariantById(id: number): Promise<ProductVariant | null> {
+    const [rows] = await pool.execute<RowDataPacket[]>('SELECT * FROM product_variants WHERE variant_id = ?', [id]);
+    return rows.length > 0 ? this.mapRowToProductVariant(rows[0]) : null;
+  }
+
+  async addVariant(v: CreateProductVariantDTO): Promise<ProductVariant> {
+    const [res] = await pool.execute<ResultSetHeader>(
+      `INSERT INTO product_variants (product_id, variant_name, sku, price_adjustment, stock_quantity) VALUES (?, ?, ?, ?, ?)`,
+      [v.productId, v.variantName, v.sku, v.priceAdjustment, v.stockQuantity]
+    );
+    return { ...v, variantId: res.insertId } as any;
+  }
+
+  async updateVariant(v: UpdateProductVariantDTO): Promise<ProductVariant | null> {
+    await pool.execute(`UPDATE product_variants SET variant_name = ?, price_adjustment = ? WHERE variant_id = ?`, 
+      [v.variantName, v.priceAdjustment, v.variantId]);
+    return this.findVariantById(v.variantId);
+  }
+
+  async deleteVariant(id: number): Promise<boolean> {
+    const [res] = await pool.execute<ResultSetHeader>('DELETE FROM product_variants WHERE variant_id = ?', [id]);
     return res.affectedRows > 0;
   }
 
-  // --- 4. HÀM LƯU DỮ LIỆU (TRANSACTION) ---
+  // --- 5. HÀM LƯU DỮ LIỆU & THỐNG KÊ (CỦA KHANH) ---
+async getImages(productId: number): Promise<ProductImage[]> {
+    const [rows] = await this.pool.execute('SELECT * FROM product_images WHERE product_id = ?', [productId]);
+    return rows as ProductImage[];
+  }
+
+async addImage(data: CreateProductImageDTO): Promise<ProductImage> {
+    const [result] = await this.pool.execute<ResultSetHeader>(
+      'INSERT INTO product_images (product_id, image_url, is_primary) VALUES (?, ?, ?)',
+      [data.productId, data.imageUrl, data.isPrimary]
+    );
+    return { 
+  imageId: result.insertId, 
+  ...data, 
+  createdAt: new Date() // Đổi từ .toISOString() sang new Date()
+} as ProductImage;
+  }
+
 
   async save(payload: SaveProductPayload, productId?: number): Promise<Product> {
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
-      // Logic xử lý thêm/sửa sản phẩm và biến thể sẽ nằm ở đây...
+      // Logic Transaction phức tạp giữ nguyên...
       await connection.commit();
       return (await this.findById(productId || 0))!; 
     } catch (error) {
@@ -105,8 +180,97 @@ export class ProductRepository implements IProductRepository {
       connection.release();
     }
   }
+async create(data: any): Promise<Product> {
+    const [result] = await this.pool.execute<ResultSetHeader>(
+      // BỔ SUNG ĐẦY ĐỦ CÁC CỘT (Đặc biệt là category_id)
+      `INSERT INTO products (
+        name, slug, sku, category_id, brand_id, 
+        price, sale_price, cost_price, stock_quantity, 
+        description, main_image, status, 
+        is_featured, is_new, is_bestseller,
+        meta_title, meta_description, meta_keywords
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        data.name, data.slug, data.sku, 
+        data.category_id || data.categoryId, // Lấy 1 trong 2 để chắc chắn
+        data.brand_id || data.brandId || null,
+        data.price, data.sale_price || data.salePrice || null,
+        data.cost_price || data.costPrice || null,
+        data.stock_quantity || data.stockQuantity || 0,
+        data.description || '',
+        data.main_image || data.mainImage || '',
+        data.status || 'active',
+        data.is_featured || data.isFeatured || 0,
+        data.is_new || data.isNew || 0,
+        data.is_bestseller || data.isBestseller || 0,
+        data.meta_title || data.metaTitle || null,
+        data.meta_description || data.metaDescription || null,
+        data.meta_keywords || data.metaKeywords || null
+      ]
+    );
+    const newProduct = await this.findById(result.insertId);
+    return newProduct!;
+}
 
-  // --- 5. HÀM TRỢ GIÚP (PRIVATE MAPPERS) ---
+// backend/src/infrastructure/repositories/ProductRepository.ts
+
+async update(data: any): Promise<Product | null> {
+  const id = data.productId; 
+
+  // BỔ SUNG ĐẦY ĐỦ CÁC CỘT CẦN CẬP NHẬT
+  await this.pool.execute(
+    `UPDATE products SET 
+      name = ?, slug = ?, sku = ?, category_id = ?, 
+      price = ?, sale_price = ?, stock_quantity = ?, 
+      status = ?, main_image = ?, description = ?
+     WHERE product_id = ?`,
+    [
+      data.name, data.slug, data.sku, 
+      data.category_id || data.categoryId, 
+      data.price, data.sale_price || data.salePrice || null,
+      data.stock_quantity || data.stockQuantity, 
+      data.status, data.main_image || data.mainImage || '',
+      data.description || '',
+      id
+    ]
+  );
+  
+  return this.findById(Number(id));
+}
+
+async delete(id: number): Promise<boolean> {
+    const [result] = await this.pool.execute<ResultSetHeader>('DELETE FROM products WHERE product_id = ?', [id]);
+    return result.affectedRows > 0;
+  }
+  async getStats(): Promise<ProductStats> {
+    const [result]: any = await this.pool.execute(`
+      SELECT 
+        COUNT(*) as totalProducts,
+        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as activeProducts,
+        SUM(CASE WHEN stock_quantity = 0 THEN 1 ELSE 0 END) as outOfStockCount
+      FROM products
+    `);
+    return result[0];
+  }
+  async archive(productId: number): Promise<boolean> {
+    const [result] = await pool.execute<ResultSetHeader>(
+      `UPDATE products SET status = 'archived' WHERE product_id = ?`, [productId]
+    );
+    return result.affectedRows > 0;
+  }
+
+  async updateStock(id: number, q: number): Promise<boolean> {
+    const [res] = await pool.execute<ResultSetHeader>(
+      'UPDATE products SET stock_quantity = stock_quantity + ? WHERE product_id = ?', [q, id]
+    );
+    return res.affectedRows > 0;
+  }
+
+  async updateVariantStock(id: number, q: number) { return false; }
+  async recalculateStock(id: number) { return false; }
+  async isSkuTaken(sku: string) { return false; }
+
+  // --- 6. HÀM TRỢ GIÚP (PRIVATE) ---
 
   private baseProductSelect() {
     return `SELECT p.*, c.name as categoryName, b.name as brandName FROM products p 
@@ -114,121 +278,96 @@ export class ProductRepository implements IProductRepository {
             LEFT JOIN brands b ON p.brand_id = b.brand_id`;
   }
 
-  /**
-   * FIX LỖI TS2352: Bổ sung đầy đủ các trường để khớp với Interface Product
-   */
   private mapRowToProduct(row: any): Product {
-    return {
-      productId: row.product_id,
-      name: row.name,
-      slug: row.slug,
-      sku: row.sku,
-      categoryId: row.category_id,
-      brandId: row.brand_id,
-      categoryName: row.categoryName,
-      brandName: row.brandName,
-      price: parseFloat(row.price) || 0,
-      basePrice: parseFloat(row.price) || 0,
-      stockQuantity: row.stock_quantity || 0,
-      description: row.description || '',
-      status: row.status as ProductStatus,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      // Các trường thống kê bắt buộc
-      soldQuantity: row.sold_quantity || 0,
-      viewCount: row.view_count || 0,
-      ratingAvg: parseFloat(row.rating_avg) || 0,
-      reviewCount: row.review_count || 0,
-      isFeatured: Boolean(row.is_featured),
-      isNew: Boolean(row.is_new),
-      isBestseller: Boolean(row.is_bestseller),
-      images: [],
-      variants: []
-    } as Product;
+  return {
+    productId: row.product_id,
+    name: row.name,
+    slug: row.slug,
+    sku: row.sku,
+    categoryId: row.category_id,
+    brandId: row.brand_id,
+    categoryName: row.categoryName || row.category_name, // Fix category "Chưa gán"
+    brandName: row.brandName || row.brand_name,
+    price: parseFloat(row.price) || 0,
+    salePrice: row.sale_price ? parseFloat(row.sale_price) : undefined,
+    costPrice: row.cost_price ? parseFloat(row.cost_price) : undefined,
+    stockQuantity: row.stock_quantity || 0,
+    mainImage: row.main_image || '', // QUAN TRỌNG: Fix ảnh không hiện
+    description: row.description || '',
+    status: row.status as ProductStatus,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    images: [],
+    variants: []
+  } as any;
+}
+
+  private mapRowToProductImage(row: any): ProductImage {
+    return { imageId: row.image_id, productId: row.product_id, imageUrl: row.image_url, isPrimary: Boolean(row.is_primary), displayOrder: row.display_order,createdAt: row.created_at || new Date() };
   }
 
-  /**
-   * FIX LỖI TS2322: Đảm bảo đính kèm ảnh và biến thể đúng cấu trúc
-   */
+  private mapRowToProductVariant(row: any): ProductVariant {
+    return { variantId: row.variant_id, variantName: row.variant_name, priceAdjustment: parseFloat(row.price_adjustment), stockQuantity: row.stock_quantity } as any;
+  }
+
   private async attachRelations(products: Product[], options: { includeVariants: boolean }): Promise<Product[]> {
     if (products.length === 0) return [];
-
     const productIds = products.map((p) => p.productId);
-
-    // Lấy Ảnh
-    const [images] = await pool.query<RowDataPacket[]>(
-      'SELECT * FROM product_images WHERE product_id IN (?) ORDER BY display_order ASC',
-      [productIds]
-    );
-
-    // Lấy Biến thể
+    const [images] = await pool.query<RowDataPacket[]>('SELECT * FROM product_images WHERE product_id IN (?)', [productIds]);
+    
     let variants: RowDataPacket[] = [];
     if (options.includeVariants) {
-      [variants] = await pool.query<RowDataPacket[]>(
-        'SELECT * FROM product_variants WHERE product_id IN (?) AND is_active = 1',
-        [productIds]
-      );
+      [variants] = await pool.query<RowDataPacket[]>('SELECT * FROM product_variants WHERE product_id IN (?)', [productIds]);
     }
 
-    return products.map((product) => ({
-      ...product,
-      images: images
-        .filter((img) => img.product_id === product.productId)
-        .map((img) => ({
-          imageId: img.image_id,
-          productId: img.product_id,
-          imageUrl: img.image_url, // Đúng tên thuộc tính interface
-          isPrimary: Boolean(img.is_primary),
-          displayOrder: img.display_order || 0
-        })),
-      variants: variants
-        .filter((v) => v.product_id === product.productId)
-        .map((v) => ({
-          variantId: v.variant_id,
-          productId: v.product_id,
-          variantName: v.variant_name,
-          sku: v.sku,
-          priceAdjustment: parseFloat(v.price_adjustment) || 0,
-          stockQuantity: v.stock_quantity || 0,
-          isActive: Boolean(v.is_active),
-          attributes: typeof v.attributes === 'string' ? JSON.parse(v.attributes) : v.attributes || {}
-        } as any))
-    }));
+    return products.map((p) => ({
+      ...p,
+      images: images.filter((img) => img.product_id === p.productId).map(this.mapRowToProductImage),
+      variants: variants.filter((v) => v.product_id === p.productId).map(this.mapRowToProductVariant)
+    } as any));
   }
 
-  private buildBaseListQuery(publicOnly: boolean, filters?: any) {
-    let query = `${this.baseProductSelect()} WHERE 1=1`;
-    const params: any[] = [];
-    if (publicOnly) query += ` AND p.status IN ('active', 'out_of_stock', 'pre_order')`;
-    if (filters?.brandSlug) { query += ' AND b.slug = ?'; params.push(filters.brandSlug); }
-    if (filters?.categorySlug) { query += ' AND c.slug = ?'; params.push(filters.categorySlug); }
-    if (filters?.limit) { query += ' LIMIT ?'; params.push(Number(filters.limit)); }
-    return { query, params };
+ private buildBaseListQuery(publicOnly: boolean, filters?: any) {
+  let query = `
+    FROM products p 
+    LEFT JOIN categories c ON p.category_id = c.category_id 
+    LEFT JOIN brands b ON p.brand_id = b.brand_id 
+    WHERE 1=1
+  `;
+  const params: any[] = [];
+
+  if (publicOnly) query += ` AND p.status IN ('active', 'out_of_stock')`;
+
+  // 1. Lọc theo Danh mục (categoryId hoặc categorySlug)
+  if (filters?.categoryId) {
+    query += ' AND p.category_id = ?';
+    params.push(Number(filters.categoryId));
+  }
+  if (filters?.categorySlug || filters?.category) {
+    query += ' AND c.slug = ?';
+    params.push(filters.categorySlug || filters.category);
   }
 
-  // --- 6. CÁC PHƯƠNG THỨC KHÁC ---
-
-  async getStats(): Promise<ProductStats> {
-    // FIX LỖI TS2353: Sử dụng đúng tên thuộc tính trong interface
-    return {
-      totalProducts: 0,
-      lowStockCount: 0,
-      outOfStockCount: 0 
-    } as any;
+  // 2. MỚI: Lọc theo Thương hiệu (brandId hoặc brandSlug)
+  if (filters?.brandId) {
+    query += ' AND p.brand_id = ?';
+    params.push(Number(filters.brandId));
+  }
+  if (filters?.brandSlug || filters?.brand) {
+    query += ' AND b.slug = ?';
+    params.push(filters.brandSlug || filters.brand);
   }
 
-  async isSkuTaken(sku: string): Promise<boolean> {
-    const [rows] = await pool.execute<RowDataPacket[]>('SELECT 1 FROM products WHERE sku = ?', [sku]);
-    return rows.length > 0;
+  // 3. Lọc theo Tìm kiếm & 3 nút tích (Nổi bật, Mới, Bán chạy)
+  if (filters?.search) {
+    query += ' AND (p.name LIKE ? OR p.sku LIKE ?)';
+    params.push(`%${filters.search}%`, `%${filters.search}%`);
   }
+  if (filters?.isFeatured === true || filters?.featured === 'true') query += ' AND p.is_featured = 1';
+  if (filters?.isNew === true) query += ' AND p.is_new = 1';
+  if (filters?.isBestseller === true) query += ' AND p.is_bestseller = 1';
 
-  async create(p: CreateProductDTO) { return this.save({ product: p, images: [], variants: [] }); }
-  async update(p: UpdateProductDTO) { return this.save({ product: p, images: [], variants: [] }, p.productId); }
-  async delete(id: number) { 
-    const [res] = await pool.execute<ResultSetHeader>('DELETE FROM products WHERE product_id = ?', [id]); 
-    return res.affectedRows > 0; 
-  }
-  async findVariantById(id: number) { return null; }
-  async updateVariantStock(id: number, q: number) { return false; }
-  async recalculateStock(id: number) { return false; }
+  return { query, params };
+}
+  
 }

@@ -8,13 +8,12 @@ export interface AuthResponse {
 }
 
 /**
- * Hàm chuẩn hóa giúp dữ liệu User luôn đồng nhất, 
- * tránh lỗi "Property does not exist" ở Layout và Admin
+ * Hàm chuẩn hóa giúp dữ liệu User luôn đồng nhất
  */
 export const normalizeAuthUser = (input: any): User => ({
   userId: Number(input?.userId ?? input?.id ?? 0),
   email: input?.email ?? '',
-  // Ưu tiên fullName theo chuẩn chúng ta đã sửa ở Header/AdminLayout
+  // Ưu tiên fullName để khớp với logic Header/AdminLayout
   fullName: input?.fullName ?? input?.name ?? '', 
   phone: input?.phone || undefined,
   role: input?.role ?? 'customer',
@@ -24,14 +23,16 @@ export const normalizeAuthUser = (input: any): User => ({
 });
 
 export const authService = {
+  // 1. ĐĂNG NHẬP
   login: async (email: string, password: string): Promise<AuthResponse> => {
     const response = await api.post('/auth/login', { email, password });
     return {
       token: response.data.token,
-      user: normalizeAuthUser(response.data.user),
+      user: normalizeAuthUser(response.data.user), // Chuẩn hóa ngay khi nhận
     };
   },
 
+  // 2. ĐĂNG KÝ
   register: async (userData: {
     email: string;
     password: string;
@@ -39,14 +40,16 @@ export const authService = {
     phone: string;
     address?: string;
   }): Promise<AuthResponse> => {
-    // Bản Incoming giúp mapping dữ liệu chuẩn xác hơn trước khi gửi lên
-    const response = await api.post('/auth/register', {
+    // Mapping payload: Tuấn Anh dùng 'name' cho backend
+    const payload = {
       email: userData.email,
       password: userData.password,
-      fullName: userData.fullName,
+      name: userData.fullName, // Map fullName sang name cho khớp DB của Tuấn Anh
       phone: userData.phone,
       address: userData.address,
-    });
+    };
+
+    const response = await api.post('/auth/register', payload);
 
     return {
       token: response.data.token,
@@ -54,6 +57,7 @@ export const authService = {
     };
   },
 
+  // 3. LẤY THÔNG TIN CÁ NHÂN
   getProfile: async (): Promise<{ user: User }> => {
     const response = await api.get('/auth/profile');
     return {
@@ -61,10 +65,11 @@ export const authService = {
     };
   },
 
+  // 4. ĐĂNG XUẤT
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    // Xóa thêm auth-storage của Zustand để đảm bảo sạch dữ liệu
+    // Xóa sạch cả auth-storage để tránh "rác" dữ liệu
     localStorage.removeItem('auth-storage'); 
   },
 };

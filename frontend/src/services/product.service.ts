@@ -4,16 +4,16 @@ import { Product, ProductFilter, ProductStats } from '@/types';
 export const productService = {
   // 1. LẤY DANH SÁCH SẢN PHẨM (Hỗ trợ bộ lọc Samsung/Apple, Giá, Tìm kiếm)
   //
-  getAll: async (filters?: ProductFilter): Promise<Product[]> => {
-    const params = new URLSearchParams();
-
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          params.append(key, String(value));
-        }
-      });
-    }
+  getAll: async (filters?: ProductFilter) => {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      // Thêm điều kiện bỏ qua false
+      if (value !== undefined && value !== null && value !== false) {
+        params.append(key, String(value));
+      }
+    });
+  }
 
     const response = await api.get(`/products?${params.toString()}`);
     // Backend hiện đang trả về mảng Product[] trực tiếp

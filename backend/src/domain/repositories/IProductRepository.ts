@@ -1,13 +1,44 @@
-import {
-  Product,
-  CreateProductDTO,
-  UpdateProductDTO,
-  ProductStatus,
-  ProductVariant,
-  SaveProductPayload,
+import { 
+  Product, 
+  CreateProductDTO, 
+  UpdateProductDTO, 
+  ProductStatus, 
+  ProductVariant, 
+  SaveProductPayload 
 } from '../entities/Product';
+import { ProductImage, CreateProductImageDTO } from '../entities/ProductImage';
+import { CreateProductVariantDTO, UpdateProductVariantDTO } from '../entities/ProductVariant';
 
-// Giao diện thống kê cho Dashboard Admin
+// --- 1. CÁC INTERFACE HỖ TRỢ (Gộp từ cả 2 bản) ---
+
+// Cấu trúc phân trang từ bản Tuấn Anh
+export interface PaginatedResult<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+// Bộ lọc sản phẩm mở rộng (Kết hợp Slugs của Khanh và cấu trúc của Tuấn Anh)
+export interface ProductFilters {
+  productId?: number;
+  categoryId?: number;
+  categorySlug?: string; 
+  brandId?: number;
+  brandSlug?: string;    
+  minPrice?: number;
+  maxPrice?: number;
+  search?: string;
+  isFeatured?: boolean;
+  isNew?: boolean;
+  isBestseller?: boolean;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}
+
+// Giao diện thống kê cho Dashboard Admin (Giữ từ bản Khanh)
 export interface ProductStats {
   totalProducts: number;
   activeProducts: number;
@@ -28,58 +59,49 @@ export interface ProductStats {
   }>;
 }
 
-export interface IProductRepository {
-  // 1. Lấy danh sách công khai (Đã gộp đủ slug hãng và danh mục)
-  findAll(filters?: {
-    productId?: number;
-    categoryId?: number;
-    categorySlug?: string; // Giữ để lọc theo URL
-    brandId?: number;
-    brandSlug?: string;    // Giữ để lọc theo URL
-    minPrice?: number;
-    maxPrice?: number;
-    search?: string;
-    isFeatured?: boolean;
-    isNew?: boolean;
-    isBestseller?: boolean;
-    status?: string;
-    limit?: number;
-    offset?: number;
-  }): Promise<Product[]>;
+// --- 2. GIAO DIỆN REPOSITORY CHÍNH ---
 
-  // 2. Các hàm truy vấn cơ bản
+export interface IProductRepository {
+  // Truy vấn danh sách
+  findAll(filters?: ProductFilters): Promise<Product[]>;
+  findAllPaginated(filters: ProductFilters, page: number, limit: number): Promise<PaginatedResult<Product>>;
+  
+  // Truy vấn chi tiết
   findById(productId: number): Promise<Product | null>;
   findBySlug(slug: string): Promise<Product | null>;
+
+  // Thao tác cơ bản
   create(product: CreateProductDTO): Promise<Product>;
   update(product: UpdateProductDTO): Promise<Product | null>;
   delete(productId: number): Promise<boolean>;
   updateStock(productId: number, quantity: number): Promise<boolean>;
 
-  // 3. Các tính năng nâng cao cho Admin (Gộp từ bản mới)
+  // --- 3. QUẢN LÝ ẢNH (BÍ QUYẾT HIỂN THỊ ẢNH CỦA TUẤN ANH) ---
+  findImages(productId: number): Promise<ProductImage[]>;
+  addImage(image: CreateProductImageDTO): Promise<ProductImage>;
+  deleteImage(imageId: number): Promise<boolean>;
+
+  // --- 4. QUẢN LÝ BIẾN THỂ (KẾT HỢP CẢ 2) ---
+  findVariants(productId: number): Promise<ProductVariant[]>;
+  findVariantById(variantId: number): Promise<ProductVariant | null>;
+  addVariant(variant: CreateProductVariantDTO): Promise<ProductVariant>;
+  updateVariant(variant: UpdateProductVariantDTO): Promise<ProductVariant | null>;
+  deleteVariant(variantId: number): Promise<boolean>;
+  updateVariantStock(variantId: number, quantity: number): Promise<boolean>;
+  recalculateStock(productId: number): Promise<boolean>;
+
+  // --- 5. TÍNH NĂNG ADMIN CAO CẤP (CỦA KHANH) ---
   getStats(): Promise<ProductStats>;
-  
   findAdminList(filters?: {
     search?: string;
     categoryId?: number;
     status?: ProductStatus | 'all';
   }): Promise<Product[]>;
-
   findAdminById(productId: number): Promise<Product | null>;
-
-  // Lưu sản phẩm kèm theo Ảnh và Biến thể (Variants)
   save(payload: SaveProductPayload, productId?: number): Promise<Product>;
-  
-  // Lưu trữ sản phẩm (thay vì xóa cứng)
   archive(productId: number): Promise<boolean>;
-
-  // 4. Quản lý Biến thể và Kho hàng chi tiết
-  findVariantById(variantId: number): Promise<ProductVariant | null>;
-  updateVariantStock(variantId: number, quantity: number): Promise<boolean>;
   
-  // Tính toán lại tổng tồn kho từ các biến thể
-  recalculateStock(productId: number): Promise<boolean>;
-
-  // Kiểm tra mã SKU đã tồn tại chưa
+  // Kiểm tra mã SKU
   isSkuTaken(sku: string, options?: {
     excludeProductId?: number;
     excludeVariantId?: number;
