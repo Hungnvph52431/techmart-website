@@ -1,18 +1,26 @@
-import { IProductRepository } from '../../domain/repositories/IProductRepository';
+import { IProductRepository, ProductFilters } from '../../domain/repositories/IProductRepository';
 import {
   CreateProductDTO,
   ProductStatus,
   SaveProductPayload,
   UpdateProductDTO,
 } from '../../domain/entities/Product';
+import { CreateProductImageDTO } from '../../domain/entities/ProductImage';
+import { CreateProductVariantDTO, UpdateProductVariantDTO } from '../../domain/entities/ProductVariant';
 
 export class ProductUseCase {
-  constructor(private productRepository: IProductRepository) {}
+  constructor(private productRepository: IProductRepository) { }
 
-  // --- CÁC PHƯƠNG THỨC CHO CLIENT (NGƯỜI MUA HÀNG) ---
-  async getAllProducts(filters?: any) {
-    // Trả về danh sách sản phẩm hiển thị trên trang chủ hoặc danh sách sản phẩm
+  // --- 1. CÁC PHƯƠNG THỨC CHO CLIENT (NGƯỜI MUA HÀNG) ---
+
+  // Sử dụng ProductFilters để hỗ trợ lọc và hiển thị ảnh chuẩn hơn
+  async getAllProducts(filters?: ProductFilters) {
     return this.productRepository.findAll(filters);
+  }
+
+  // Thêm phân trang để trang chủ load ảnh nhanh hơn
+  async getAllProductsPaginated(filters: ProductFilters, page: number, limit: number) {
+    return this.productRepository.findAllPaginated(filters, page, limit);
   }
 
   async getProductById(id: number) {
@@ -23,13 +31,13 @@ export class ProductUseCase {
     return this.productRepository.findBySlug(slug);
   }
 
-  // --- CÁC PHƯƠNG THỨC QUẢN TRỊ (ADMIN) ---
+  // --- 2. CÁC PHƯƠNG THỨC QUẢN TRỊ (ADMIN) ---
+
   async getAdminProducts(filters?: {
     search?: string;
     categoryId?: number;
     status?: ProductStatus | 'all';
   }) {
-    // Phục vụ danh sách có phân trang và lọc trạng thái trong Admin
     return this.productRepository.findAdminList(filters);
   }
 
@@ -38,13 +46,13 @@ export class ProductUseCase {
   }
 
   async getProductStats() {
-    // Cung cấp dữ liệu cho biểu đồ kho hàng trên Dashboard
     return this.productRepository.getStats();
   }
 
-  // --- THAO TÁC DỮ LIỆU ---
+  // --- 3. THAO TÁC DỮ LIỆU TỔNG QUÁT ---
+
   async saveProduct(payload: SaveProductPayload, productId?: number) {
-    // Phương thức gộp thông minh: Tự động nhận diện Thêm mới hoặc Cập nhật
+    // Giữ lại hàm save gộp của Khanh để tiện dụng
     return this.productRepository.save(payload, productId);
   }
 
@@ -61,7 +69,6 @@ export class ProductUseCase {
   }
 
   async archiveProduct(id: number) {
-    // Chuyển sản phẩm vào kho lưu trữ thay vì xóa vĩnh viễn
     return this.productRepository.archive(id);
   }
 
@@ -69,8 +76,41 @@ export class ProductUseCase {
     return this.productRepository.updateStock(id, quantity);
   }
 
+  // --- 4. QUẢN LÝ ẢNH SẢN PHẨM (GIÚP HIỂN THỊ ẢNH) ---
+
+  async getProductImages(productId: number) {
+    return this.productRepository.findImages(productId);
+  }
+
+  async addProductImage(imageData: CreateProductImageDTO) {
+    return this.productRepository.addImage(imageData);
+  }
+
+  async deleteProductImage(imageId: number) {
+    return this.productRepository.deleteImage(imageId);
+  }
+
+  // --- 5. QUẢN LÝ BIẾN THỂ (MÀU SẮC, DUNG LƯỢNG) ---
+
   async getVariantById(id: number) {
-    // Lấy thông tin biến thể (RAM, Màu sắc) cho trang chi tiết
+    // Giữ lại để phục vụ trang chi tiết của Khanh
     return this.productRepository.findVariantById(id);
+  }
+
+  async getProductVariants(productId: number) {
+    // Thêm các hàm chi tiết từ Tuấn Anh để Admin quản lý dễ hơn
+    return this.productRepository.findVariants(productId);
+  }
+
+  async addProductVariant(variantData: CreateProductVariantDTO) {
+    return this.productRepository.addVariant(variantData);
+  }
+
+  async updateProductVariant(variantData: UpdateProductVariantDTO) {
+    return this.productRepository.updateVariant(variantData);
+  }
+
+  async deleteProductVariant(variantId: number) {
+    return this.productRepository.deleteVariant(variantId);
   }
 }

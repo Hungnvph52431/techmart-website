@@ -31,4 +31,14 @@ export class VoucherController {
       res.status(500).json({ message: "Lỗi khi xóa Voucher" });
     }
   }
+  async validate(req: Request, res: Response) {
+  try {
+    const { code } = req.body;
+    if (!code) return res.status(400).json({ message: "Vui lòng nhập mã!" });
+    const voucher = await this.voucherUseCase.validateVoucher(code);
+    res.json(voucher);
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+}
 }

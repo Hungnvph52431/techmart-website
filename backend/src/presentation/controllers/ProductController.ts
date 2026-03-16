@@ -3,50 +3,61 @@ import { ProductUseCase } from '../../application/use-cases/ProductUseCase';
 import { toStorefrontProduct } from '../../application/mappers/ProductPresenter';
 
 export class ProductController {
-  constructor(private productUseCase: ProductUseCase) {}
+  constructor(private productUseCase: ProductUseCase) { }
 
-  // 1. LẤY TẤT CẢ SẢN PHẨM (Kết hợp Phân trang & Bộ lọc mở rộng)
-  getAll = async (req: Request, res: Response) => {
-    try {
-      // Logic phân trang từ bản HEAD
-      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 8;
-      const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
-      const offset = (page - 1) * limit;
+  // --- 1. LẤY DANH SÁCH SẢN PHẨM (KẾT HỢP PHÂN TRANG) ---
+// backend/src/presentation/controllers/ProductController.ts
 
-      // Bộ lọc kết hợp từ cả 2 bản
-      const filters = {
-        // Lọc theo ID hoặc Slug
-        categoryId: req.query.categoryId ? Number(req.query.categoryId) : undefined,
-        categorySlug: req.query.categorySlug as string,
-        brandId: req.query.brandId ? Number(req.query.brandId) : undefined,
-        brandSlug: req.query.brandSlug as string,
-        
-        // Lọc theo khoảng giá
-        minPrice: req.query.minPrice ? Number(req.query.minPrice) : undefined,
-        maxPrice: req.query.maxPrice ? Number(req.query.maxPrice) : undefined,
-        
-        // Lọc theo trạng thái đặc biệt
-        search: req.query.search as string,
-        isFeatured: req.query.featured === 'true' || req.query.isFeatured === 'true' ? true : undefined,
-        isNew: req.query.isNew === 'true' ? true : undefined,
-        isBestseller: req.query.isBestseller === 'true' ? true : undefined,
-        
-        status: req.query.status as string,
-        limit: limit,
-        offset: offset,
-      };
+getAll = async (req: Request, res: Response) => {
+  try {
+    const page = req.query.page ? Number(req.query.page) : undefined;
+    const limit = req.query.limit ? Number(req.query.limit) : 12;
 
-      const products = await this.productUseCase.getAllProducts(filters);
-      
-      // Sử dụng Mapper để định dạng lại dữ liệu cho Storefront
-      res.json(products.map(toStorefrontProduct));
-    } catch (error: any) {
-      console.error("LỖI TẠI PRODUCT CONTROLLER:", error);
-      res.status(500).json({ message: error.message });
+    // 1. TỪ ĐIỂN THÔNG DỊCH: Map từ khóa của Frontend sang đúng Slug của Database
+    const slugDictionary: Record<string, string> = {
+      'apple': 'iphone',        // Nút Apple -> tìm danh mục iphone
+      'iphone': 'iphone',       // Icon iPhone -> tìm danh mục iphone
+      'samsung': 'samsung-galaxy', 
+      'xiaomi': 'xiaomi-phone',
+      'oppo': 'oppo-phone',
+      'laptop': 'laptop',
+      'tablet': 'tablet',
+      'phu-kien': 'phu-kien',
+      'smartwatch': 'dong-ho-thong-minh',
+      'tai-nghe': 'tai-nghe'
+    };
+
+    // Lấy từ khóa do Frontend gửi lên (không phân biệt chữ hoa/thường)
+    const rawCategory = (req.query.categorySlug || req.query.category) as string;
+    const rawBrand = (req.query.brandSlug || req.query.brand) as string;
+    const incomingSlug = (rawCategory || rawBrand || '').toLowerCase();
+
+    // Dịch sang Slug chuẩn của DB (Nếu không có trong từ điển thì dùng y nguyên gốc)
+    const mappedSlug = incomingSlug ? (slugDictionary[incomingSlug] || incomingSlug) : undefined;
+
+    const filters = {
+      // Ép tất cả về categorySlug (vì DB của Khanh lưu iPhone, Samsung dưới dạng category)
+      categorySlug: mappedSlug,
+      search: req.query.search as string,
+      isFeatured: req.query.featured === 'true' || req.query.isFeatured === 'true',
+      isNew: req.query.isNew === 'true',
+      isBestseller: req.query.isBestseller === 'true',
+      status: req.query.status as string,
+    };
+
+    if (page) {
+      const result = await this.productUseCase.getAllProductsPaginated(filters, page, limit);
+      return res.json(result);
     }
-  };
+    const products = await this.productUseCase.getAllProducts(filters);
+    res.json(products);
+  } catch (error: any) {
+    console.error("LỖI 500 TẠI CONTROLLER:", error.message);
+    res.status(500).json({ message: "Lỗi hệ thống khi tải sản phẩm" });
+  }
+};
+  // --- 2. TÌM CHI TIẾT (ID & SLUG) ---
 
-  // 2. LẤY THEO ID
   getById = async (req: Request, res: Response) => {
     try {
       const product = await this.productUseCase.getProductById(Number(req.params.id));
@@ -58,25 +69,26 @@ export class ProductController {
     }
   };
 
-  // 3. LẤY THEO SLUG (Cho trang chi tiết sản phẩm)
   getBySlug = async (req: Request, res: Response) => {
-  try {
-    console.log(">>> Backend đang tìm sản phẩm với Slug:", req.params.slug); // Thêm dòng này
-    const product = await this.productUseCase.getProductBySlug(req.params.slug);
-    
-    if (!product) {
-      console.log("!!! KHÔNG TÌM THẤY sản phẩm trong DB với slug này"); // Thêm dòng này
-      return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
+    try {
+      // Giữ lại log để Khanh dễ debug lỗi 404
+      console.log(">>> Backend đang tìm sản phẩm với Slug:", req.params.slug); 
+      const product = await this.productUseCase.getProductBySlug(req.params.slug);
+
+      if (!product) {
+        console.log("!!! KHÔNG TÌM THẤY sản phẩm trong DB với slug này");
+        return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
+      }
+
+      res.json(toStorefrontProduct(product));
+    } catch (error: any) {
+      console.error("LỖI TẠI CONTROLLER getBySlug:", error);
+      res.status(500).json({ message: error.message });
     }
+  };
 
-    res.json(toStorefrontProduct(product));
-  } catch (error: any) {
-    console.error("LỖI TẠI CONTROLLER getBySlug:", error);
-    res.status(500).json({ message: error.message });
-  }
-};
+  // --- 3. CÁC THAO TÁC QUẢN TRỊ (ADMIN) ---
 
-  // 4. LẤY THỐNG KÊ (Stats)
   getStats = async (_req: Request, res: Response) => {
     try {
       const stats = await this.productUseCase.getProductStats();
@@ -86,14 +98,20 @@ export class ProductController {
     }
   };
 
-  // 5. CÁC THAO TÁC QUẢN TRỊ (Giữ lại từ bản HEAD)
-  create = async (req: Request, res: Response) => {
-    try {
-      const product = await this.productUseCase.createProduct(req.body);
-      res.status(201).json(product);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+ create = async (req: Request, res: Response) => {
+  try {
+    const { name, slug, sku, categoryId, price } = req.body;
+
+    // SỬA: Kiểm tra undefined/null thay vì dùng ! để cho phép giá trị 0
+    if (!name || !slug || !sku || categoryId === undefined || price === undefined) {
+      return res.status(400).json({ message: 'Thiếu thông tin bắt buộc (Tên, Slug, SKU, Category, Giá)' });
     }
+
+    const product = await this.productUseCase.createProduct(req.body);
+    res.status(201).json(product);
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
   };
 
   update = async (req: Request, res: Response) => {
@@ -114,6 +132,91 @@ export class ProductController {
       const success = await this.productUseCase.deleteProduct(Number(req.params.id));
       if (!success) return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
       res.json({ message: 'Xóa thành công' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  };
+
+  // --- 4. QUẢN LÝ ẢNH SẢN PHẨM (TỪ BẢN TUẤN ANH) ---
+
+  getImages = async (req: Request, res: Response) => {
+    try {
+      const images = await this.productUseCase.getProductImages(Number(req.params.id));
+      res.json(images);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  };
+
+  addImage = async (req: Request, res: Response) => {
+    try {
+      const { imageUrl } = req.body;
+      if (!imageUrl) return res.status(400).json({ message: 'Đường dẫn ảnh là bắt buộc' });
+
+      const image = await this.productUseCase.addProductImage({
+        productId: Number(req.params.id),
+        ...req.body,
+      });
+      res.status(201).json(image);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  };
+
+  deleteImage = async (req: Request, res: Response) => {
+    try {
+      const success = await this.productUseCase.deleteProductImage(Number(req.params.imageId));
+      if (!success) return res.status(404).json({ message: 'Không tìm thấy ảnh' });
+      res.json({ message: 'Xóa ảnh thành công' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  };
+
+  // --- 5. QUẢN LÝ BIẾN THỂ - RAM/MÀU SẮC (TỪ BẢN TUẤN ANH) ---
+
+  getVariants = async (req: Request, res: Response) => {
+    try {
+      const variants = await this.productUseCase.getProductVariants(Number(req.params.id));
+      res.json(variants);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  };
+
+  addVariant = async (req: Request, res: Response) => {
+    try {
+      const { variantName } = req.body;
+      if (!variantName) return res.status(400).json({ message: 'Tên biến thể là bắt buộc' });
+
+      const variant = await this.productUseCase.addProductVariant({
+        productId: Number(req.params.id),
+        ...req.body,
+      });
+      res.status(201).json(variant);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  };
+
+  updateVariant = async (req: Request, res: Response) => {
+    try {
+      const variant = await this.productUseCase.updateProductVariant({
+        variantId: Number(req.params.variantId),
+        ...req.body,
+      });
+      if (!variant) return res.status(404).json({ message: 'Không tìm thấy biến thể' });
+      res.json(variant);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  };
+
+  deleteVariant = async (req: Request, res: Response) => {
+    try {
+      const success = await this.productUseCase.deleteProductVariant(Number(req.params.variantId));
+      if (!success) return res.status(404).json({ message: 'Không tìm thấy biến thể' });
+      res.json({ message: 'Xóa biến thể thành công' });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

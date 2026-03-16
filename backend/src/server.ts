@@ -7,10 +7,13 @@ import { testConnection } from './infrastructure/database/connection';
 import { UserRepository } from './infrastructure/repositories/UserRepository';
 import { ProductRepository } from './infrastructure/repositories/ProductRepository';
 import { OrderRepository } from './infrastructure/repositories/OrderRepository';
-import { VoucherRepository } from './infrastructure/repositories/VoucherRepository';
-import { CategoryRepository } from './infrastructure/repositories/CategoryRepository';
-import { AttributeRepository } from './infrastructure/repositories/AttributeRepository';
-import { ReviewRepository } from './infrastructure/repositories/ReviewRepository';
+import { VoucherRepository } from './infrastructure/repositories/VoucherRepository'; //
+import { CategoryRepository } from './infrastructure/repositories/CategoryRepository'; 
+import { AttributeRepository } from './infrastructure/repositories/AttributeRepository'; //
+import { ReviewRepository } from './infrastructure/repositories/ReviewRepository'; //
+import { BrandRepository } from './infrastructure/repositories/BrandRepository'; //
+import { CouponRepository } from './infrastructure/repositories/CouponRepository'; //
+import { BannerRepository } from './infrastructure/repositories/BannerRepository';
 
 // --- USE CASES ---
 import { AuthUseCase } from './application/use-cases/AuthUseCase';
@@ -21,6 +24,9 @@ import { VoucherUseCase } from './application/use-cases/VoucherUseCase';
 import { CategoryUseCase } from './application/use-cases/CategoryUseCase';
 import { AttributeUseCase } from './application/use-cases/AttributeUseCase';
 import { ReviewUseCase } from './application/use-cases/ReviewUseCase';
+import { BrandUseCase } from './application/use-cases/BrandUseCase'; //
+import { CouponUseCase } from './application/use-cases/CouponUseCase'; //
+import { BannerUseCase } from './application/use-cases/BannerUseCase';
 
 // --- CONTROLLERS ---
 import { AuthController } from './presentation/controllers/AuthController';
@@ -33,6 +39,9 @@ import { VoucherController } from './presentation/controllers/VoucherController'
 import { CategoryController } from './presentation/controllers/CategoryController';
 import { AttributeController } from './presentation/controllers/AttributeController';
 import { ReviewController } from './presentation/controllers/ReviewController';
+import { BrandController } from './presentation/controllers/BrandController'; //
+import { CouponController } from './presentation/controllers/CouponController'; //
+import { BannerController } from './presentation/controllers/BannerController';
 
 // --- ROUTES ---
 import { createAuthRoutes } from './presentation/routes/auth.routes';
@@ -46,6 +55,10 @@ import { createAdminCategoryRoutes } from './presentation/routes/admin/category.
 import { createAdminAttributeRoutes } from './presentation/routes/admin/attribute.routes';
 import { createAdminOrderRoutes } from './presentation/routes/admin/order.routes';
 import { createOrderReviewRoutes } from './presentation/routes/order-review.routes';
+import { createBrandRoutes } from './presentation/routes/brand.routes'; //
+import { createCouponRoutes } from './presentation/routes/coupon.routes'; //
+import { createBannerRoutes, createAdminBannerRoutes } from './presentation/routes/banner.routes';
+import path from 'path';
 
 dotenv.config();
 
@@ -54,11 +67,22 @@ const PORT = process.env.PORT || 5000;
 
 // --- MIDDLEWARE ---
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',')
+    : ['http://localhost:5173', 'http://localhost:5174'],
   credentials: true,
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, '../public')));
+
+
+// Logger "tự chế" của Khanh để soi Log Docker
+app.use((req, _res, next) => {
+  console.log(`>>> [${new Date().toLocaleTimeString()}] ${req.method} ${req.url}`);
+  next();
+});
+
 // --- DEPENDENCY INJECTION ---
 // Repositories
 const userRepository = new UserRepository();
@@ -68,6 +92,9 @@ const voucherRepo = new VoucherRepository();
 const categoryRepository = new CategoryRepository();
 const attributeRepository = new AttributeRepository();
 const reviewRepository = new ReviewRepository();
+const brandRepository = new BrandRepository(); //
+const couponRepository = new CouponRepository(); //
+const bannerRepository = new BannerRepository(); // db là pool MySQL của bạn
 
 // Use Cases
 const authUseCase = new AuthUseCase(userRepository);
@@ -78,6 +105,9 @@ const voucherUseCase = new VoucherUseCase(voucherRepo);
 const categoryUseCase = new CategoryUseCase(categoryRepository);
 const attributeUseCase = new AttributeUseCase(attributeRepository);
 const reviewUseCase = new ReviewUseCase(reviewRepository, orderRepository);
+const brandUseCase = new BrandUseCase(brandRepository); //
+const couponUseCase = new CouponUseCase(couponRepository); //
+const bannerUseCase = new BannerUseCase(bannerRepository);
 
 // Controllers
 const authController = new AuthController(authUseCase);
@@ -90,6 +120,9 @@ const voucherController = new VoucherController(voucherUseCase);
 const categoryController = new CategoryController(categoryUseCase);
 const attributeController = new AttributeController(attributeUseCase);
 const reviewController = new ReviewController(reviewUseCase);
+const brandController = new BrandController(brandUseCase); //
+const couponController = new CouponController(couponUseCase); //
+const bannerController = new BannerController(bannerUseCase);
 
 // --- ROUTES MOUNTING ---
 // Public & Customer Routes
@@ -100,18 +133,19 @@ app.use('/api/orders', createOrderRoutes(orderController));
 app.use('/api/orders', createOrderReviewRoutes(reviewController));
 app.use('/api/users', createUserRoutes(userController));
 app.use('/api/vouchers', createVoucherRoutes(voucherController));
-app.use((req, res, next) => {
-  console.log(`>>> [${new Date().toLocaleTimeString()}] ${req.method} ${req.url}`);
-  next();
-});
+app.use('/api/brands', createBrandRoutes(brandController)); //
+app.use('/api/coupons', createCouponRoutes(couponController)); //
+app.use('/api/banners', createBannerRoutes(bannerController));
+
 // Admin Routes
 app.use('/api/admin/products', createAdminProductRoutes(adminProductController));
 app.use('/api/admin/categories', createAdminCategoryRoutes(categoryController));
 app.use('/api/admin/attributes', createAdminAttributeRoutes(attributeController));
 app.use('/api/admin/orders', createAdminOrderRoutes(adminOrderController));
+app.use('/api/admin/banners', createAdminBannerRoutes(bannerController));
 
 // --- HEALTH CHECK ---
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ status: 'OK', message: 'TechMart API is running' });
 });
 

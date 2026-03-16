@@ -5,6 +5,7 @@ import {
 } from '../../domain/entities/Category';
 import { ICategoryRepository } from '../../domain/repositories/ICategoryRepository';
 
+// Định nghĩa kiểu dữ liệu cho cây danh mục (Giữ lại từ bản của Khanh)
 interface CategoryTreeNode extends Category {
   children: CategoryTreeNode[];
 }
@@ -12,10 +13,28 @@ interface CategoryTreeNode extends Category {
 export class CategoryUseCase {
   constructor(private categoryRepository: ICategoryRepository) {}
 
+  // --- 1. CÁC HÀM LẤY DỮ LIỆU ---
+
   async getAllCategories() {
     return this.categoryRepository.findAll();
   }
 
+  // Lấy danh mục theo ID (Thêm từ bản của Tuấn Anh)
+  async getCategoryById(id: number) {
+    return this.categoryRepository.findById(id);
+  }
+
+  // Lấy danh mục theo Slug (Thêm từ bản của Tuấn Anh)
+  async getCategoryBySlug(slug: string) {
+    return this.categoryRepository.findBySlug(slug);
+  }
+
+  // Lấy danh mục con theo ParentID (Thêm từ bản của Tuấn Anh)
+  async getCategoriesByParentId(parentId: number | null) {
+    return this.categoryRepository.findByParentId(parentId);
+  }
+
+  // Logic tạo cây thư mục (Giữ lại từ bản của Khanh)
   async getCategoryTree(): Promise<CategoryTreeNode[]> {
     const categories = await this.categoryRepository.findAll();
     const nodeMap = new Map<number, CategoryTreeNode>();
@@ -37,17 +56,22 @@ export class CategoryUseCase {
     return roots;
   }
 
+  // --- 2. CÁC HÀM THAO TÁC DỮ LIỆU (Ưu tiên logic an toàn của Khanh) ---
+
   async createCategory(data: CreateCategoryDTO) {
+    // Khanh đã thêm validation rất tốt, nên giữ lại
     await this.validateCategoryPayload(data);
     return this.categoryRepository.create(data);
   }
 
   async updateCategory(data: UpdateCategoryDTO) {
+    // Kiểm tra logic trước khi cập nhật
     await this.validateCategoryPayload(data, data.categoryId);
     return this.categoryRepository.update(data);
   }
 
   async deleteCategory(categoryId: number) {
+    // Giữ lại logic kiểm tra ràng buộc của Khanh để tránh lỗi DB
     const hasChildren = await this.categoryRepository.hasChildren(categoryId);
     if (hasChildren) {
       throw new Error('Category still has child categories');
@@ -61,10 +85,13 @@ export class CategoryUseCase {
     return this.categoryRepository.delete(categoryId);
   }
 
+  // --- 3. LOGIC KIỂM TRA RÀNG BUỘC (PRIVATE) ---
+
   private async validateCategoryPayload(
     data: Partial<CreateCategoryDTO>,
     currentCategoryId?: number
   ) {
+    // Kiểm tra trùng Slug
     if (data.slug) {
       const categoryBySlug = await this.categoryRepository.findBySlug(data.slug);
       if (categoryBySlug && categoryBySlug.categoryId !== currentCategoryId) {
@@ -72,6 +99,7 @@ export class CategoryUseCase {
       }
     }
 
+    // Kiểm tra cha-con để tránh vòng lặp vô tận
     if (data.parentId !== undefined && data.parentId !== null) {
       if (data.parentId === currentCategoryId) {
         throw new Error('Category cannot be its own parent');

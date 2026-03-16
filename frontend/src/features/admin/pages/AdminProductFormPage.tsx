@@ -8,7 +8,6 @@ import {
   AdminAttribute,
   AdminAttributeValue,
   AdminCategory,
-  AdminProduct,
   AdminProductImage,
   AdminProductVariant,
   CategoryAttributeAssignment,
@@ -210,36 +209,36 @@ export const AdminProductFormPage = () => {
     }
   };
 
-  const hydrateForm = (data: AdminProduct) => {
-    setProduct({
-      name: data.name,
-      slug: data.slug,
-      sku: data.sku,
-      categoryId: data.categoryId,
-      brandId: data.brandId,
-      price: data.price,
-      salePrice: data.salePrice,
-      costPrice: data.costPrice,
-      description: data.description || '',
-      specifications: data.specifications || {},
-      mainImage: data.mainImage || '',
-      stockQuantity: data.stockQuantity,
-      isFeatured: data.isFeatured,
-      isNew: data.isNew,
-      isBestseller: data.isBestseller,
-      status: data.status,
-      metaTitle: data.metaTitle || '',
-      metaDescription: data.metaDescription || '',
-      metaKeywords: data.metaKeywords || '',
-    });
+  const hydrateForm = (data: any) => {
+  setProduct({
+    name: data.name,
+    slug: data.slug,
+    sku: data.sku,
+    categoryId: data.category_id,        // ✅ snake_case
+    brandId: data.brand_id,              // ✅ snake_case
+    price: Number(data.price),
+    salePrice: data.sale_price ? Number(data.sale_price) : undefined,   // ✅
+    costPrice: data.cost_price ? Number(data.cost_price) : undefined,   // ✅
+    description: data.description || '',
+    specifications: data.specifications || {},
+    mainImage: data.main_image || '',    // ✅ snake_case
+    stockQuantity: data.stock_quantity,  // ✅ snake_case
+    isFeatured: Boolean(data.is_featured),  // ✅ snake_case
+    isNew: Boolean(data.is_new),            // ✅ snake_case
+    isBestseller: Boolean(data.is_bestseller), // ✅ snake_case
+    status: data.status,
+    metaTitle: data.meta_title || '',
+    metaDescription: data.meta_description || '',
+    metaKeywords: data.meta_keywords || '',
+  });
 
-    setImages(
-      data.images?.length
-        ? data.images
-        : [{ ...createEmptyImage(), imageUrl: data.mainImage || '' }]
-    );
-    setVariants(data.variants || []);
-  };
+  setImages(
+    data.images?.length
+      ? data.images
+      : [{ ...createEmptyImage(), imageUrl: data.main_image || '' }]
+  );
+  setVariants(data.variants || []);
+};
 
   const updateSpecification = (code: string, value: AdminAttributeValue) => {
     setProduct((prev) => ({
@@ -564,24 +563,28 @@ export const AdminProductFormPage = () => {
               className="border border-gray-300 rounded-lg px-4 py-2"
               required
             />
-            <select
-              value={product.categoryId || ''}
-              onChange={(event) =>
-                setProduct((prev) => ({
-                  ...prev,
-                  categoryId: Number(event.target.value),
-                }))
-              }
-              className="border border-gray-300 rounded-lg px-4 py-2"
-              required
-            >
-              <option value="">Chọn danh mục</option>
-              {categories.map((category) => (
-                <option key={category.categoryId} value={category.categoryId}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+           <select
+  value={product.categoryId || ''}
+  onChange={(event) => {
+    const val = Number(event.target.value);
+    console.log("🎯 ID Danh mục Khanh vừa chọn là:", val); // Log để kiểm tra
+    setProduct((prev) => ({ ...prev, categoryId: val }));
+  }}
+  className="border border-gray-300 rounded-lg px-4 py-2"
+  required
+>
+  <option value="">Chọn danh mục</option>
+  {categories.map((category: any, index: number) => {
+    // Tự động tìm ID dù là category_id hay categoryId
+    const realId = category.category_id || category.categoryId || category.id;
+    
+    return (
+      <option key={realId || index} value={realId}>
+        {category.name}
+      </option>
+    );
+  })}
+</select>
             <select
               value={product.status}
               onChange={(event) =>
