@@ -1,4 +1,5 @@
 import api from './api';
+import type { OrderDetailView } from '@/types/order';
 import { 
   Order, 
   OrderStats, 
@@ -27,14 +28,14 @@ export const orderService = {
     return response.data;
   },
 
-  getById: async (id: number | string): Promise<Order> => {
-    // Tự động nhận diện endpoint dựa trên quyền hoặc ID
-    const response = await api.get(`/orders/${id}`);
+  // ✅ Fix: đổi return type thành OrderDetailView
+  getById: async (id: number | string): Promise<OrderDetailView> => {
+    const response = await api.get(`/orders/my-orders/${id}`);
     return response.data;
   },
 
   getTimeline: async (id: number): Promise<any[]> => {
-    const response = await api.get(`/orders/${id}/timeline`);
+    const response = await api.get(`/orders/my-orders/${id}/timeline`);
     return response.data;
   },
 
@@ -44,7 +45,7 @@ export const orderService = {
   },
 
   cancel: async (orderId: number, payload: { reason: string }): Promise<{ status: string }> => {
-    const response = await api.post(`/orders/${orderId}/cancel`, payload);
+    const response = await api.post(`/orders/my-orders/${orderId}/cancel`, payload);
     return response.data;
   },
 
@@ -55,35 +56,35 @@ export const orderService = {
   },
 
   updateStatus: async (orderId: number, status: string): Promise<Order> => {
-  const response = await api.patch(`/orders/${orderId}/status`, {
-    status,
-    actorUserId: null,   // Admin action, không cần userId cụ thể
-    actorRole: 'admin',
-    note: '',
-  });
-  return response.data;
-},
+    const response = await api.patch(`/orders/${orderId}/status`, {
+      status,
+      actorUserId: null,
+      actorRole: 'admin',
+      note: '',
+    });
+    return response.data;
+  },
 
   updatePaymentStatus: async (orderId: number, paymentStatus: string): Promise<Order> => {
     const response = await api.patch(`/orders/${orderId}/payment-status`, { paymentStatus });
     return response.data;
   },
 
-  // Hàm quan trọng để fix lỗi AdminDashboard
   getStats: async (): Promise<OrderStats> => {
     const response = await api.get('/orders/stats');
-    // Bóc tách data từ envelope nếu Backend trả về dạng { success: true, data: {...} }
     return response.data.data || response.data;
   },
 
   // 3. QUẢN LÝ ĐỔI TRẢ (Returns)
+  // ✅ Fix: thêm my-orders vào endpoint
   createReturn: async (orderId: number, payload: any): Promise<any> => {
-    const response = await api.post(`/orders/${orderId}/returns`, payload);
+    const response = await api.post(`/orders/my-orders/${orderId}/returns`, payload);
     return response.data;
   },
 
+  // ✅ Fix: thêm my-orders vào endpoint
   getReturns: async (orderId: number): Promise<any[]> => {
-    const response = await api.get(`/orders/${orderId}/returns`);
+    const response = await api.get(`/orders/my-orders/${orderId}/returns`);
     return response.data;
   }
 };

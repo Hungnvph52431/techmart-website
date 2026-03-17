@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # TechMart - Website Bán Điện Thoại
 
 Website thương mại điện tử bán điện thoại được xây dựng với React (Frontend) và Node.js + Express (Backend) sử dụng Clean Architecture.
@@ -356,3 +357,6 @@ ISC
 ## 📞 Liên Hệ
 
 Email: support@techmart.com
+=======
+# doantotnghiep
+>>>>>>> b46d8ae8fee3897d5ffb1e46fa89fb796b87590f
