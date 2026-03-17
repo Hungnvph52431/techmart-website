@@ -29,6 +29,21 @@ export interface Product {
   updatedAt: string;
 }
 
+export interface Brand {
+  brandId: number;
+  name: string;
+  slug: string;
+  logoUrl?: string;
+  isActive: boolean;
+}
+
+export interface PublicCategory {
+  categoryId: number;
+  name: string;
+  slug: string;
+  parentId?: number;
+}
+
 export interface User {
   id: string;
   email: string;
