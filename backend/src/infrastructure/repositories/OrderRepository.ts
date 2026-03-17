@@ -232,7 +232,41 @@ export class OrderRepository implements IOrderRepository {
   async receiveReturn(input: ReceiveOrderReturnDTO): Promise<OrderReturn | null> { return null; }
   async refundReturn(input: RefundOrderReturnDTO): Promise<OrderReturn | null> { return null; }
   async closeReturn(input: CloseOrderReturnDTO): Promise<OrderReturn | null> { return null; }
-  async updatePaymentStatus(input: UpdatePaymentStatusDTO): Promise<Order | null> { return null; }
+  async updatePaymentStatus(input: UpdatePaymentStatusDTO): Promise<Order | null> {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const order = await this.findOrderForUpdate(connection, input.orderId);
+      if (!order || order.paymentStatus !== input.currentStatus) {
+        await connection.rollback();
+        return null;
+      }
+
+      const now = new Date();
+      await connection.execute(
+        'UPDATE orders SET payment_status = ?, updated_at = ? WHERE order_id = ?',
+        [input.nextStatus, now, input.orderId]
+      );
+
+      await this.appendEventWithConnection(connection, {
+        orderId: input.orderId,
+        eventType: 'payment_status_changed',
+        toStatus: input.nextStatus,
+        actorUserId: input.actorUserId,
+        actorRole: input.actorRole,
+        note: input.note,
+      });
+
+      await connection.commit();
+      return this.findById(input.orderId);
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
 
   // --- PRIVATE DB HELPERS ---
   private async getProductSnapshot(executor: SqlExecutor, id: number) {

@@ -3,6 +3,11 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { testConnection } from './infrastructure/database/connection';
 
+
+// --- ORder ---
+import { OrderScheduler } from './application/schedulers/OrderScheduler';
+
+
 // --- REPOSITORIES ---
 import { UserRepository } from './infrastructure/repositories/UserRepository';
 import { ProductRepository } from './infrastructure/repositories/ProductRepository';
@@ -156,6 +161,11 @@ const startServer = async () => {
     app.listen(PORT, () => {
       console.log(`🚀 Server is running on port ${PORT}`);
       console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+ 
+      // ✅ THÊM ĐOẠN NÀY:
+      const scheduler = new OrderScheduler(orderUseCase);
+      scheduler.start();
+      // ✅ KẾT THÚC ĐOẠN THÊM
     });
   } catch (error) {
     console.error('Failed to start server:', error);

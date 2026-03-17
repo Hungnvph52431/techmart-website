@@ -30,7 +30,7 @@ import { AdminUsers } from '@/features/admin/pages/AdminUsers';
 import { AdminAttributes } from '@/features/admin/pages/AdminAttributes';
 import { AdminVoucher } from '@/features/admin/pages/AdminVouchers';
 import { AdminBanners } from '@/features/admin/pages/AdminBanners';
-
+import { AdminOrderDetail } from './features/admin/pages/AdminOrderDetail';
 function App() {
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -64,12 +64,13 @@ function App() {
           <Route path="attributes" element={<AdminAttributes />} />
           <Route path="products" element={<AdminProducts />} />
           <Route path="banners" element={<AdminBanners />} />
-
+          
           
           {/* Chốt dùng AdminProductFormPage cho đồng bộ */}
           <Route path="products/new" element={<AdminProductFormPage />} />
           <Route path="products/edit/:id" element={<AdminProductFormPage />} />          
           <Route path="orders" element={<AdminOrders />} />
+          <Route path="/admin/orders/:id" element={<AdminOrderDetail />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="vouchers" element={<AdminVoucher />} />
         </Route>
