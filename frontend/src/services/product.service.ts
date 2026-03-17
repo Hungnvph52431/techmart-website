@@ -29,6 +29,7 @@ export const productService = {
     maxPrice?: number;
     search?: string;
     featured?: boolean;
+    sort?: 'newest' | 'price_asc' | 'price_desc' | 'popular';
   }): Promise<Product[]> => {
     const params = new URLSearchParams();
     if (filters) {

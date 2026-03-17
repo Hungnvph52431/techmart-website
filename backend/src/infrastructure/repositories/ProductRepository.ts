@@ -25,6 +25,7 @@ type PublicFilters = {
   isNew?: boolean;
   isBestseller?: boolean;
   status?: string;
+  sort?: 'newest' | 'price_asc' | 'price_desc' | 'popular';
 };
 
 export class ProductRepository implements IProductRepository {
@@ -456,7 +457,25 @@ export class ProductRepository implements IProductRepository {
       }
     }
 
-    query += ' ORDER BY p.updated_at DESC, p.created_at DESC';
+    if (publicOnly) {
+      const sortBy = (filters as PublicFilters | undefined)?.sort;
+      switch (sortBy) {
+        case 'price_asc':
+          query += ' ORDER BY p.price ASC';
+          break;
+        case 'price_desc':
+          query += ' ORDER BY p.price DESC';
+          break;
+        case 'popular':
+          query += ' ORDER BY p.sold_quantity DESC, p.view_count DESC';
+          break;
+        case 'newest':
+        default:
+          query += ' ORDER BY p.created_at DESC, p.updated_at DESC';
+      }
+    } else {
+      query += ' ORDER BY p.updated_at DESC, p.created_at DESC';
+    }
     return { query, params };
   }
 

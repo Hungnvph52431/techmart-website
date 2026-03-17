@@ -1,26 +1,55 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { ProductCard } from '@/features/products/components/ProductCard';
+import { FilterSidebar } from '@/features/products/components/FilterSidebar';
 import { productService } from '@/services/product.service';
-import { Product } from '@/types';
-import { ChevronRight, Zap, Award, Smartphone, Laptop, Tablet, Watch, Headphones } from 'lucide-react';
+import { brandService } from '@/services/brand.service';
+import { Product, Brand } from '@/types';
+import { ChevronRight, Zap, Award, Search, Smartphone, Laptop, Tablet, Watch, Headphones, SlidersHorizontal } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useProductFilters, SORT_OPTIONS } from '@/hooks/useProductFilters';
 
 export const HomePage = () => {
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
-  const [newProducts, setNewProducts] = useState<Product[]>([]);
+  const [explorerProducts, setExplorerProducts] = useState<Product[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterLoading, setFilterLoading] = useState(false);
+
+  const {
+    selectedBrand,
+    minPriceInput,
+    maxPriceInput,
+    appliedPriceRange,
+    sortBy,
+    selectBrand,
+    clearBrand,
+    setMinPriceInput,
+    setMaxPriceInput,
+    applyCustomPrice,
+    applyPreset,
+    clearPrice,
+    isActivePreset,
+    setSortBy,
+    resetFilters,
+    activeFilterCount,
+    toApiParams,
+  } = useProductFilters();
+
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchInitialData = async () => {
       try {
         setLoading(true);
-        const [featured, newest] = await Promise.all([
+        const [featured, brandsData, explorer] = await Promise.all([
           productService.getAll({ featured: true }),
-          productService.getAll({}), // Assuming latest products by default or can filter
+          brandService.getActiveBrands(),
+          productService.getAll({ sort: 'popular' }),
         ]);
         setFeaturedProducts(featured.slice(0, 10));
-        setNewProducts(newest.slice(0, 10));
+        setBrands(brandsData);
+        setExplorerProducts(explorer);
       } catch (error) {
         console.error('Error fetching home page data:', error);
       } finally {
@@ -28,17 +57,40 @@ export const HomePage = () => {
       }
     };
 
-    fetchData();
+    fetchInitialData();
   }, []);
 
+  const fetchExplorerProducts = useCallback(async () => {
+    try {
+      setFilterLoading(true);
+      const params = toApiParams();
+      const data = await productService.getAll(params);
+      setExplorerProducts(data);
+    } catch (error) {
+      console.error('Error fetching filtered products:', error);
+    } finally {
+      setFilterLoading(false);
+    }
+  }, [toApiParams]);
+
+  // Re-fetch when filters change (skip first mount since initial fetch covers it)
+  const [filtersInitialized, setFiltersInitialized] = useState(false);
+  useEffect(() => {
+    if (!filtersInitialized) {
+      setFiltersInitialized(true);
+      return;
+    }
+    fetchExplorerProducts();
+  }, [selectedBrand, appliedPriceRange, sortBy]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const categories = [
-    { name: 'iPhone', icon: <Smartphone className="w-8 h-8" />, path: '/products?category=iPhone', color: 'bg-blue-50 text-blue-600' },
-    { name: 'Samsung', icon: <Smartphone className="w-8 h-8" />, path: '/products?category=Samsung', color: 'bg-orange-50 text-orange-600' },
-    { name: 'Xiaomi', icon: <Smartphone className="w-8 h-8" />, path: '/products?category=Xiaomi', color: 'bg-orange-50 text-orange-600' },
-    { name: 'Laptop', icon: <Laptop className="w-8 h-8" />, path: '/products?category=Laptop', color: 'bg-purple-50 text-purple-600' },
-    { name: 'Tablet', icon: <Tablet className="w-8 h-8" />, path: '/products?category=Tablet', color: 'bg-green-50 text-green-600' },
-    { name: 'Smartwatch', icon: <Watch className="w-8 h-8" />, path: '/products?category=Watch', color: 'bg-red-50 text-red-600' },
-    { name: 'Phụ kiện', icon: <Headphones className="w-8 h-8" />, path: '/products?category=Accessory', color: 'bg-yellow-50 text-yellow-600' },
+    { name: 'iPhone', icon: <Smartphone className="w-8 h-8" />, path: '/products?brand=apple', color: 'bg-blue-50 text-blue-600' },
+    { name: 'Samsung', icon: <Smartphone className="w-8 h-8" />, path: '/products?brand=samsung', color: 'bg-orange-50 text-orange-600' },
+    { name: 'Xiaomi', icon: <Smartphone className="w-8 h-8" />, path: '/products?brand=xiaomi', color: 'bg-orange-50 text-orange-600' },
+    { name: 'Laptop', icon: <Laptop className="w-8 h-8" />, path: '/products?category=laptop', color: 'bg-purple-50 text-purple-600' },
+    { name: 'Tablet', icon: <Tablet className="w-8 h-8" />, path: '/products?category=tablet', color: 'bg-green-50 text-green-600' },
+    { name: 'Smartwatch', icon: <Watch className="w-8 h-8" />, path: '/products?category=dong-ho-thong-minh', color: 'bg-red-50 text-red-600' },
+    { name: 'Phụ kiện', icon: <Headphones className="w-8 h-8" />, path: '/products?category=phu-kien', color: 'bg-yellow-50 text-yellow-600' },
   ];
 
   return (
@@ -155,30 +207,150 @@ export const HomePage = () => {
           </div>
         </section>
 
-        {/* Featured Brands / Highlights */}
+        {/* Khám phá sản phẩm – sidebar layout */}
         <section className="py-8">
           <div className="container mx-auto px-4">
-            <div className="flex items-center justify-between mb-8">
+
+            {/* Section header */}
+            <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-2">
-                <Award className="text-primary-600 w-8 h-8" />
-                <h2 className="text-2xl font-bold text-gray-800">Sản phẩm nổi bật</h2>
+                <Search className="text-primary-600 w-7 h-7" />
+                <h2 className="text-2xl font-bold text-gray-800">Khám phá sản phẩm</h2>
+                {!filterLoading && explorerProducts.length > 0 && (
+                  <span className="text-sm text-gray-400 font-normal ml-1">
+                    ({explorerProducts.length} sản phẩm)
+                  </span>
+                )}
               </div>
-              <Link to="/products?featured=true" className="text-primary-600 font-semibold flex items-center gap-1 hover:underline">
+              <Link to="/products" className="text-primary-600 font-semibold flex items-center gap-1 hover:underline">
                 Xem tất cả <ChevronRight className="w-4 h-4" />
               </Link>
             </div>
 
-            {loading ? (
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => <div key={i} className="animate-pulse bg-gray-100 h-80 rounded-xl"></div>)}
+            {/* Main area: sidebar + content */}
+            <div className="flex gap-6 items-start">
+
+              {/* ── LEFT SIDEBAR – sticky on desktop ── */}
+              <aside className="hidden lg:block w-56 xl:w-64 flex-none sticky top-20">
+                <FilterSidebar
+                  brands={brands}
+                  selectedBrand={selectedBrand}
+                  minPriceInput={minPriceInput}
+                  maxPriceInput={maxPriceInput}
+                  appliedPriceRange={appliedPriceRange}
+                  activeFilterCount={activeFilterCount}
+                  isActivePreset={isActivePreset}
+                  onBrandSelect={selectBrand}
+                  onClearBrand={clearBrand}
+                  onMinPriceChange={setMinPriceInput}
+                  onMaxPriceChange={setMaxPriceInput}
+                  onApplyCustomPrice={applyCustomPrice}
+                  onApplyPreset={applyPreset}
+                  onClearPrice={clearPrice}
+                  onReset={resetFilters}
+                />
+              </aside>
+
+              {/* ── MOBILE DRAWER ── */}
+              {/* Backdrop */}
+              <div
+                className={`fixed inset-0 bg-black/40 z-40 lg:hidden transition-opacity duration-300
+                  ${sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                onClick={() => setSidebarOpen(false)}
+              />
+              {/* Slide-in panel */}
+              <div
+                className={`fixed left-0 top-0 h-full w-72 z-50 lg:hidden transition-transform duration-300
+                  ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+              >
+                <FilterSidebar
+                  brands={brands}
+                  selectedBrand={selectedBrand}
+                  minPriceInput={minPriceInput}
+                  maxPriceInput={maxPriceInput}
+                  appliedPriceRange={appliedPriceRange}
+                  activeFilterCount={activeFilterCount}
+                  isActivePreset={isActivePreset}
+                  onBrandSelect={selectBrand}
+                  onClearBrand={clearBrand}
+                  onMinPriceChange={setMinPriceInput}
+                  onMaxPriceChange={setMaxPriceInput}
+                  onApplyCustomPrice={applyCustomPrice}
+                  onApplyPreset={applyPreset}
+                  onClearPrice={clearPrice}
+                  onReset={resetFilters}
+                  isDrawer
+                  onClose={() => setSidebarOpen(false)}
+                />
               </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6">
-                {featuredProducts.map((product) => (
-                  <ProductCard key={product.productId} product={product} />
-                ))}
+
+              {/* ── RIGHT CONTENT: sort row + grid ── */}
+              <div className="flex-1 min-w-0">
+                {/* Sort + mobile filter button */}
+                <div className="flex items-center gap-2 mb-4 flex-wrap">
+                  {/* Mobile open-sidebar button */}
+                  <button
+                    onClick={() => setSidebarOpen(true)}
+                    className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-full text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm transition-colors"
+                  >
+                    <SlidersHorizontal className="w-4 h-4" />
+                    Bộ lọc
+                    {activeFilterCount > 0 && (
+                      <span className="bg-primary-600 text-white text-xs font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                        {activeFilterCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Sort row (always visible) */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+                    {SORT_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setSortBy(opt.value)}
+                        className={`flex-none px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap
+                          ${sortBy === opt.value
+                            ? 'bg-primary-600 text-white shadow-sm'
+                            : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+                          }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Product grid */}
+                {loading || filterLoading ? (
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                      <div key={i} className="animate-pulse bg-gray-100 h-80 rounded-xl" />
+                    ))}
+                  </div>
+                ) : explorerProducts.length === 0 ? (
+                  <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
+                    <div className="text-5xl mb-4">🔍</div>
+                    <p className="text-gray-500 text-lg font-medium">Không tìm thấy sản phẩm phù hợp</p>
+                    <p className="text-gray-400 text-sm mt-1 mb-4">Thử thay đổi bộ lọc hoặc xóa bộ lọc để xem thêm</p>
+                    <button
+                      onClick={resetFilters}
+                      className="px-6 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors"
+                    >
+                      Xóa bộ lọc
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 xl:gap-6">
+                    {explorerProducts.map((product) => (
+                      <ProductCard
+                        key={(product as any).productId ?? product.id ?? product.slug}
+                        product={product}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </section>
 

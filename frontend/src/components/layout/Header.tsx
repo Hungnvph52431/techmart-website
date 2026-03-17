@@ -120,22 +120,22 @@ export const Header = () => {
               </Link>
             </li>
             <li>
-              <Link to="/products?category=iPhone" className="text-gray-700 hover:text-primary-600">
+              <Link to="/products?brand=apple" className="text-gray-700 hover:text-primary-600">
                 iPhone
               </Link>
             </li>
             <li>
-              <Link to="/products?category=Samsung" className="text-gray-700 hover:text-primary-600">
+              <Link to="/products?brand=samsung" className="text-gray-700 hover:text-primary-600">
                 Samsung
               </Link>
             </li>
             <li>
-              <Link to="/products?category=Xiaomi" className="text-gray-700 hover:text-primary-600">
+              <Link to="/products?brand=xiaomi" className="text-gray-700 hover:text-primary-600">
                 Xiaomi
               </Link>
             </li>
             <li>
-              <Link to="/products?category=OPPO" className="text-gray-700 hover:text-primary-600">
+              <Link to="/products?brand=oppo" className="text-gray-700 hover:text-primary-600">
                 OPPO
               </Link>
             </li>

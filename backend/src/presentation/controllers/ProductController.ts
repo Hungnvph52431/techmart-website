@@ -19,6 +19,7 @@ export class ProductController {
         isNew: req.query.isNew === 'true' ? true : req.query.isNew === 'false' ? false : undefined,
         isBestseller: req.query.isBestseller === 'true' ? true : req.query.isBestseller === 'false' ? false : undefined,
         status: req.query.status as string,
+        sort: req.query.sort as string | undefined,
       };
 
       const products = await this.productUseCase.getAllProducts(filters);

@@ -10,6 +10,7 @@ import { OrderRepository } from './infrastructure/repositories/OrderRepository';
 import { CategoryRepository } from './infrastructure/repositories/CategoryRepository';
 import { AttributeRepository } from './infrastructure/repositories/AttributeRepository';
 import { ReviewRepository } from './infrastructure/repositories/ReviewRepository';
+import { BrandRepository } from './infrastructure/repositories/BrandRepository';
 
 // Use Cases
 import { AuthUseCase } from './application/use-cases/AuthUseCase';
@@ -19,6 +20,7 @@ import { UserUseCase } from './application/use-cases/UserUseCase';
 import { CategoryUseCase } from './application/use-cases/CategoryUseCase';
 import { AttributeUseCase } from './application/use-cases/AttributeUseCase';
 import { ReviewUseCase } from './application/use-cases/ReviewUseCase';
+import { BrandUseCase } from './application/use-cases/BrandUseCase';
 
 // Controllers
 import { AuthController } from './presentation/controllers/AuthController';
@@ -30,6 +32,7 @@ import { UserController } from './presentation/controllers/UserControllers';
 import { CategoryController } from './presentation/controllers/CategoryController';
 import { AttributeController } from './presentation/controllers/AttributeController';
 import { ReviewController } from './presentation/controllers/ReviewController';
+import { BrandController } from './presentation/controllers/BrandController';
 
 // Routes
 import { createAuthRoutes } from './presentation/routes/auth.routes';
@@ -42,6 +45,7 @@ import { createAdminCategoryRoutes } from './presentation/routes/admin/category.
 import { createAdminAttributeRoutes } from './presentation/routes/admin/attribute.routes';
 import { createAdminOrderRoutes } from './presentation/routes/admin/order.routes';
 import { createOrderReviewRoutes } from './presentation/routes/order-review.routes';
+import { createBrandRoutes } from './presentation/routes/brand.routes';
 
 dotenv.config();
 
@@ -63,6 +67,7 @@ const orderRepository = new OrderRepository();
 const categoryRepository = new CategoryRepository();
 const attributeRepository = new AttributeRepository();
 const reviewRepository = new ReviewRepository();
+const brandRepository = new BrandRepository();
 
 const authUseCase = new AuthUseCase(userRepository);
 const productUseCase = new ProductUseCase(productRepository);
@@ -71,6 +76,7 @@ const userUseCase = new UserUseCase(userRepository);
 const categoryUseCase = new CategoryUseCase(categoryRepository);
 const attributeUseCase = new AttributeUseCase(attributeRepository);
 const reviewUseCase = new ReviewUseCase(reviewRepository, orderRepository);
+const brandUseCase = new BrandUseCase(brandRepository);
 
 const authController = new AuthController(authUseCase);
 const productController = new ProductController(productUseCase);
@@ -81,6 +87,7 @@ const userController = new UserController(userUseCase);
 const categoryController = new CategoryController(categoryUseCase);
 const attributeController = new AttributeController(attributeUseCase);
 const reviewController = new ReviewController(reviewUseCase);
+const brandController = new BrandController(brandUseCase);
 
 // Routes
 app.use('/api/auth', createAuthRoutes(authController));
@@ -93,6 +100,7 @@ app.use('/api/admin/products', createAdminProductRoutes(adminProductController))
 app.use('/api/admin/categories', createAdminCategoryRoutes(categoryController));
 app.use('/api/admin/attributes', createAdminAttributeRoutes(attributeController));
 app.use('/api/admin/orders', createAdminOrderRoutes(adminOrderController));
+app.use('/api/brands', createBrandRoutes(brandController));
 
 // Health check
 app.get('/health', (req, res) => {
