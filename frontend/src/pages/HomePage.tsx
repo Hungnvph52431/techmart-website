@@ -5,6 +5,8 @@ import { productService } from '@/services/product.service';
 import { Product } from '@/types';
 import { ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Feedback } from '@/components/common/Feedback';
+import { Faq } from '@/components/common/Faq';
 
 export const HomePage = () => {
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
@@ -130,6 +132,8 @@ export const HomePage = () => {
           </div>
         </div>
       </section>
+      <Feedback/>
+      <Faq/>
     </Layout>
   );
 };
