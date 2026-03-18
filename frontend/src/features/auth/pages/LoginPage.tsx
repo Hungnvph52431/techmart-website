@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { authService } from '@/services/auth.service';
 import { useAuthStore } from '@/store/authStore';
@@ -11,7 +11,6 @@ export const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const { setAuth } = useAuthStore();
   const navigate = useNavigate();
-  const location = useLocation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,16 +20,12 @@ export const LoginPage = () => {
       const result = await authService.login(email, password);
       setAuth(result.user, result.token);
       toast.success('Đăng nhập thành công!');
-
-      const redirectTarget =
-        typeof location.state === 'object' && location.state !== null && 'from' in location.state
-          ? String((location.state as { from?: string }).from || '')
-          : '';
-
+      
+      // Redirect based on user role
       if (result.user.role !== 'customer') {
         navigate('/admin');
       } else {
-        navigate(redirectTarget || '/orders');
+        navigate('/');
       }
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Đăng nhập thất bại');
@@ -55,7 +50,6 @@ export const LoginPage = () => {
                 id="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                autoComplete="username"
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="example@email.com"
@@ -71,7 +65,6 @@ export const LoginPage = () => {
                 id="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="••••••••"

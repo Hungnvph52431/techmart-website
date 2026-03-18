@@ -1,14 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AuthUser } from '@/types/auth';
-import { normalizeAuthUser } from '@/services/auth.service';
-
-const AUTH_STORAGE_KEY = 'auth-storage';
+import { User } from '@/types';
 
 interface AuthState {
-  user: AuthUser | null;
+  user: User | null;
   token: string | null;
-  setAuth: (user: AuthUser | Record<string, unknown>, token: string) => void;
+  setAuth: (user: User, token: string) => void;
   clearAuth: () => void;
   isAuthenticated: () => boolean;
 }
@@ -19,35 +16,21 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       token: null,
       setAuth: (user, token) => {
-        const normalizedUser = normalizeAuthUser(user);
-        set({ user: normalizedUser, token });
+        set({ user, token });
         localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(normalizedUser));
+        localStorage.setItem('user', JSON.stringify(user));
       },
       clearAuth: () => {
         set({ user: null, token: null });
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        localStorage.removeItem(AUTH_STORAGE_KEY);
       },
       isAuthenticated: () => {
         return !!get().token;
       },
     }),
     {
-      name: AUTH_STORAGE_KEY,
-      merge: (persistedState, currentState) => {
-        const typedState = (persistedState || {}) as Partial<AuthState>;
-
-        return {
-          ...currentState,
-          ...typedState,
-          token: typeof typedState.token === 'string' ? typedState.token : null,
-          user: typedState.user
-            ? normalizeAuthUser(typedState.user as Record<string, unknown>)
-            : null,
-        };
-      },
+      name: 'auth-storage',
     }
   )
 );

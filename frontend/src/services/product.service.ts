@@ -1,46 +1,21 @@
 import api from './api';
-import { Product } from '@/types';
-
-export interface ProductStats {
-  totalProducts: number;
-  activeProducts: number;
-  inactiveProducts: number;
-  outOfStockCount: number;
-  lowStockCount: number;
-  topSellingProducts: Array<{
-    productId: number;
-    name: string;
-    soldQuantity: number;
-    stockQuantity: number;
-    mainImage: string | null;
-  }>;
-  lowStockProducts: Array<{
-    productId: number;
-    name: string;
-    stockQuantity: number;
-  }>;
-}
+import { Product, ProductFilter, ProductResponse } from '@/types';
 
 export const productService = {
-  getAll: async (filters?: {
-    category?: string;
-    brand?: string;
-    minPrice?: number;
-    maxPrice?: number;
-    search?: string;
-    featured?: boolean;
-    sort?: 'newest' | 'price_asc' | 'price_desc' | 'popular';
-  }): Promise<Product[]> => {
-    const params = new URLSearchParams();
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          params.append(key, value.toString());
-        }
-      });
-    }
-    const response = await api.get(`/products?${params.toString()}`);
-    return response.data;
+  getAll: async (filters?: ProductFilter): Promise<ProductResponse> => {
+  const params = new URLSearchParams();
+
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        params.append(key, String(value));
+      }
+    });
+  }
+
+  const response = await api.get(`/products?${params.toString()}`);
+
+  return response.data;
   },
 
   getProducts: async (): Promise<Product[]> => {
@@ -58,8 +33,17 @@ export const productService = {
     return response.data;
   },
 
-  getStats: async (): Promise<ProductStats> => {
-    const response = await api.get('/products/stats');
-    return response.data.data;
+  createProduct: async (productData: any): Promise<Product> => {
+    const response = await api.post('/products', productData);
+    return response.data;
+  },
+
+  updateProduct: async (id: number, productData: any): Promise<Product> => {
+    const response = await api.put(`/products/${id}`, productData);
+    return response.data;
+  },
+
+  deleteProduct: async (id: number): Promise<void> => {
+    await api.delete(`/products/${id}`);
   },
 };

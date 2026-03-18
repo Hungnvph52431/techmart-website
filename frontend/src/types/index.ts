@@ -1,6 +1,5 @@
 export interface Product {
-  id: number;
-  productId?: number;
+  id: string;
   name: string;
   slug: string;
   description: string;
@@ -10,38 +9,42 @@ export interface Product {
   category: string;
   stock: number;
   images: string[];
-  specifications: Record<string, string>;
+  specifications: {
+    screen?: string;
+    os?: string;
+    camera?: string;
+    processor?: string;
+    ram?: string;
+    storage?: string;
+    battery?: string;
+    [key: string]: string | undefined;
+  };
   featured: boolean;
   rating: number;
   reviewCount: number;
-  status?: 'draft' | 'active' | 'inactive' | 'out_of_stock' | 'pre_order' | 'archived';
-  variants?: Array<{
-    id: number;
-    variantId: number;
-    name: string;
-    sku: string;
-    attributes: Record<string, string>;
-    price: number;
-    stock: number;
-    image?: string;
-  }>;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface Brand {
-  brandId: number;
-  name: string;
-  slug: string;
-  logoUrl?: string;
-  isActive: boolean;
+export interface ProductFilter {
+  category?: string;
+  brand?: string;
+  search?: string;
+  featured?: boolean;
+
+  minPrice?: number;
+  maxPrice?: number;
+
+  page?: number;
+  limit?: number;
 }
 
-export interface PublicCategory {
-  categoryId: number;
-  name: string;
-  slug: string;
-  parentId?: number;
+export interface ProductResponse {
+  products: Product[];
+  totalPages: number;
+  total: number;
+  page: number;
+  limit: number;
 }
 
 export interface User {
@@ -75,7 +78,7 @@ export interface Order {
 }
 
 export interface OrderItem {
-  productId: number;
+  productId: string;
   productName: string;
   productImage: string;
   quantity: number;

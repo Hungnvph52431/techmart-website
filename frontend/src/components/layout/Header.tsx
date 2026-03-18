@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingCart, User, Search } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
@@ -7,29 +6,8 @@ import { useCartStore } from '@/store/cartStore';
 export const Header = () => {
   const { user, isAuthenticated, clearAuth } = useAuthStore();
   const { getTotalItems } = useCartStore();
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const userMenuRef = useRef<HTMLDivElement | null>(null);
-  const displayName = user?.name || (user as any)?.fullName || user?.email || 'Tai khoan';
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (!userMenuRef.current) {
-        return;
-      }
-
-      if (!userMenuRef.current.contains(event.target as Node)) {
-        setIsUserMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
 
   const handleLogout = () => {
-    setIsUserMenuOpen(false);
     clearAuth();
     window.location.href = '/';
   };
@@ -67,26 +45,20 @@ export const Header = () => {
             </Link>
 
             {isAuthenticated() ? (
-              <div ref={userMenuRef} className="relative">
-                <button
-                  onClick={() => setIsUserMenuOpen((previous) => !previous)}
-                  className="flex items-center space-x-2"
-                >
+              <div className="relative group">
+                <button className="flex items-center space-x-2">
                   <User className="h-6 w-6 text-gray-700" />
-                  <span className="text-sm">{displayName}</span>
+                  <span className="text-sm">{user?.fullName}</span>
                 </button>
-                {isUserMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1">
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 hidden group-hover:block">
                   <Link
                     to="/profile"
-                    onClick={() => setIsUserMenuOpen(false)}
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   >
                     Thông tin cá nhân
                   </Link>
                   <Link
                     to="/orders"
-                    onClick={() => setIsUserMenuOpen(false)}
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   >
                     Đơn hàng của tôi
@@ -97,8 +69,7 @@ export const Header = () => {
                   >
                     Đăng xuất
                   </button>
-                  </div>
-                )}
+                </div>
               </div>
             ) : (
               <Link
@@ -120,27 +91,23 @@ export const Header = () => {
               </Link>
             </li>
             <li>
-              <Link to="/products?brand=apple" className="text-gray-700 hover:text-primary-600">
-                iPhone
+              <Link to="/about" className="text-gray-700 hover:text-primary-600">
+                Giới Thiệu
               </Link>
             </li>
             <li>
-              <Link to="/products?brand=samsung" className="text-gray-700 hover:text-primary-600">
-                Samsung
+              <Link to="/news" className="text-gray-700 hover:text-primary-600">
+                Tin Tức
               </Link>
             </li>
             <li>
-              <Link to="/products?brand=xiaomi" className="text-gray-700 hover:text-primary-600">
-                Xiaomi
+              <Link to="/contact" className="text-gray-700 hover:text-primary-600">
+                Liên Hệ
               </Link>
             </li>
+           
             <li>
-              <Link to="/products?brand=oppo" className="text-gray-700 hover:text-primary-600">
-                OPPO
-              </Link>
-            </li>
-            <li>
-              <Link to="/products?featured=true" className="text-gray-700 hover:text-primary-600">
+              <Link to="/products" className="text-gray-700 hover:text-primary-600">
                 Sản phẩm nổi bật
               </Link>
             </li>
