@@ -26,8 +26,6 @@ export const AdminLayout = () => {
     return null;
   }
 
-  const displayName = user.name || (user as any).fullName || user.email;
-
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Top Header */}
@@ -40,7 +38,7 @@ export const AdminLayout = () => {
           </div>
           <div className="flex items-center space-x-4">
             <span className="text-gray-700">
-              👤 {displayName}
+              👤 {user.fullName || user.email}
             </span>
             <Link
               to="/"
@@ -73,26 +71,6 @@ export const AdminLayout = () => {
               📊 Dashboard
             </Link>
             <Link
-              to="/admin/categories"
-              className={`block px-4 py-3 rounded-lg transition-colors ${
-                isActive('/admin/categories')
-                  ? 'bg-blue-500 text-white'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              🗂️ Danh mục
-            </Link>
-            <Link
-              to="/admin/attributes"
-              className={`block px-4 py-3 rounded-lg transition-colors ${
-                isActive('/admin/attributes')
-                  ? 'bg-blue-500 text-white'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              🧩 Thuộc tính
-            </Link>
-            <Link
               to="/admin/products"
               className={`block px-4 py-3 rounded-lg transition-colors ${
                 isActive('/admin/products')
@@ -111,16 +89,6 @@ export const AdminLayout = () => {
               }`}
             >
               🛒 Đơn hàng
-            </Link>
-            <Link
-              to="/admin/users"
-              className={`block px-4 py-3 rounded-lg transition-colors ${
-                isActive('/admin/users')
-                  ? 'bg-blue-500 text-white'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              👥 Người dùng
             </Link>
           </nav>
         </aside>
