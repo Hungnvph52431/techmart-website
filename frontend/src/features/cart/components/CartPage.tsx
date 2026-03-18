@@ -2,11 +2,12 @@ import { Layout } from '@/components/layout/Layout';
 import { useCartStore } from '@/store/cartStore';
 import toast from 'react-hot-toast';
 import { Trash2, Plus, Minus, ShoppingCart } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const CartPage = () => {
-  const { items, removeItem, updateQuantity, getTotalPrice, getTotalItems } = useCartStore();
+  const navigate = useNavigate();
+  const { items, removeItem, updateQuantity, getTotalItems, selectedItemIds, toggleItemSelection, toggleAllSelection, getSelectedTotalPrice } = useCartStore();
 
   const handleUpdateQuantity = (productId: number, newQuantity: number, stockQuantity: number) => {
     if (newQuantity === 0) {
@@ -53,6 +54,26 @@ export const CartPage = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
+            {/* Thanh Chọn tất cả */}
+            <div className="bg-white rounded-lg shadow-md mb-4 p-4 flex items-center justify-between">
+              <label className="flex items-center gap-3 cursor-pointer select-none">
+                <input 
+                  type="checkbox" 
+                  checked={items.length > 0 && selectedItemIds.length === items.length}
+                  onChange={toggleAllSelection}
+                  className="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer pl-2"
+                />
+                <span className="font-semibold text-gray-700">
+                  Chọn tất cả ({items.length} sản phẩm)
+                </span>
+              </label>
+              {selectedItemIds.length > 0 && (
+                <span className="text-sm text-gray-500 flex items-center">
+                  Đã chọn {selectedItemIds.length} sản phẩm
+                </span>
+              )}
+            </div>
+
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
               <AnimatePresence>
                 {items.map((item) => (
@@ -65,6 +86,12 @@ export const CartPage = () => {
                     transition={{ duration: 0.3 }}
                     className="flex items-center gap-4 p-4 border-b last:border-b-0 origin-top bg-white"
                   >
+                    <input 
+                      type="checkbox"
+                      checked={selectedItemIds.includes(item.product.productId)}
+                      onChange={() => toggleItemSelection(item.product.productId)}
+                      className="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer ml-2"
+                    />
                     <img
                       src={item.product.mainImage || '/placeholder.jpg'}
                       alt={item.product.name}
@@ -133,13 +160,13 @@ export const CartPage = () => {
                 <div className="flex justify-between text-gray-600">
                   <span>Tạm tính:</span>
                   <span className="font-semibold text-gray-800">
-                    {getTotalPrice().toLocaleString('vi-VN')}₫
+                    {getSelectedTotalPrice().toLocaleString('vi-VN')}₫
                   </span>
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span>Phí vận chuyển:</span>
                   <span className="font-semibold text-gray-800">
-                    {getTotalPrice() >= 5000000 ? 'Miễn phí' : '30.000₫'}
+                    {getSelectedTotalPrice() >= 5000000 || getSelectedTotalPrice() === 0 ? 'Miễn phí' : '30.000₫'}
                   </span>
                 </div>
                 <div className="border-t border-gray-100 pt-4 mt-2 flex justify-between text-lg">
@@ -147,7 +174,7 @@ export const CartPage = () => {
                   <div className="text-right">
                     <span className="font-bold text-red-600 block text-xl">
                       {(
-                        getTotalPrice() + (getTotalPrice() >= 5000000 ? 0 : 30000)
+                        getSelectedTotalPrice() + (getSelectedTotalPrice() >= 5000000 || getSelectedTotalPrice() === 0 ? 0 : 30000)
                       ).toLocaleString('vi-VN')}₫
                     </span>
                     <span className="text-xs text-gray-500 font-normal mt-1">(Đã bao gồm VAT)</span>
@@ -155,12 +182,23 @@ export const CartPage = () => {
                 </div>
               </div>
 
-                              <Link
-                  to="/checkout"
-                  className="block w-full bg-primary-600 text-white text-center py-3 rounded-lg hover:bg-primary-700 transition-colors"
-                >
-                  Tiến hành thanh toán
-                </Link>
+                              <button
+                onClick={() => {
+                  if (selectedItemIds.length === 0) {
+                    toast.error('Vui lòng chọn ít nhất một sản phẩm để thanh toán!');
+                    return;
+                  }
+                  navigate('/checkout');
+                }}
+                disabled={selectedItemIds.length === 0}
+                className={`block w-full text-white text-center py-3 rounded-lg transition-colors ${
+                  selectedItemIds.length === 0 
+                    ? 'bg-gray-400 cursor-not-allowed' 
+                    : 'bg-primary-600 hover:bg-primary-700'
+                }`}
+              >
+                Tiến hành thanh toán
+              </button>
               <Link
                 to="/products"
                 className="block w-full text-center text-primary-600 mt-3 hover:text-primary-700"

@@ -15,8 +15,11 @@ const ACCOUNT_NAME = "BUI VIET KHANH";
 
 export const CheckoutPage = () => {
   const navigate = useNavigate();
-  const { items, clearCart } = useCartStore();
+  const { items, selectedItemIds, clearSelectedItems } = useCartStore();
   const { user } = useAuthStore();
+  
+  // Chỉ lấy những sản phẩm đã được chọn trong giỏ hàng
+  const checkoutItems = items.filter(item => selectedItemIds.includes(item.product.productId));
 
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "bank_transfer">("cod");
   const [loading, setLoading] = useState(false);
@@ -38,7 +41,7 @@ export const CheckoutPage = () => {
   });
 
   // Tính tổng tiền
-  const subtotal = items.reduce(
+  const subtotal = checkoutItems.reduce(
     (sum, item) => sum + (item.product.salePrice || item.product.price) * item.quantity,
     0
   );
@@ -116,8 +119,8 @@ export const CheckoutPage = () => {
       toast.error("Vui lòng điền đầy đủ thông tin giao hàng!");
       return;
     }
-    if (items.length === 0) {
-      toast.error("Giỏ hàng trống!");
+    if (checkoutItems.length === 0) {
+      toast.error("Không có sản phẩm nào để thanh toán!");
       return;
     }
 
@@ -125,7 +128,7 @@ export const CheckoutPage = () => {
       setLoading(true);
 
       const orderData = {
-        items: items.map((item) => ({
+        items: checkoutItems.map((item) => ({
           productId: item.product.productId,
           quantity: item.quantity,
           price: item.product.salePrice || item.product.price,
@@ -143,7 +146,7 @@ export const CheckoutPage = () => {
       };
 
       const result = await orderService.create(orderData as any);
-      clearCart();
+      clearSelectedItems();
       toast.success("Đặt hàng thành công!");
       navigate(`/orders/${result.orderId}`);
     } catch (error) {
@@ -408,12 +411,12 @@ export const CheckoutPage = () => {
           <div className="space-y-6">
             <div className="bg-white rounded-3xl border-2 border-gray-100 p-6 sticky top-6">
               <h2 className="text-lg font-black uppercase tracking-widest text-gray-700 mb-6">
-                Đơn hàng ({items.length} sản phẩm)
+                Đơn hàng ({checkoutItems.length} sản phẩm)
               </h2>
 
               {/* Danh sách sản phẩm */}
               <div className="space-y-4 mb-6">
-                {items.map((item) => (
+                {checkoutItems.map((item) => (
                   <div key={item.product.productId} className="flex gap-3">
                     <img
                       src={item.product.mainImage || "/placeholder.jpg"}

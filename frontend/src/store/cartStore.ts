@@ -4,19 +4,25 @@ import { Product, CartItem } from '@/types';
 
 interface CartState {
   items: CartItem[];
+  selectedItemIds: number[];
   addItem: (product: Product, quantity?: number) => void;
   removeItem: (productId: number) => void;
   updateQuantity: (productId: number, quantity: number) => void;
   clearCart: () => void;
+  clearSelectedItems: () => void;
+  toggleItemSelection: (productId: number) => void;
+  toggleAllSelection: () => void;
   // Đã đổi tên hàm để khớp với Header.tsx
   getTotalItems: () => number;
   getTotalPrice: () => number;
+  getSelectedTotalPrice: () => number;
 }
 
 export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
       items: [],
+      selectedItemIds: [],
 
       addItem: (product, quantity = 1) => {
         const items = get().items;
@@ -45,6 +51,7 @@ export const useCartStore = create<CartState>()(
       removeItem: (productId) => {
         set({
           items: get().items.filter((item) => item.product.productId !== productId),
+          selectedItemIds: get().selectedItemIds.filter(id => id !== productId),
         });
       },
 
@@ -66,7 +73,38 @@ export const useCartStore = create<CartState>()(
       },
 
       clearCart: () => {
-        set({ items: [] });
+        set({ items: [], selectedItemIds: [] });
+      },
+
+      clearSelectedItems: () => {
+        const selectedIds = get().selectedItemIds;
+        set({
+          items: get().items.filter(item => !selectedIds.includes(item.product.productId)),
+          selectedItemIds: []
+        });
+      },
+
+      toggleItemSelection: (productId) => {
+        const currentSelected = get().selectedItemIds;
+        const isSelected = currentSelected.includes(productId);
+        set({
+          selectedItemIds: isSelected 
+            ? currentSelected.filter(id => id !== productId)
+            : [...currentSelected, productId]
+        });
+      },
+
+      toggleAllSelection: () => {
+        const items = get().items;
+        const currentSelected = get().selectedItemIds;
+        
+        if (currentSelected.length === items.length && items.length > 0) {
+          // Deselect all
+          set({ selectedItemIds: [] });
+        } else {
+          // Select all
+          set({ selectedItemIds: items.map(item => item.product.productId) });
+        }
       },
 
       // Tên hàm đã được chuẩn hóa để dập lỗi gạch đỏ ở Header
@@ -83,6 +121,16 @@ export const useCartStore = create<CartState>()(
           },
           0
         );
+      },
+
+      getSelectedTotalPrice: () => {
+        const selectedIds = get().selectedItemIds;
+        return get().items
+          .filter(item => selectedIds.includes(item.product.productId))
+          .reduce((total, item) => {
+            const activePrice = item.product.salePrice || item.product.price;
+            return total + activePrice * item.quantity;
+          }, 0);
       },
     }),
     {
