@@ -9,6 +9,13 @@ import { addressService, type Address } from "@/services/address.service";
 import api from "@/services/api";
 import toast from "react-hot-toast";
 
+const BACKEND_URL = (import.meta.env.VITE_API_URL as string)?.replace('/api', '') || 'http://localhost:5001';
+const getImageUrl = (url?: string | null) => {
+  if (!url) return '/placeholder.jpg';
+  if (url.startsWith('http')) return url;
+  return `${BACKEND_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
 // ─── Voucher Popup ──────────────────────────────────────────────────────────
 interface CouponItem {
   couponId: number;
@@ -658,7 +665,7 @@ export const CheckoutPage = () => {
                 {checkoutItems.map((item) => (
                   <div key={item.product.productId} className="flex gap-3">
                     <img
-                      src={item.product.mainImage || "/placeholder.jpg"}
+                      src={getImageUrl(item.product.mainImage)}
                       alt={item.product.name}
                       className="w-16 h-16 object-contain rounded-2xl bg-gray-50 border border-gray-100"
                     />

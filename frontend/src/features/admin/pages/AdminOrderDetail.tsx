@@ -17,6 +17,13 @@ import {
 } from 'lucide-react';
 import { adminOrderService } from '@/services/admin/order.service';
 
+const BACKEND_URL = (import.meta.env.VITE_API_URL as string)?.replace('/api', '') || 'http://localhost:5001';
+const getImageUrl = (url?: string | null) => {
+  if (!url) return '/placeholder.jpg';
+  if (url.startsWith('http')) return url;
+  return `${BACKEND_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
 const ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
@@ -349,7 +356,7 @@ export const AdminOrderDetail = () => {
               {items.length > 0 ? items.map((item: any) => (
                 <div key={item.orderDetailId} className="flex gap-4 px-6 py-4">
                   <img
-                    src={item.productImage || '/placeholder.jpg'}
+                    src={getImageUrl(item.productImage)}
                     alt={item.productName}
                     className="h-16 w-16 rounded-xl object-cover bg-gray-100 flex-shrink-0"
                   />
