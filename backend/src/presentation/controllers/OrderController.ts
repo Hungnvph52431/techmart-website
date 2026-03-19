@@ -101,6 +101,7 @@ getReturns = async (req: AuthRequest, res: Response) => {
       });
       res.status(201).json(order);
     } catch (error: any) {
+      console.error('❌ [OrderController.create]', error.message, error.stack?.split('\n').slice(0, 3).join('\n'));
       res.status(400).json({ message: error.message });
     }
   };
@@ -261,6 +262,7 @@ getReturns = async (req: AuthRequest, res: Response) => {
       const stats = await this.orderUseCase.getOrderStats();
       res.json({ success: true, data: stats });
     } catch (error: any) {
+      console.error('[getStats ERROR]', error);
       res.status(500).json({ success: false, message: error.message });
     }
   };

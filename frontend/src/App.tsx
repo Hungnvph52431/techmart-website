@@ -3,6 +3,13 @@ import { Toaster } from 'react-hot-toast';
 
 // --- PAGES CÔNG KHAI ---
 import { HomePage } from '@/pages/HomePage';
+import { AboutPage } from '@/pages/AboutPage';
+import { ContactPage } from '@/pages/ContactPage';
+import { PolicyPage } from '@/pages/PolicyPage';
+import { ShippingPage } from '@/pages/ShippingPage';
+import { ReturnPage } from '@/pages/ReturnPage';
+import { PaymentPage } from '@/pages/PaymentPage';
+import { FAQPage } from '@/pages/FAQPage';
 import { ProductListPage } from '@/features/products/pages/ProductListPage';
 import { ProductDetailPage } from '@/features/products/pages/ProductDetailPage';
 import { CartPage } from '@/features/cart/pages/CartPage';
@@ -43,6 +50,13 @@ function App() {
       <Routes>
         {/* --- 1. ROUTES CHO NGƯỜI DÙNG --- */}
         <Route path="/" element={<HomePage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/policy" element={<PolicyPage />} />
+        <Route path="/shipping" element={<ShippingPage />} />
+        <Route path="/return" element={<ReturnPage />} />
+        <Route path="/payment" element={<PaymentPage />} />
+        <Route path="/faq" element={<FAQPage />} />
         <Route path="/products" element={<ProductListPage />} />
         <Route path="/products/:slug" element={<ProductDetailPage />} />
         <Route path="/login" element={<LoginPage />} />

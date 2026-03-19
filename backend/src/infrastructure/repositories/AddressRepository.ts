@@ -97,7 +97,7 @@ export class AddressRepository {
     if (!fields.length) return this.findById(addressId);
 
     values.push(addressId);
-    await pool.execute(`UPDATE addresses SET ${fields.join(', ')} WHERE address_id = ?`, values);
+    await pool.execute(`UPDATE addresses SET ${fields.join(', ')} WHERE address_id = ?`, values as any);
     return this.findById(addressId);
   }
 

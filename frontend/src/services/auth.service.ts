@@ -11,15 +11,16 @@ export interface AuthResponse {
  * Hàm chuẩn hóa giúp dữ liệu User luôn đồng nhất
  */
 export const normalizeAuthUser = (input: any): User => ({
-  userId: Number(input?.userId ?? input?.id ?? 0),
+  userId: Number(input?.userId ?? input?.user_id ?? input?.id ?? 0),
   email: input?.email ?? '',
   // Ưu tiên fullName để khớp với logic Header/AdminLayout
-  fullName: input?.fullName ?? input?.name ?? '', 
+  fullName: input?.fullName ?? input?.name ?? '',
   phone: input?.phone || undefined,
   role: input?.role ?? 'customer',
-  status: input?.status,
+  status: input?.status ?? 'active',
   points: typeof input?.points === 'number' ? input.points : 0,
-  membershipLevel: input?.membershipLevel ?? 'bronze',
+  membershipLevel: input?.membershipLevel ?? input?.membership_level ?? 'bronze',
+  walletBalance: Number(input?.walletBalance ?? input?.wallet_balance ?? 0),
 });
 
 export const authService = {
