@@ -3,7 +3,8 @@ import { useParams } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { productService } from "@/services/product.service";
 import { Product } from "@/types";
-import { ShoppingCart, Star, Truck, Shield, RefreshCw, ChevronRight, Check } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ShoppingCart, Star, Truck, Shield, RefreshCw, ChevronRight, Check, Zap } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
 import toast from "react-hot-toast";
 import { ProductReviews } from '../components/ProductReviews';
@@ -60,6 +61,7 @@ const SPEC_LABELS: Record<string, string> = {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export const ProductDetailPage = () => {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -84,10 +86,14 @@ export const ProductDetailPage = () => {
         : Number(selectedVariant.price || basePrice))
     : basePrice;
 
-  // Tính stock: API có thể trả về stockQuantity hoặc stock
-  const stockToUse = selectedVariant
+  // Tính stock: variant stock ưu tiên, fallback về product stock nếu variant = 0
+  const variantStock = selectedVariant
     ? Number(selectedVariant.stockQuantity ?? selectedVariant.stock ?? 0)
-    : Number(product?.stockQuantity ?? 0);
+    : 0;
+  const productStock = Number(product?.stockQuantity ?? 0);
+  const stockToUse = selectedVariant
+    ? (variantStock > 0 ? variantStock : productStock)
+    : productStock;
 
   const availableStock = stockToUse - cartQuantity;
   const isOutOfStock = stockToUse <= 0;
@@ -122,13 +128,22 @@ export const ProductDetailPage = () => {
 
   const handleAddToCart = () => {
     if (!product || quantity <= 0) return;
-    // Nếu có variants nhưng chưa chọn thì báo lỗi
     if (variants.length > 0 && !selectedVariantId) {
       toast.error('Vui lòng chọn phiên bản sản phẩm');
       return;
     }
     addItem(product, quantity);
     toast.success(`Đã thêm ${quantity} sản phẩm vào giỏ hàng!`);
+  };
+
+  const handleBuyNow = () => {
+    if (!product || quantity <= 0) return;
+    if (variants.length > 0 && !selectedVariantId) {
+      toast.error('Vui lòng chọn phiên bản sản phẩm');
+      return;
+    }
+    addItem(product, quantity);
+    navigate('/checkout');
   };
 
   const increaseQty = () => { if (quantity < availableStock) setQuantity(p => p + 1); };
@@ -373,15 +388,27 @@ export const ProductDetailPage = () => {
               </div>
             )}
 
-            <button onClick={handleAddToCart} disabled={isDisabled || quantity <= 0}
-              className={`w-full flex items-center justify-center gap-4 py-6 rounded-[32px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-2xl mb-8 ${
-                isDisabled || quantity <= 0
-                  ? "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none"
-                  : "bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200"
-              }`}>
-              <ShoppingCart className="h-6 w-6" />
-              {isOutOfStock ? "Tạm hết hàng" : isMaxReached ? "Đã có trong giỏ" : "Chốt đơn ngay"}
-            </button>
+            <div className="flex gap-3 mb-8">
+              <button onClick={handleAddToCart} disabled={isDisabled || quantity <= 0}
+                className={`flex-1 flex items-center justify-center gap-3 py-5 rounded-[32px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-xl ${
+                  isDisabled || quantity <= 0
+                    ? "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none"
+                    : "bg-white text-blue-600 border-2 border-blue-600 hover:bg-blue-50 shadow-blue-100"
+                }`}>
+                <ShoppingCart className="h-5 w-5" />
+                {isOutOfStock ? "Hết hàng" : isMaxReached ? "Đã có trong giỏ" : "Thêm vào giỏ"}
+              </button>
+
+              <button onClick={handleBuyNow} disabled={isDisabled || quantity <= 0}
+                className={`flex-1 flex items-center justify-center gap-3 py-5 rounded-[32px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-2xl ${
+                  isDisabled || quantity <= 0
+                    ? "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none"
+                    : "bg-gradient-to-r from-red-600 to-orange-500 text-white hover:opacity-90 shadow-red-200"
+                }`}>
+                <Zap className="h-5 w-5" />
+                {isOutOfStock ? "Tạm hết hàng" : "Mua ngay"}
+              </button>
+            </div>
 
             {/* CAM KẾT */}
             <div className="grid grid-cols-3 gap-4">
