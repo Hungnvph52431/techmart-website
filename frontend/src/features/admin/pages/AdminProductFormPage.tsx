@@ -393,6 +393,35 @@ export const AdminProductFormPage = () => {
   const productAttributes = mergedAttributes.filter((a) => a.scope === 'product');
   const variantAttributes = mergedAttributes.filter((a) => a.scope === 'variant' || a.assignment.isVariantAxis);
 
+  // Real-time duplicate variant detection
+  const getDuplicateWarning = (variantIndex: number, attrCode: string): string | null => {
+    if (watchedVariants.length < 2) return null;
+    const currentVariant = watchedVariants[variantIndex];
+    if (!currentVariant?.attributes) return null;
+
+    const colorKeyPatterns = ['mau', 'color', 'colour'];
+    const allCodes = variantAttributes.map(a => a.code);
+    const groupCodes = allCodes.filter(c => colorKeyPatterns.some(p => c.toLowerCase().includes(p)));
+    const uniqueCodes = allCodes.filter(c => !groupCodes.includes(c));
+    if (uniqueCodes.length === 0) return null;
+
+    const curGroup = groupCodes.map(k => currentVariant.attributes?.[k] ?? '').join(',');
+    const curUnique = uniqueCodes.map(k => currentVariant.attributes?.[k] ?? '').join(',');
+    if (!curUnique.replace(/,/g, '')) return null;
+
+    for (let i = 0; i < watchedVariants.length; i++) {
+      if (i === variantIndex) continue;
+      const other = watchedVariants[i];
+      if (!other?.attributes) continue;
+      const otherGroup = groupCodes.map(k => other.attributes?.[k] ?? '').join(',');
+      const otherUnique = uniqueCodes.map(k => other.attributes?.[k] ?? '').join(',');
+      if (curGroup === otherGroup && curUnique === otherUnique) {
+        return `Trùng với biến thể ${i + 1}`;
+      }
+    }
+    return null;
+  };
+
   // FIX LỖI 6: Cast payload để tránh lỗi type mismatch với SaveAdminProductPayload
   const onSubmit = async (data: ProductFormValues) => {
     const primaryImg = data.images.find((i) => i.isPrimary) ?? data.images[0];
@@ -714,9 +743,11 @@ export const AdminProductFormPage = () => {
                           <label className="text-xs font-semibold text-slate-500">{attr.name}</label>
                           <Controller name={`variants.${index}.attributes.${attr.code}` as `variants.${number}.attributes.${string}`} control={control}
                             render={({ field: f }) => {
-                              // Lấy lỗi duplicate nếu có
+                              // Lấy lỗi duplicate từ Zod hoặc real-time
                               const attrError = (errors.variants?.[index] as any)?.attributes?.[attr.code]?.message;
-                              const hasError = Boolean(attrError);
+                              const dupWarning = getDuplicateWarning(index, attr.code);
+                              const errorMsg = attrError || dupWarning;
+                              const hasError = Boolean(errorMsg);
                               if (attr.inputType === 'select' || attr.inputType === 'color') return (
                                 <>
                                   <select value={(f.value as string) || ''} onChange={(e) => f.onChange(e.target.value)}
@@ -724,14 +755,14 @@ export const AdminProductFormPage = () => {
                                     <option value="">Chọn {attr.name}</option>
                                     {attr.options.filter((o) => o.isActive).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                                   </select>
-                                  {hasError && <FieldError message={attrError} />}
+                                  {hasError && <p className="text-xs text-red-500 font-semibold flex items-center gap-1">⚠ {errorMsg}</p>}
                                 </>
                               );
                               return (
                                 <>
                                   <input value={(f.value as string) || ''} onChange={(e) => f.onChange(e.target.value)} placeholder={attr.name}
                                     className={`w-full border-2 rounded-xl px-3 py-2 text-sm focus:outline-none transition-colors ${hasError ? 'border-red-400 bg-red-50' : 'border-slate-200 focus:border-blue-400'}`} />
-                                  {hasError && <FieldError message={attrError} />}
+                                  {hasError && <p className="text-xs text-red-500 font-semibold flex items-center gap-1">⚠ {errorMsg}</p>}
                                 </>
                               );
                             }} />
