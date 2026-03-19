@@ -85,7 +85,7 @@ export class AddressRepository {
     ward: string; district: string; city: string;
   }>) {
     const fields: string[] = [];
-    const values: unknown[] = [];
+    const values: Array<string | number> = [];
 
     if (data.fullName !== undefined) { fields.push('full_name = ?'); values.push(data.fullName); }
     if (data.phone !== undefined) { fields.push('phone = ?'); values.push(data.phone); }
