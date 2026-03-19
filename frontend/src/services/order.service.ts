@@ -1,13 +1,20 @@
 import api from './api';
-import type { OrderDetailView } from '@/types/order';
-import { 
-  Order, 
-  OrderStats, 
-  OrderItem,  
+import type { OrderDetailView, OrderReturnView, CreateOrderReturnPayload } from '@/types/order';
+import {
+  Order,
+  OrderStats,
+  OrderItem,
 } from '@/types';
 
 // Các type bổ trợ cho tính năng Đơn hàng nâng cao
-export type OrderStatus = 'pending' | 'confirmed' | 'processing' | 'shipping' | 'delivered' | 'cancelled' | 'returned';
+export type OrderStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'shipping'
+  | 'delivered'
+  | 'completed'
+  | 'cancelled'
+  | 'returned';
 
 export interface CreateOrderPayload {
   items: OrderItem[];
@@ -36,6 +43,11 @@ export const orderService = {
 
   getTimeline: async (id: number): Promise<any[]> => {
     const response = await api.get(`/orders/my-orders/${id}/timeline`);
+    return response.data;
+  },
+
+  confirmDelivered: async (orderId: number): Promise<any> => {
+    const response = await api.post(`/orders/my-orders/${orderId}/confirm-delivered`);
     return response.data;
   },
 
@@ -75,16 +87,54 @@ export const orderService = {
     return response.data.data || response.data;
   },
 
-  // 3. QUẢN LÝ ĐỔI TRẢ (Returns)
-  // ✅ Fix: thêm my-orders vào endpoint
-  createReturn: async (orderId: number, payload: any): Promise<any> => {
-    const response = await api.post(`/orders/my-orders/${orderId}/returns`, payload);
+  // 3. QUẢN LÝ ĐỔI TRẢ (Returns) — gửi FormData để hỗ trợ upload ảnh bằng chứng
+  createReturn: async (orderId: number, payload: CreateOrderReturnPayload & { evidenceImages?: File[] }): Promise<OrderReturnView> => {
+    const formData = new FormData();
+    formData.append('reason', payload.reason);
+    if (payload.customerNote) formData.append('customerNote', payload.customerNote);
+    formData.append('items', JSON.stringify(payload.items));
+    if (payload.evidenceImages) {
+      for (const file of payload.evidenceImages) {
+        formData.append('evidenceImages', file);
+      }
+    }
+    const response = await api.post(`/orders/my-orders/${orderId}/returns`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return response.data;
   },
 
-  // ✅ Fix: thêm my-orders vào endpoint
-  getReturns: async (orderId: number): Promise<any[]> => {
+  getReturns: async (orderId: number): Promise<OrderReturnView[]> => {
     const response = await api.get(`/orders/my-orders/${orderId}/returns`);
     return response.data;
-  }
+  },
+
+  getReturnById: async (orderId: number, returnId: number): Promise<OrderReturnView> => {
+    const response = await api.get(`/orders/my-orders/${orderId}/returns/${returnId}`);
+    return response.data;
+  },
+
+  // 4. ADMIN — QUẢN LÝ HOÀN TRẢ
+  adminGetAllReturns: async (filters?: { status?: string }): Promise<OrderReturnView[]> => {
+    const params = new URLSearchParams();
+    if (filters?.status) params.append('status', filters.status);
+    const q = params.toString();
+    const response = await api.get(`/orders/admin/returns${q ? `?${q}` : ''}`);
+    return response.data;
+  },
+
+  adminReviewReturn: async (orderId: number, returnId: number, decision: 'approved' | 'rejected', adminNote?: string): Promise<OrderReturnView> => {
+    const response = await api.patch(`/orders/${orderId}/returns/${returnId}/review`, { decision, adminNote });
+    return response.data;
+  },
+
+  adminReceiveReturn: async (orderId: number, returnId: number, adminNote?: string): Promise<OrderReturnView> => {
+    const response = await api.patch(`/orders/${orderId}/returns/${returnId}/receive`, { adminNote });
+    return response.data;
+  },
+
+  adminRefundReturn: async (orderId: number, returnId: number, adminNote?: string): Promise<OrderReturnView> => {
+    const response = await api.patch(`/orders/${orderId}/returns/${returnId}/refund`, { adminNote });
+    return response.data;
+  },
 };

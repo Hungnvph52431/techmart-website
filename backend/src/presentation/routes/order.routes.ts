@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { OrderController } from '../controllers/OrderController';
 import { authMiddleware, adminMiddleware } from '../middlewares/auth.middleware';
+import { uploadReturnEvidence } from '../middlewares/upload.middleware';
 
 export const createOrderRoutes = (orderController: OrderController) => {
   const router = Router();
@@ -24,11 +25,17 @@ export const createOrderRoutes = (orderController: OrderController) => {
 
   // Cập nhật trạng thái đơn hàng & thanh toán
   router.patch(
-    '/:id/status', 
-    authMiddleware, 
-    adminMiddleware, 
+    '/:id/status',
+    authMiddleware,
+    adminMiddleware,
     orderController.updateStatus
   );
+
+  // Quản lý Hoàn/Trả hàng (Admin)
+  router.get('/admin/returns', authMiddleware, adminMiddleware, orderController.adminListAllReturns);
+  router.patch('/:id/returns/:returnId/review', authMiddleware, adminMiddleware, orderController.adminReviewReturn);
+  router.patch('/:id/returns/:returnId/receive', authMiddleware, adminMiddleware, orderController.adminReceiveReturn);
+  router.patch('/:id/returns/:returnId/refund', authMiddleware, adminMiddleware, orderController.adminRefundReturn);
 
   // --- 2. ROUTES DÀNH CHO KHÁCH HÀNG (Yêu cầu Đăng nhập) ---
   router.use(authMiddleware);
@@ -41,9 +48,10 @@ export const createOrderRoutes = (orderController: OrderController) => {
   // Tạo mới & Hủy đơn
   router.post('/', orderController.create);
   router.post('/my-orders/:id/cancel', orderController.cancelMine);
+  router.post('/my-orders/:id/confirm-delivered', orderController.confirmDeliveredMine);
 
-  // Quản lý Hoàn/Trả hàng (Returns)
-  router.post('/my-orders/:id/returns', orderController.createReturn);
+  // Quản lý Hoàn/Trả hàng (Returns) — tối đa 5 ảnh bằng chứng
+  router.post('/my-orders/:id/returns', uploadReturnEvidence.array('evidenceImages', 5), orderController.createReturn);
   router.get('/my-orders/:id/returns', orderController.getReturns);
   router.get('/my-orders/:id/returns/:returnId', orderController.getReturnById);
 

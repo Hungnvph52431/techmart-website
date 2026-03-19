@@ -5,7 +5,7 @@ import { Toaster } from 'react-hot-toast';
 import { HomePage } from '@/pages/HomePage';
 import { ProductListPage } from '@/features/products/pages/ProductListPage';
 import { ProductDetailPage } from '@/features/products/pages/ProductDetailPage';
-import { CartPage } from '@/features/cart/components/CartPage';
+import { CartPage } from '@/features/cart/pages/CartPage';
 import { CheckoutPage } from '@/features/orders/pages/CheckoutPage';
 
 // --- AUTH & ACCOUNT ---
@@ -18,8 +18,10 @@ import { CustomerRouteGuard } from '@/features/orders/components/CustomerRouteGu
 import { CustomerOrdersLayout } from '@/features/orders/components/CustomerOrdersLayout';
 import { OrdersPage } from '@/features/orders/pages/OrdersPage';
 import { OrderDetailPage } from '@/features/orders/pages/OrderDetailPage';
-
+import { PaymentResultPage } from '@/features/payment/pages/PaymentResultPage';
+import { BankTransferPage } from '@/features/payment/pages/BankTransferPage';
 // --- QUẢN TRỊ (ADMIN) ---
+import { AdminReviews } from '@/features/admin/pages/AdminReviews';
 import { AdminLayout } from '@/features/admin/components/AdminLayout';
 import { AdminDashboard } from '@/features/admin/pages/AdminDashboard';
 import { AdminCategories } from '@/features/admin/pages/AdminCategories';
@@ -31,6 +33,9 @@ import { AdminAttributes } from '@/features/admin/pages/AdminAttributes';
 import { AdminVoucher } from '@/features/admin/pages/AdminVouchers';
 import { AdminBanners } from '@/features/admin/pages/AdminBanners';
 import { AdminOrderDetail } from './features/admin/pages/AdminOrderDetail';
+import { AdminReturns } from '@/features/admin/pages/AdminReturns';
+import { WalletPage } from '@/features/wallet/pages/WalletPage';
+import { AdminWalletTopups } from '@/features/admin/pages/AdminWalletTopups';
 function App() {
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -44,7 +49,8 @@ function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
-
+        <Route path="/payment/result" element={<PaymentResultPage />} />
+        <Route path="/payment/bank-transfer/:orderId" element={<BankTransferPage />} />
         {/* Bảo vệ các route cần đăng nhập (Đơn hàng & Profile) */}
         <Route element={<CustomerRouteGuard />}>
           <Route path="/orders" element={<CustomerOrdersLayout />}>
@@ -54,7 +60,8 @@ function App() {
           
           {/* Khanh ưu tiên chuyển Profile về trang Đơn hàng */}
           {/* Nếu muốn dùng trang Profile của Tuấn Anh, hãy đổi Navigate thành <ProfilePage /> */}
-          <Route path="/profile" element={<ProfilePage />} /> 
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/wallet" element={<WalletPage />} />
         </Route>
 
         {/* --- 2. ROUTES CHO ADMIN --- */}
@@ -73,6 +80,9 @@ function App() {
           <Route path="/admin/orders/:id" element={<AdminOrderDetail />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="vouchers" element={<AdminVoucher />} />
+          <Route path="reviews" element={<AdminReviews />} />
+          <Route path="returns" element={<AdminReturns />} />
+          <Route path="wallet-topups" element={<AdminWalletTopups />} />
         </Route>
 
         {/* Điều hướng mặc định nếu gõ sai URL */}

@@ -6,6 +6,14 @@ import { productService } from '@/services/product.service';
 import { adminCategoryService } from '@/services/admin/category.service'; 
 import { Product, Category } from '@/types'; 
 
+// ✅ Helper: chuyển path ảnh local thành URL đầy đủ
+const BACKEND_URL = (import.meta.env.VITE_API_URL as string)?.replace('/api', '') || 'http://localhost:5001';
+const getImageUrl = (url?: string): string => {
+  if (!url) return '/placeholder.jpg';
+  if (url.startsWith('http') || url.startsWith('data:')) return url;
+  return `${BACKEND_URL}${url}`;
+};
+
 // --- CẤU HÌNH TRẠNG THÁI (Giữ từ bản Khanh) ---
 const STATUS_OPTIONS = [
   { label: 'Tất cả trạng thái', value: 'all' },
@@ -165,15 +173,13 @@ export const AdminProducts = () => {
                     <div className="flex items-center gap-4">
                       {/* Image fallback từ bản Tuấn Anh */}
                      <img
-  // Dùng ảnh mặc định là 1 pixel xám để cực nhẹ
-  src={product.mainImage || "data:image/gif;base64,R0lGODlhAQABAIAAAMLCwgAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw=="}
+  src={getImageUrl(product.mainImage)}
   alt={product.name}
   className="w-14 h-14 object-contain bg-gray-100 rounded-2xl border border-gray-100 shadow-sm"
   onError={(e) => { 
-    // CHẶN ĐỨNG VÒNG LẶP: Không cho phép thử lại lần 2
-    e.currentTarget.onerror = null; 
-    // Gán ảnh xám nếu link gốc lỗi
-    e.currentTarget.src = "data:image/gif;base64,R0lGODlhAQABAIAAAMLCwgAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw=="; 
+    const el = e.target as HTMLImageElement;
+    el.onerror = null; 
+    el.src = '/placeholder.jpg'; 
   }}
 />
                       <div>

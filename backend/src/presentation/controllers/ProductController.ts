@@ -13,36 +13,57 @@ getAll = async (req: Request, res: Response) => {
     const page = req.query.page ? Number(req.query.page) : undefined;
     const limit = req.query.limit ? Number(req.query.limit) : 12;
 
-    // 1. TỪ ĐIỂN THÔNG DỊCH: Map từ khóa của Frontend sang đúng Slug của Database
-    const slugDictionary: Record<string, string> = {
-      'apple': 'iphone',        // Nút Apple -> tìm danh mục iphone
-      'iphone': 'iphone',       // Icon iPhone -> tìm danh mục iphone
-      'samsung': 'samsung-galaxy', 
-      'xiaomi': 'xiaomi-phone',
-      'oppo': 'oppo-phone',
+    // TỪ ĐIỂN THÔNG DỊCH category slug
+    const categorySlugMap: Record<string, string> = {
+      'iphone': 'iphone',
       'laptop': 'laptop',
       'tablet': 'tablet',
       'phu-kien': 'phu-kien',
       'smartwatch': 'dong-ho-thong-minh',
-      'tai-nghe': 'tai-nghe'
+      'tai-nghe': 'tai-nghe',
     };
 
-    // Lấy từ khóa do Frontend gửi lên (không phân biệt chữ hoa/thường)
+    // TỪ ĐIỂN THÔNG DỊCH brand slug
+    const brandSlugMap: Record<string, string> = {
+      'apple': 'apple',
+      'samsung': 'samsung',
+      'xiaomi': 'xiaomi',
+      'oppo': 'oppo',
+      'vivo': 'vivo',
+      'realme': 'realme',
+    };
+
     const rawCategory = (req.query.categorySlug || req.query.category) as string;
     const rawBrand = (req.query.brandSlug || req.query.brand) as string;
-    const incomingSlug = (rawCategory || rawBrand || '').toLowerCase();
 
-    // Dịch sang Slug chuẩn của DB (Nếu không có trong từ điển thì dùng y nguyên gốc)
-    const mappedSlug = incomingSlug ? (slugDictionary[incomingSlug] || incomingSlug) : undefined;
+    // Phân biệt: nếu là brand thì dùng brandSlug, nếu là category thì dùng categorySlug
+    const categoryKey = rawCategory?.toLowerCase();
+    const brandKey = rawBrand?.toLowerCase();
+
+    const resolvedCategorySlug = categoryKey
+      ? (categorySlugMap[categoryKey] || categoryKey)
+      : undefined;
+
+    const resolvedBrandSlug = brandKey
+      ? (brandSlugMap[brandKey] || brandKey)
+      : undefined;
 
     const filters = {
-      // Ép tất cả về categorySlug (vì DB của Khanh lưu iPhone, Samsung dưới dạng category)
-      categorySlug: mappedSlug,
-      search: req.query.search as string,
+      categorySlug: resolvedCategorySlug,
+      brandSlug: resolvedBrandSlug,
+      search: req.query.search as string || undefined,
       isFeatured: req.query.featured === 'true' || req.query.isFeatured === 'true',
       isNew: req.query.isNew === 'true',
       isBestseller: req.query.isBestseller === 'true',
-      status: req.query.status as string,
+      status: req.query.status as string || undefined,
+      // ✅ Spec filters
+      ram:      req.query.ram      as string || undefined,
+      storage:  req.query.storage  as string || undefined,
+      chip:     req.query.chip     as string || undefined,
+      need:     req.query.need     as string || undefined,
+      feature:  req.query.feature  as string || undefined,
+      minPrice: req.query.minPrice ? Number(req.query.minPrice) : undefined,
+      maxPrice: req.query.maxPrice ? Number(req.query.maxPrice) : undefined,
     };
 
     if (page) {

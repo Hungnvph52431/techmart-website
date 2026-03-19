@@ -126,13 +126,46 @@ getReturns = async (req: AuthRequest, res: Response) => {
     }
   };
 
-  /** Yêu cầu hoàn trả hàng */
+  /** Khách xác nhận đã nhận hàng */
+  confirmDeliveredMine = async (req: AuthRequest, res: Response) => {
+    try {
+      const order = await this.orderUseCase.confirmDeliveredByCustomer(
+        Number(req.params.id),
+        req.user.userId
+      );
+
+      if (!order) {
+        return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
+      }
+
+      res.json(order);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  };
+
+  /** Yêu cầu hoàn trả hàng (hỗ trợ upload ảnh bằng chứng) */
   createReturn = async (req: AuthRequest, res: Response) => {
     try {
+      // Multer đã parse multipart → req.files chứa ảnh, req.body chứa JSON fields
+      const files = (req.files as Express.Multer.File[]) || [];
+      const evidenceImages = files.map((f) => `/images/returns/${f.filename}`);
+
+      // Nếu items gửi dưới dạng string (FormData), parse lại
+      let items = req.body.items;
+      if (typeof items === 'string') {
+        items = JSON.parse(items);
+      }
+
       const orderReturn = await this.orderUseCase.requestReturn(
         Number(req.params.id),
         req.user.userId,
-        req.body
+        {
+          reason: req.body.reason,
+          customerNote: req.body.customerNote,
+          items,
+          evidenceImages: evidenceImages.length > 0 ? evidenceImages : undefined,
+        }
       );
 
       if (!orderReturn) {
@@ -146,6 +179,69 @@ getReturns = async (req: AuthRequest, res: Response) => {
   };
 
   // --- DÀNH CHO QUẢN TRỊ (ADMIN) ---
+
+  /** Lấy tất cả yêu cầu hoàn trả (Admin) */
+  adminListAllReturns = async (req: Request, res: Response) => {
+    try {
+      const returns = await this.orderUseCase.getAdminAllReturns(req.query as any);
+      res.json(returns);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  };
+
+  /** Admin duyệt / từ chối yêu cầu hoàn trả */
+  adminReviewReturn = async (req: AuthRequest, res: Response) => {
+    try {
+      const { decision, adminNote } = req.body;
+      const result = await this.orderUseCase.reviewReturn(
+        Number(req.params.id),
+        Number(req.params.returnId),
+        req.user.userId,
+        req.user.role,
+        decision,
+        adminNote
+      );
+      if (!result) return res.status(404).json({ message: 'Không tìm thấy yêu cầu hoàn trả' });
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  };
+
+  /** Admin xác nhận đã nhận lại hàng */
+  adminReceiveReturn = async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await this.orderUseCase.receiveReturn(
+        Number(req.params.id),
+        Number(req.params.returnId),
+        req.user.userId,
+        req.user.role,
+        req.body.adminNote
+      );
+      if (!result) return res.status(404).json({ message: 'Không tìm thấy yêu cầu hoàn trả' });
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  };
+
+  /** Admin xác nhận đã hoàn tiền */
+  adminRefundReturn = async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await this.orderUseCase.refundReturn(
+        Number(req.params.id),
+        Number(req.params.returnId),
+        req.user.userId,
+        req.user.role,
+        req.body.adminNote
+      );
+      if (!result) return res.status(404).json({ message: 'Không tìm thấy yêu cầu hoàn trả' });
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  };
 
   /** Lấy tất cả đơn hàng (Admin) */
   getAll = async (req: Request, res: Response) => {

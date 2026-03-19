@@ -4,6 +4,14 @@ import { Product } from "@/types";
 import { useCartStore } from "@/store/cartStore";
 import toast from "react-hot-toast";
 
+// ✅ Helper: chuyển path ảnh local thành URL đầy đủ
+const BACKEND_URL = (import.meta.env.VITE_API_URL as string)?.replace('/api', '') || 'http://localhost:5001';
+const getImageUrl = (url?: string): string => {
+  if (!url) return '/placeholder.jpg';
+  if (url.startsWith('http')) return url;
+  return `${BACKEND_URL}${url}`;
+};
+
 interface ProductCardProps {
   product: Product;
 }
@@ -40,10 +48,10 @@ export const ProductCard = ({ product }: ProductCardProps) => {
       {/* 1. CONTAINER ẢNH & BADGES */}
       <div className="relative pt-[100%] overflow-hidden bg-gray-50">
         <img
-          src={product.mainImage || "/placeholder.jpg"}
+          src={getImageUrl(product.mainImage || (product as any).images?.[0]?.imageUrl)}
           alt={product.name}
           className="absolute inset-0 h-full w-full object-contain p-4 transition-transform duration-500 group-hover:scale-110"
-          onError={(e) => (e.currentTarget.src = "https://placehold.co/400x400?text=" + product.name)}
+          onError={(e) => { const el = e.target as HTMLImageElement; el.onerror = null; el.src = '/placeholder.jpg'; }}
         />
         
         {/* Badges - Thông tin Nổi bật và Giảm giá (Phong cách Khanh) */}

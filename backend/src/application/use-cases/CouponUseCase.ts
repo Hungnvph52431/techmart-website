@@ -8,6 +8,19 @@ export class CouponUseCase {
         return this.couponRepository.findAll();
     }
 
+    // Lấy danh sách coupon còn hiệu lực (cho khách hàng chọn)
+    async getAvailableCoupons() {
+        const all = await this.couponRepository.findAll();
+        const now = new Date();
+        return all.filter((c) => {
+            if (!c.isActive) return false;
+            if (c.validFrom && now < new Date(c.validFrom)) return false;
+            if (c.validTo && now > new Date(c.validTo)) return false;
+            if (c.usageLimit && c.usedCount >= c.usageLimit) return false;
+            return true;
+        });
+    }
+
     async getCouponById(id: number) {
         return this.couponRepository.findById(id);
     }

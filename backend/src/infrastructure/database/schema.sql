@@ -19,8 +19,11 @@ CREATE TABLE users (
     phone VARCHAR(20),
     role ENUM('customer', 'admin', 'staff', 'warehouse') DEFAULT 'customer',
     status ENUM('active', 'inactive', 'banned') DEFAULT 'active',
+    avatar_url VARCHAR(500),
+    banner_url VARCHAR(500),
     points INT DEFAULT 0,
     membership_level ENUM('bronze', 'silver', 'gold', 'platinum') DEFAULT 'bronze',
+    wallet_balance DECIMAL(15,2) DEFAULT 0.00,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     last_login TIMESTAMP NULL,
@@ -113,6 +116,7 @@ CREATE TABLE products (
     meta_keywords VARCHAR(500),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
     FOREIGN KEY (category_id) REFERENCES categories(category_id) ON DELETE RESTRICT,
     FOREIGN KEY (brand_id) REFERENCES brands(brand_id) ON DELETE SET NULL,
     INDEX idx_slug (slug),
@@ -124,6 +128,7 @@ CREATE TABLE products (
     INDEX idx_featured (is_featured),
     INDEX idx_new (is_new),
     INDEX idx_bestseller (is_bestseller),
+    INDEX idx_deleted_at (deleted_at),
     FULLTEXT idx_search (name, description)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -316,12 +321,12 @@ CREATE TABLE orders (
     coupon_code VARCHAR(50),
     
     -- Thanh toán
-    payment_method ENUM('cod', 'bank_transfer', 'momo', 'vnpay', 'zalopay') NOT NULL,
+    payment_method ENUM('cod', 'bank_transfer', 'momo', 'vnpay', 'wallet') NOT NULL,
     payment_status ENUM('pending', 'paid', 'failed', 'refunded') DEFAULT 'pending',
     payment_date TIMESTAMP NULL,
-    
+
     -- Trạng thái
-    status ENUM('pending', 'confirmed', 'processing', 'shipping', 'delivered', 'cancelled', 'returned') DEFAULT 'pending',
+    status ENUM('pending', 'confirmed', 'processing', 'shipping', 'delivered', 'completed', 'cancelled', 'returned') DEFAULT 'pending',
     
     -- Ghi chú
     customer_note TEXT,
@@ -335,7 +340,8 @@ CREATE TABLE orders (
     delivered_at TIMESTAMP NULL,
     cancelled_at TIMESTAMP NULL,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
+
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (coupon_id) REFERENCES coupons(coupon_id) ON DELETE SET NULL,
     INDEX idx_order_code (order_code),
@@ -411,6 +417,7 @@ CREATE TABLE order_returns (
     status ENUM('requested', 'approved', 'rejected', 'received', 'refunded', 'closed') DEFAULT 'requested',
     reason TEXT NOT NULL,
     customer_note TEXT,
+    evidence_images JSON NULL,
     admin_note TEXT,
     requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     approved_at TIMESTAMP NULL,
@@ -673,6 +680,46 @@ CREATE TABLE settings (
     is_public BOOLEAN DEFAULT FALSE,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_key (setting_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==================================================
+-- BẢNG WALLET_TOPUP_REQUESTS - Yêu cầu nạp tiền vào ví
+-- ==================================================
+CREATE TABLE wallet_topup_requests (
+    request_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    amount DECIMAL(15,2) NOT NULL,
+    payment_method ENUM('qr', 'vnpay') NOT NULL DEFAULT 'qr',
+    status ENUM('pending', 'completed', 'failed', 'expired') NOT NULL DEFAULT 'pending',
+    reference_code VARCHAR(50) NOT NULL UNIQUE,
+    vnpay_txn_ref VARCHAR(100),
+    admin_note TEXT,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP NULL,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    INDEX idx_user (user_id),
+    INDEX idx_status (status),
+    INDEX idx_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==================================================
+-- BẢNG WALLET_TRANSACTIONS - Lịch sử giao dịch ví
+-- ==================================================
+CREATE TABLE wallet_transactions (
+    transaction_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    type ENUM('topup', 'payment', 'refund', 'admin_adjust') NOT NULL,
+    amount DECIMAL(15,2) NOT NULL,
+    balance_after DECIMAL(15,2) NOT NULL,
+    reference_type VARCHAR(50),
+    reference_id INT,
+    note TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    INDEX idx_user (user_id),
+    INDEX idx_type (type),
+    INDEX idx_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================

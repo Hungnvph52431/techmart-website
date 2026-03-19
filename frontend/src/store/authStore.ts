@@ -8,11 +8,9 @@ const AUTH_STORAGE_KEY = 'auth-storage';
 interface AuthState {
   user: User | null;
   token: string | null;
-  // Hàm cập nhật thông tin đăng nhập
   setAuth: (user: User, token: string) => void;
-  // Hàm đăng xuất sạch sẽ
+  updateUser: (partial: Partial<User>) => void;
   clearAuth: () => void;
-  // Hàm kiểm tra trạng thái đăng nhập (đã fix cho Header)
   isAuthenticated: () => boolean;
 }
 
@@ -24,9 +22,14 @@ export const useAuthStore = create<AuthState>()(
 
       setAuth: (user, token) => {
         set({ user, token });
-        // Đồng bộ thêm vào localStorage để các service khác (như api.ts) có thể truy cập
         localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify(user));
+      },
+
+      updateUser: (partial) => {
+        set((state) => ({
+          user: state.user ? { ...state.user, ...partial } : state.user,
+        }));
       },
 
       clearAuth: () => {

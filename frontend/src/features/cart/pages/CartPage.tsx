@@ -6,7 +6,18 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const CartPage = () => {
-  const { items, removeItem, updateQuantity, getTotalPrice, getTotalItems } = useCartStore();
+  const {
+    items,
+    removeItem,
+    updateQuantity,
+    getTotalPrice,
+    getTotalItems,
+    selectedProductIds,
+    toggleSelect,
+    selectAll,
+    clearSelection,
+    getSelectedTotalPrice,
+  } = useCartStore();
 
   const handleUpdateQuantity = (productId: number, newQuantity: number, stockQuantity: number) => {
     if (newQuantity === 0) {
@@ -46,6 +57,14 @@ export const CartPage = () => {
     );
   }
 
+  const allSelected = selectedProductIds.length > 0 && selectedProductIds.length === items.length;
+  const selectedCount =
+    selectedProductIds.length > 0
+      ? items.filter((i) => selectedProductIds.includes(i.product.productId)).length
+      : items.length;
+  const selectedSubtotal = getSelectedTotalPrice();
+  const shippingFee = selectedSubtotal >= 5000000 ? 0 : 30000;
+
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8">
@@ -54,6 +73,19 @@ export const CartPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={() => (allSelected ? clearSelection() : selectAll())}
+                    className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">
+                    Chọn tất cả ({selectedCount}/{items.length})
+                  </span>
+                </div>
+              </div>
               <AnimatePresence>
                 {items.map((item) => (
                   <motion.div
@@ -65,6 +97,15 @@ export const CartPage = () => {
                     transition={{ duration: 0.3 }}
                     className="flex items-center gap-4 p-4 border-b last:border-b-0 origin-top bg-white"
                   >
+                    <input
+                      type="checkbox"
+                      checked={
+                        selectedProductIds.length === 0 ||
+                        selectedProductIds.includes(item.product.productId)
+                      }
+                      onChange={() => toggleSelect(item.product.productId)}
+                      className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
                     <img
                       src={item.product.mainImage || '/placeholder.jpg'}
                       alt={item.product.name}
@@ -131,24 +172,22 @@ export const CartPage = () => {
 
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between text-gray-600">
-                  <span>Tạm tính:</span>
+                  <span>Tạm tính ({selectedCount} sản phẩm):</span>
                   <span className="font-semibold text-gray-800">
-                    {getTotalPrice().toLocaleString('vi-VN')}₫
+                    {selectedSubtotal.toLocaleString('vi-VN')}₫
                   </span>
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span>Phí vận chuyển:</span>
                   <span className="font-semibold text-gray-800">
-                    {getTotalPrice() >= 5000000 ? 'Miễn phí' : '30.000₫'}
+                    {shippingFee === 0 ? 'Miễn phí' : '30.000₫'}
                   </span>
                 </div>
                 <div className="border-t border-gray-100 pt-4 mt-2 flex justify-between text-lg">
                   <span className="font-bold text-gray-800">Tổng cộng:</span>
                   <div className="text-right">
                     <span className="font-bold text-red-600 block text-xl">
-                      {(
-                        getTotalPrice() + (getTotalPrice() >= 5000000 ? 0 : 30000)
-                      ).toLocaleString('vi-VN')}₫
+                      {(selectedSubtotal + shippingFee).toLocaleString('vi-VN')}₫
                     </span>
                     <span className="text-xs text-gray-500 font-normal mt-1">(Đã bao gồm VAT)</span>
                   </div>

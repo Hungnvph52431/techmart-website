@@ -46,8 +46,8 @@ export class CategoryRepository implements ICategoryRepository {
 
   async hasProducts(categoryId: number): Promise<boolean> {
     const [rows] = await pool.execute<RowDataPacket[]>(
-      `SELECT product_id FROM products 
-       WHERE category_id = ? AND status <> 'archived' 
+      `SELECT product_id FROM products
+       WHERE category_id = ? AND deleted_at IS NULL
        LIMIT 1`,
       [categoryId]
     );
@@ -120,6 +120,30 @@ export class CategoryRepository implements ICategoryRepository {
       [categoryId]
     );
     return result.affectedRows > 0;
+  }
+
+  async moveProductsToCategory(fromCategoryId: number, toCategoryId: number): Promise<number> {
+    const [result] = await pool.execute<ResultSetHeader>(
+      'UPDATE products SET category_id = ? WHERE category_id = ? AND deleted_at IS NULL',
+      [toCategoryId, fromCategoryId]
+    );
+    return result.affectedRows;
+  }
+
+  async findOrCreateUncategorized(): Promise<Category> {
+    const slug = 'khong-xac-dinh';
+    const existing = await this.findBySlug(slug);
+    if (existing) return existing;
+
+    return this.create({
+      name: 'Không xác định',
+      slug,
+      description: 'Danh mục mặc định cho sản phẩm không có danh mục',
+      parentId: undefined,
+      imageUrl: undefined,
+      displayOrder: 9999,
+      isActive: false,
+    });
   }
 
   private mapRowToCategory(row: any): Category {

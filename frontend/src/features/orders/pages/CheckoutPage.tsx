@@ -1,31 +1,178 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
 import { orderService } from "@/services/order.service";
+import { walletService } from "@/services/wallet.service";
+import { addressService, type Address } from "@/services/address.service";
 import api from "@/services/api";
 import toast from "react-hot-toast";
 
-// ====== CẤU HÌNH VIETQR - THAY THÔNG TIN CỦA BẠN VÀO ĐÂY ======
-const BANK_ID = "TPB";
-const ACCOUNT_NO = "00001302290";
-const ACCOUNT_NAME = "BUI VIET KHANH";
-// =================================================================
+// ─── Voucher Popup ──────────────────────────────────────────────────────────
+interface CouponItem {
+  couponId: number;
+  code: string;
+  description?: string;
+  discountType: 'percentage' | 'fixed_amount';
+  discountValue: number;
+  minOrderValue: number;
+  maxDiscountAmount?: number;
+  validTo?: string;
+}
+
+const VoucherPopup = ({
+  open,
+  onClose,
+  onSelect,
+  subtotal,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSelect: (coupon: CouponItem) => void;
+  subtotal: number;
+}) => {
+  const [coupons, setCoupons] = useState<CouponItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [manualCode, setManualCode] = useState("");
+  const [manualError, setManualError] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    setLoading(true);
+    api.get('/coupons/available')
+      .then((res) => setCoupons(res.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [open]);
+
+  const handleManualApply = async () => {
+    if (!manualCode.trim()) return;
+    setManualError("");
+    try {
+      const res = await api.post('/coupons/validate', { code: manualCode.toUpperCase(), orderTotal: subtotal });
+      onSelect(res.data.coupon);
+      onClose();
+    } catch (err: any) {
+      setManualError(err.response?.data?.message || 'Mã không hợp lệ');
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-white rounded-3xl w-full max-w-md mx-4 max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b">
+          <h3 className="text-lg font-black uppercase tracking-widest text-gray-800">Chọn mã giảm giá</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button>
+        </div>
+
+        {/* Nhập mã thủ công */}
+        <div className="px-6 pt-4">
+          <div className="flex gap-2">
+            <input
+              value={manualCode}
+              onChange={(e) => { setManualCode(e.target.value.toUpperCase()); setManualError(""); }}
+              onKeyDown={(e) => e.key === "Enter" && handleManualApply()}
+              placeholder="Nhập mã voucher..."
+              className="flex-1 border-2 border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold uppercase tracking-wider focus:outline-none focus:border-blue-500"
+            />
+            <button
+              onClick={handleManualApply}
+              disabled={!manualCode.trim()}
+              className="px-4 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 disabled:opacity-50 transition-all"
+            >
+              Áp dụng
+            </button>
+          </div>
+          {manualError && <p className="text-xs text-red-500 font-bold mt-1">{manualError}</p>}
+        </div>
+
+        {/* Danh sách coupon */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-3">
+          {loading ? (
+            <p className="text-center text-sm text-gray-400 py-8">Đang tải...</p>
+          ) : coupons.length === 0 ? (
+            <p className="text-center text-sm text-gray-400 py-8">Không có mã giảm giá nào</p>
+          ) : (
+            coupons.map((c) => {
+              const isEligible = subtotal >= c.minOrderValue;
+              return (
+                <button
+                  key={c.couponId}
+                  onClick={() => { if (isEligible) { onSelect(c); onClose(); } }}
+                  disabled={!isEligible}
+                  className={`w-full text-left flex items-center gap-4 p-4 rounded-2xl border-2 transition-all ${
+                    isEligible
+                      ? 'border-gray-100 hover:border-blue-400 hover:bg-blue-50 cursor-pointer'
+                      : 'border-gray-50 bg-gray-50 opacity-60 cursor-not-allowed'
+                  }`}
+                >
+                  {/* Badge giảm giá */}
+                  <div className="flex-shrink-0 w-16 h-16 rounded-xl bg-gradient-to-br from-red-500 to-pink-500 flex flex-col items-center justify-center text-white">
+                    {c.discountType === 'percentage' ? (
+                      <>
+                        <span className="font-black text-lg leading-none">{c.discountValue}%</span>
+                        <span className="text-[9px] font-bold">GIẢM</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-black text-xs leading-none">{(c.discountValue / 1000).toFixed(0)}K</span>
+                        <span className="text-[9px] font-bold">GIẢM</span>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Thông tin */}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-black text-sm text-gray-800">{c.code}</p>
+                    <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{c.description || (
+                      c.discountType === 'percentage'
+                        ? `Giảm ${c.discountValue}%${c.maxDiscountAmount ? ` tối đa ${c.maxDiscountAmount.toLocaleString('vi-VN')}đ` : ''}`
+                        : `Giảm ${c.discountValue.toLocaleString('vi-VN')}đ`
+                    )}</p>
+                    {c.minOrderValue > 0 && (
+                      <p className={`text-[10px] mt-1 font-bold ${isEligible ? 'text-green-600' : 'text-red-500'}`}>
+                        {isEligible ? '✓' : '✗'} Đơn tối thiểu {c.minOrderValue.toLocaleString('vi-VN')}đ
+                      </p>
+                    )}
+                    {c.validTo && (
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        HSD: {new Date(c.validTo).toLocaleDateString('vi-VN')}
+                      </p>
+                    )}
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const CheckoutPage = () => {
   const navigate = useNavigate();
-  const { items, clearCart } = useCartStore();
-  const { user } = useAuthStore();
+  const { items, clearCart, getSelectedItems } = useCartStore();
+  const { user, updateUser } = useAuthStore();
 
-  const [paymentMethod, setPaymentMethod] = useState<"cod" | "bank_transfer">("cod");
+  useEffect(() => {
+    walletService.getBalance().then((balance) => updateUser({ walletBalance: balance })).catch(() => {});
+  }, []);
+
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "bank_transfer" | "vnpay" | "wallet">("cod");
   const [loading, setLoading] = useState(false);
 
   // Voucher states
-  const [voucherCode, setVoucherCode] = useState("");
   const [voucher, setVoucher] = useState<any>(null);
-  const [voucherError, setVoucherError] = useState("");
-  const [voucherLoading, setVoucherLoading] = useState(false);
+  const [showVoucherPopup, setShowVoucherPopup] = useState(false);
+
+  // Saved addresses
+  const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
+  const [showAddressPicker, setShowAddressPicker] = useState(false);
 
   const [form, setForm] = useState({
     shippingName: user?.fullName || "",
@@ -37,8 +184,39 @@ export const CheckoutPage = () => {
     customerNote: "",
   });
 
+  // Load saved addresses & auto-fill default
+  useEffect(() => {
+    addressService.getMyAddresses().then((addrs) => {
+      setSavedAddresses(addrs);
+      const defaultAddr = addrs.find(a => a.isDefault) || addrs[0];
+      if (defaultAddr) {
+        setForm(prev => ({
+          ...prev,
+          shippingName: prev.shippingName || defaultAddr.fullName,
+          shippingPhone: prev.shippingPhone || defaultAddr.phone,
+          shippingAddress: defaultAddr.addressLine,
+          shippingWard: defaultAddr.ward,
+          shippingDistrict: defaultAddr.district,
+          shippingCity: defaultAddr.city,
+        }));
+      }
+    }).catch(() => {});
+  }, []);
+
+  // Chỉ thanh toán các sản phẩm đang được chọn trong giỏ.
+  // Nếu người dùng chưa chọn gì thì getSelectedItems() sẽ trả về toàn bộ items.
+  const checkoutItems = getSelectedItems();
+
+  // Nếu vào checkout mà giỏ hàng trống (vd: bấm Back sau khi đã đặt) → redirect
+  useEffect(() => {
+    if (items.length === 0) {
+      navigate('/cart', { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Chỉ chạy 1 lần khi mount, không chạy lại khi clearCart
+
   // Tính tổng tiền
-  const subtotal = items.reduce(
+  const subtotal = checkoutItems.reduce(
     (sum, item) => sum + (item.product.salePrice || item.product.price) * item.quantity,
     0
   );
@@ -46,19 +224,15 @@ export const CheckoutPage = () => {
 
   // Tính giảm giá từ voucher
   const discountAmount = voucher
-    ? voucher.discount_type === "percent"
+    ? voucher.discountType === "percentage"
       ? Math.min(
-          Math.round((subtotal * voucher.discount_value) / 100),
-          voucher.max_discount || Infinity
+          Math.round((subtotal * voucher.discountValue) / 100),
+          voucher.maxDiscountAmount || Infinity
         )
-      : voucher.discount_value
+      : voucher.discountValue
     : 0;
 
   const total = subtotal + shippingFee - discountAmount;
-
-  // Tạo URL QR VietQR động
-  const qrDescription = `TechMart ${user?.userId || ""}`;
-  const qrUrl = `https://img.vietqr.io/image/${BANK_ID}-${ACCOUNT_NO}-compact2.png?amount=${total}&addInfo=${encodeURIComponent(qrDescription)}&accountName=${encodeURIComponent(ACCOUNT_NAME)}`;
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -66,44 +240,13 @@ export const CheckoutPage = () => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // Xử lý apply voucher
-  const handleApplyVoucher = async () => {
-    if (!voucherCode.trim()) return;
-    try {
-      setVoucherLoading(true);
-      setVoucherError("");
-      setVoucher(null);
-
-      const response = await api.post("/vouchers/validate", {
-        code: voucherCode.toUpperCase(),
-      });
-
-      // Kiểm tra đơn tối thiểu
-      if (
-        response.data.min_order_amount &&
-        subtotal < response.data.min_order_amount
-      ) {
-        setVoucherError(
-          `Đơn hàng tối thiểu ${response.data.min_order_amount.toLocaleString("vi-VN")}₫ để dùng mã này!`
-        );
-        return;
-      }
-
-      setVoucher(response.data);
-      toast.success("Áp dụng mã giảm giá thành công!");
-    } catch (error: any) {
-      setVoucherError(
-        error.response?.data?.message || "Mã không hợp lệ!"
-      );
-    } finally {
-      setVoucherLoading(false);
-    }
+  const handleSelectVoucher = (coupon: CouponItem) => {
+    setVoucher(coupon);
+    toast.success(`Áp dụng mã ${coupon.code} thành công!`);
   };
 
   const handleRemoveVoucher = () => {
     setVoucher(null);
-    setVoucherCode("");
-    setVoucherError("");
   };
 
   const handleSubmit = async () => {
@@ -121,11 +264,21 @@ export const CheckoutPage = () => {
       return;
     }
 
+    if (checkoutItems.length === 0) {
+      toast.error("Vui lòng chọn ít nhất 1 sản phẩm để thanh toán!");
+      return;
+    }
+
+    if (paymentMethod === "wallet" && (user?.walletBalance ?? 0) < total) {
+      toast.error("Số dư ví không đủ để thanh toán đơn hàng này!");
+      return;
+    }
+
     try {
       setLoading(true);
 
       const orderData = {
-        items: items.map((item) => ({
+        items: checkoutItems.map((item) => ({
           productId: item.product.productId,
           quantity: item.quantity,
           price: item.product.salePrice || item.product.price,
@@ -137,12 +290,29 @@ export const CheckoutPage = () => {
         shippingDistrict: form.shippingDistrict,
         shippingCity: form.shippingCity,
         shippingFee,
-        paymentMethod,
+        paymentMethod: paymentMethod,
         customerNote: form.customerNote,
         couponCode: voucher?.code || undefined,
       };
 
       const result = await orderService.create(orderData as any);
+
+      // VNPay / Chuyển khoản: KHÔNG xóa cart ở đây
+      // Cart sẽ được xóa trên trang kết quả thanh toán khi payment thành công
+      if (paymentMethod === 'vnpay') {
+        const { data } = await api.post('/payment/vnpay/create', {
+          orderId: result.orderId,
+        });
+        window.location.href = data.paymentUrl;
+        return;
+      }
+
+      if (paymentMethod === 'bank_transfer') {
+        navigate(`/payment/bank-transfer/${result.orderId}`);
+        return;
+      }
+
+      // COD / Wallet → xóa giỏ hàng và chuyển trang
       clearCart();
       toast.success("Đặt hàng thành công!");
       navigate(`/orders/${result.orderId}`);
@@ -167,9 +337,61 @@ export const CheckoutPage = () => {
 
             {/* Form địa chỉ */}
             <div className="bg-white rounded-3xl border-2 border-gray-100 p-8">
-              <h2 className="text-lg font-black uppercase tracking-widest text-gray-700 mb-6">
-                Thông tin giao hàng
-              </h2>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-black uppercase tracking-widest text-gray-700">
+                  Thông tin giao hàng
+                </h2>
+                {savedAddresses.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddressPicker(!showAddressPicker)}
+                    className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-3 py-1.5 rounded-xl transition-all"
+                  >
+                    {showAddressPicker ? 'Ẩn' : `Chọn từ ${savedAddresses.length} địa chỉ đã lưu`}
+                  </button>
+                )}
+              </div>
+
+              {/* Address picker */}
+              {showAddressPicker && (
+                <div className="mb-6 space-y-2 max-h-48 overflow-y-auto">
+                  {savedAddresses.map((addr) => (
+                    <button
+                      key={addr.addressId}
+                      type="button"
+                      onClick={() => {
+                        setForm(prev => ({
+                          ...prev,
+                          shippingName: addr.fullName,
+                          shippingPhone: addr.phone,
+                          shippingAddress: addr.addressLine,
+                          shippingWard: addr.ward,
+                          shippingDistrict: addr.district,
+                          shippingCity: addr.city,
+                        }));
+                        setShowAddressPicker(false);
+                        toast.success('Đã chọn địa chỉ');
+                      }}
+                      className={`w-full text-left p-3 rounded-2xl border-2 transition-all hover:border-blue-400 hover:bg-blue-50 ${
+                        form.shippingAddress === addr.addressLine && form.shippingCity === addr.city
+                          ? 'border-blue-400 bg-blue-50'
+                          : 'border-gray-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-bold text-gray-800">{addr.fullName}</p>
+                        <span className="text-xs text-gray-400">|</span>
+                        <p className="text-xs text-gray-500">{addr.phone}</p>
+                        {addr.isDefault && (
+                          <span className="text-[10px] font-bold text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded-full">Mặc định</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">{addr.addressLine}, {addr.ward}, {addr.district}, {addr.city}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-black uppercase tracking-widest text-gray-400 mb-1 block">
@@ -265,37 +487,20 @@ export const CheckoutPage = () => {
                 🎟️ Mã giảm giá
               </h2>
 
-              {/* Input nhập mã */}
+              {/* Chưa chọn voucher → nút mở popup */}
               {!voucher && (
-                <div className="flex gap-3">
-                  <input
-                    value={voucherCode}
-                    onChange={(e) => {
-                      setVoucherCode(e.target.value.toUpperCase());
-                      setVoucherError("");
-                    }}
-                    onKeyDown={(e) => e.key === "Enter" && handleApplyVoucher()}
-                    placeholder="Nhập mã voucher..."
-                    className="flex-1 border-2 border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold uppercase tracking-widest focus:outline-none focus:border-blue-500"
-                  />
-                  <button
-                    onClick={handleApplyVoucher}
-                    disabled={voucherLoading || !voucherCode.trim()}
-                    className="px-6 py-3 bg-blue-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-blue-700 disabled:opacity-50 transition-all"
-                  >
-                    {voucherLoading ? "..." : "Áp dụng"}
-                  </button>
-                </div>
+                <button
+                  onClick={() => setShowVoucherPopup(true)}
+                  className="w-full flex items-center justify-between border-2 border-dashed border-blue-300 rounded-2xl px-5 py-4 hover:bg-blue-50 transition-all group"
+                >
+                  <span className="text-sm font-bold text-blue-600 group-hover:text-blue-700">
+                    Chọn hoặc nhập mã giảm giá
+                  </span>
+                  <span className="text-blue-500 font-black text-lg">&rsaquo;</span>
+                </button>
               )}
 
-              {/* Hiện lỗi */}
-              {voucherError && (
-                <p className="mt-3 text-xs font-bold text-red-500">
-                  ❌ {voucherError}
-                </p>
-              )}
-
-              {/* Voucher hợp lệ */}
+              {/* Voucher đã chọn */}
               {voucher && (
                 <div className="flex items-center justify-between bg-green-50 border-2 border-green-200 rounded-2xl px-5 py-4">
                   <div>
@@ -304,11 +509,11 @@ export const CheckoutPage = () => {
                     </p>
                     <p className="text-xs text-green-600 font-bold mt-1">
                       Giảm{" "}
-                      {voucher.discount_type === "percent"
-                        ? `${voucher.discount_value}%`
-                        : `${Number(voucher.discount_value).toLocaleString("vi-VN")}₫`}
-                      {voucher.max_discount
-                        ? ` (tối đa ${Number(voucher.max_discount).toLocaleString("vi-VN")}₫)`
+                      {voucher.discountType === "percentage"
+                        ? `${voucher.discountValue}%`
+                        : `${Number(voucher.discountValue).toLocaleString("vi-VN")}₫`}
+                      {voucher.maxDiscountAmount
+                        ? ` (tối đa ${Number(voucher.maxDiscountAmount).toLocaleString("vi-VN")}₫)`
                         : ""}
                     </p>
                   </div>
@@ -326,6 +531,14 @@ export const CheckoutPage = () => {
                 </div>
               )}
             </div>
+
+            {/* Voucher Popup */}
+            <VoucherPopup
+              open={showVoucherPopup}
+              onClose={() => setShowVoucherPopup(false)}
+              onSelect={handleSelectVoucher}
+              subtotal={subtotal}
+            />
 
             {/* Chọn phương thức thanh toán */}
             <div className="bg-white rounded-3xl border-2 border-gray-100 p-8">
@@ -371,33 +584,62 @@ export const CheckoutPage = () => {
                     <span className="ml-auto text-blue-600 font-black text-lg">✓</span>
                   )}
                 </button>
+
+                {/* Ví TechMart */}
+                <button
+                  onClick={() => setPaymentMethod("wallet")}
+                  className={`flex items-center gap-4 p-5 rounded-2xl border-2 transition-all ${
+                    paymentMethod === "wallet"
+                      ? "border-orange-500 bg-orange-50"
+                      : "border-gray-100 hover:border-gray-300"
+                  }`}
+                >
+                  <span className="text-3xl">👛</span>
+                  <div className="text-left flex-1">
+                    <p className="font-black text-sm uppercase tracking-widest text-orange-600">Ví TechMart</p>
+                    <p className="text-xs font-bold mt-0.5">
+                      Số dư:{" "}
+                      <span className={`${(user?.walletBalance ?? 0) >= total ? "text-green-600" : "text-red-500"}`}>
+                        {(user?.walletBalance ?? 0).toLocaleString("vi-VN")}₫
+                      </span>
+                    </p>
+                    {(user?.walletBalance ?? 0) > 0 && (user?.walletBalance ?? 0) < total && (
+                      <p className="text-[10px] text-red-400 font-bold mt-0.5">Không đủ số dư</p>
+                    )}
+                  </div>
+                  {paymentMethod === "wallet" && (
+                    <span className="ml-auto text-orange-500 font-black text-lg">✓</span>
+                  )}
+                </button>
+
+                {/* VNPay */}
+                <button
+                  onClick={() => setPaymentMethod("vnpay")}
+                  className={`flex items-center gap-4 p-5 rounded-2xl border-2 transition-all ${
+                    paymentMethod === "vnpay"
+                      ? "border-[#005BAA] bg-blue-50"
+                      : "border-gray-100 hover:border-gray-300"
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-[#005BAA] flex items-center justify-center flex-shrink-0">
+                    <span className="text-white font-black text-xs">VN</span>
+                  </div>
+                  <div className="text-left">
+                    <p className="font-black text-sm uppercase tracking-widest text-[#005BAA]">VNPay</p>
+                    <p className="text-xs text-gray-400 font-bold">Thanh toán qua cổng VNPay</p>
+                  </div>
+                  {paymentMethod === "vnpay" && (
+                    <span className="ml-auto text-[#005BAA] font-black text-lg">✓</span>
+                  )}
+                </button>
               </div>
 
-              {/* Hiển thị QR khi chọn chuyển khoản */}
+              {/* Thông báo khi chọn chuyển khoản */}
               {paymentMethod === "bank_transfer" && (
-                <div className="mt-6 flex flex-col items-center bg-gray-50 rounded-3xl p-8 border-2 border-dashed border-gray-200">
-                  <p className="text-xs font-black uppercase tracking-widest text-gray-400 mb-4">
-                    Quét mã để thanh toán
-                  </p>
-                  <img
-                    src={qrUrl}
-                    alt="VietQR"
-                    className="w-56 h-56 rounded-2xl shadow-lg"
-                  />
-                  <div className="mt-4 text-center space-y-1">
-                    <p className="font-black text-sm text-gray-700">{ACCOUNT_NAME}</p>
-                    <p className="text-xs text-gray-400 font-bold">
-                      {BANK_ID} - {ACCOUNT_NO}
-                    </p>
-                    <p className="text-xs text-gray-400 font-bold">
-                      Nội dung: {qrDescription}
-                    </p>
-                    <p className="font-black text-lg text-blue-600">
-                      {total.toLocaleString("vi-VN")}₫
-                    </p>
-                  </div>
-                  <p className="mt-4 text-[10px] text-gray-400 font-bold text-center uppercase tracking-widest">
-                    Đơn hàng sẽ được xác nhận sau khi chuyển khoản thành công
+                <div className="mt-6 flex items-center gap-3 bg-blue-50 rounded-2xl p-4 border border-blue-200">
+                  <span className="text-2xl">📱</span>
+                  <p className="text-xs font-bold text-blue-700">
+                    Sau khi đặt hàng, bạn sẽ được chuyển đến trang mã QR để thanh toán qua ngân hàng.
                   </p>
                 </div>
               )}
@@ -408,12 +650,12 @@ export const CheckoutPage = () => {
           <div className="space-y-6">
             <div className="bg-white rounded-3xl border-2 border-gray-100 p-6 sticky top-6">
               <h2 className="text-lg font-black uppercase tracking-widest text-gray-700 mb-6">
-                Đơn hàng ({items.length} sản phẩm)
+                Đơn hàng ({checkoutItems.length} sản phẩm)
               </h2>
 
               {/* Danh sách sản phẩm */}
               <div className="space-y-4 mb-6">
-                {items.map((item) => (
+                {checkoutItems.map((item) => (
                   <div key={item.product.productId} className="flex gap-3">
                     <img
                       src={item.product.mainImage || "/placeholder.jpg"}

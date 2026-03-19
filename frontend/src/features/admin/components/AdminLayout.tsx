@@ -3,16 +3,19 @@ import { useAuthStore } from '@/store/authStore';
 import { useEffect } from 'react';
 import { 
   LayoutDashboard,
-  Image, 
-  Package, 
-  ShoppingCart, 
-  Users, 
-  Ticket, 
-  LogOut, 
+  Image,
+  Package,
+  ShoppingCart,
+  Users,
+  Ticket,
+  LogOut,
   ExternalLink,
   User as UserIcon,
   Layers,
-  Settings2
+  Settings2,
+  Star,
+  RotateCcw,
+  Wallet,
 } from 'lucide-react';
 
 export const AdminLayout = () => {
@@ -95,6 +98,9 @@ export const AdminLayout = () => {
             {/* Tích hợp Voucher từ bản của Khanh */}
             <SidebarLink to="/admin/vouchers" icon={<Ticket size={18} />} label="Mã giảm giá" active={isActive('/admin/vouchers')} />
             <SidebarLink to="/admin/banners" icon={<Image size={18} />} label="Banner" active={isActive('/admin/banners')} />
+            <SidebarLink to="/admin/reviews" icon={<Star size={18} />} label="Đánh giá" active={isActive('/admin/reviews')} />
+            <SidebarLink to="/admin/returns" icon={<RotateCcw size={18} />} label="Hoàn/Trả hàng" active={isActive('/admin/returns')} />
+            <SidebarLink to="/admin/wallet-topups" icon={<Wallet size={18} />} label="Lịch sử nạp ví" active={isActive('/admin/wallet-topups')} />
           </nav>
         </aside>
 

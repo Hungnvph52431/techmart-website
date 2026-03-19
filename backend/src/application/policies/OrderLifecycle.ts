@@ -4,26 +4,37 @@ import {
   OrderActorRole,
 } from '../../domain/entities/Order';
 
+// ─── Luồng trạng thái ─────────────────────────────────────────────────────────
+// Bỏ bước "processing" (Chuẩn bị đơn hàng)
+// pending → confirmed → shipping → delivered → completed
 export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  pending: ['confirmed', 'cancelled'],
-  confirmed: ['processing', 'cancelled'],
-  processing: ['shipping', 'cancelled'],
-  shipping: ['delivered'],
-  delivered: [],
+  pending:   ['confirmed', 'cancelled'],
+  confirmed: ['shipping', 'cancelled'],  // ✅ Bỏ processing, confirmed → shipping thẳng
+  shipping:  ['delivered'],              // ❌ Không thể hủy khi đang giao
+  delivered: ['completed'],
+  completed: [],
   cancelled: [],
-  returned: [],
+  returned:  [],
 };
 
 export const PAYMENT_STATUS_TRANSITIONS: Record<PaymentStatus, PaymentStatus[]> = {
-  pending: ['paid', 'failed'],
-  paid: ['refunded'],
-  failed: ['pending'],
+  pending:  ['paid', 'failed'],
+  paid:     ['refunded'],
+  failed:   ['pending'],
   refunded: [],
 };
 
+// ✅ Khách chỉ hủy được khi pending/confirmed — KHÔNG được hủy khi shipping trở đi
 const CUSTOMER_CANCELLABLE_STATUSES: OrderStatus[] = ['pending', 'confirmed'];
-const BACKOFFICE_CANCELLABLE_STATUSES: OrderStatus[] = ['pending', 'confirmed', 'processing'];
-const RETURN_REQUESTABLE_STATUSES: OrderStatus[] = ['delivered'];
+
+// Admin cũng không hủy được khi đang giao (theo yêu cầu)
+const BACKOFFICE_CANCELLABLE_STATUSES: OrderStatus[] = ['pending', 'confirmed'];
+
+// Yêu cầu trả hàng khi đã giao hoặc đã hoàn thành (delivered/completed)
+const RETURN_REQUESTABLE_STATUSES: OrderStatus[] = ['delivered', 'completed'];
+
+// Thời hạn cho phép yêu cầu hoàn trả (tính từ ngày giao hàng)
+export const RETURN_DEADLINE_DAYS = 7;
 
 export const getAllowedNextOrderStatuses = (status: OrderStatus) =>
   ORDER_STATUS_TRANSITIONS[status] || [];
@@ -35,7 +46,6 @@ export const canCancelOrder = (status: OrderStatus, actorRole: OrderActorRole) =
   if (actorRole === 'customer') {
     return CUSTOMER_CANCELLABLE_STATUSES.includes(status);
   }
-
   return BACKOFFICE_CANCELLABLE_STATUSES.includes(status);
 };
 

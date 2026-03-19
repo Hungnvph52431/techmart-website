@@ -8,6 +8,7 @@ export interface User {
   status: 'active' | 'inactive' | 'banned';
   points: number;
   membershipLevel: 'bronze' | 'silver' | 'gold' | 'platinum';
+  walletBalance: number;
   createdAt: Date;
   updatedAt: Date;
   lastLogin?: Date;
@@ -26,6 +27,7 @@ export interface UpdateUserDTO extends Partial<Omit<CreateUserDTO, 'password'>> 
   status?: 'active' | 'inactive' | 'banned';
   points?: number;
   membershipLevel?: 'bronze' | 'silver' | 'gold' | 'platinum';
+  walletBalance?: number;
 }
 
 export interface UserLoginDTO {

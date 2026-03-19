@@ -165,6 +165,32 @@ export class OrderRepository implements IOrderRepository {
         orderId, eventType: 'order_created', actorUserId: orderData.userId, actorRole: 'customer', toStatus: 'pending', note: orderData.customerNote
       });
 
+      // Nếu thanh toán bằng ví → trừ wallet_balance và đánh dấu paid ngay
+      if (orderData.paymentMethod === 'wallet') {
+        const [[walletRow]] = await connection.execute<RowDataPacket[]>(
+          'SELECT wallet_balance FROM users WHERE user_id = ? FOR UPDATE',
+          [orderData.userId]
+        );
+        const walletBalance = Number(walletRow?.wallet_balance ?? 0);
+        if (walletBalance < total) {
+          await connection.rollback();
+          throw new Error(`Số dư ví không đủ (hiện có ${walletBalance.toLocaleString('vi-VN')}đ)`);
+        }
+        await connection.execute(
+          'UPDATE users SET wallet_balance = wallet_balance - ? WHERE user_id = ?',
+          [total, orderData.userId]
+        );
+        await connection.execute(
+          "UPDATE orders SET payment_status = 'paid', payment_date = ? WHERE order_id = ?",
+          [now, orderId]
+        );
+        await this.appendEventWithConnection(connection, {
+          orderId, eventType: 'payment_status_changed', toStatus: 'paid',
+          actorUserId: orderData.userId, actorRole: 'customer',
+          note: `Thanh toán bằng ví TechMart (${total.toLocaleString('vi-VN')}đ)`,
+        });
+      }
+
       await connection.commit();
       return (await this.findById(orderId))!;
     } catch (error) { await connection.rollback(); throw error; } finally { connection.release(); }
@@ -212,26 +238,317 @@ export class OrderRepository implements IOrderRepository {
     const [[summary]] = await pool.execute<RowDataPacket[]>(
       `SELECT COUNT(*) AS total_orders, COALESCE(SUM(total), 0) AS total_revenue,
         SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending_count,
-        SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) AS delivered_count
-       FROM orders`
+        SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) AS delivered_count,
+        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_count
+       FROM orders WHERE deleted_at IS NULL`
     );
     const totalOrders = Number(summary.total_orders) || 0;
     return {
-      totalOrders, totalRevenue: parseFloat(summary.total_revenue), revenueThisMonth: 0, avgOrderValue: totalOrders > 0 ? parseFloat(summary.total_revenue) / totalOrders : 0,
-      ordersByStatus: { pending: Number(summary.pending_count), confirmed: 0, processing: 0, shipping: 0, delivered: Number(summary.delivered_count), cancelled: 0, returned: 0 },
-      paymentMethodStats: { cod: 0, bank_transfer: 0, momo: 0, vnpay: 0, zalopay: 0 },
-      recentOrders: []
+      totalOrders,
+      totalRevenue: parseFloat(summary.total_revenue),
+      revenueThisMonth: 0,
+      avgOrderValue:
+        totalOrders > 0 ? parseFloat(summary.total_revenue) / totalOrders : 0,
+      ordersByStatus: {
+        pending: Number(summary.pending_count),
+        confirmed: 0,
+        shipping: 0,
+        delivered: Number(summary.delivered_count),
+        cancelled: 0,
+        returned: 0,
+        completed: Number(summary.completed_count),
+      },
+      paymentMethodStats: {
+        cod: 0,
+        bank_transfer: 0,
+        momo: 0,
+        vnpay: 0,
+        zalopay: 0,
+      },
+      recentOrders: [],
     };
   }
 
-  // --- RETURN LOGIC (STUBS FOR INTERFACE) ---
-  async listReturns(orderId: number): Promise<OrderReturn[]> { return []; }
-  async getReturnById(orderId: number, orderReturnId: number): Promise<OrderReturn | null> { return null; }
-  async createReturn(input: CreateOrderReturnDTO): Promise<OrderReturn> { throw new Error('Not implemented'); }
-  async reviewReturn(input: ReviewOrderReturnDTO): Promise<OrderReturn | null> { return null; }
-  async receiveReturn(input: ReceiveOrderReturnDTO): Promise<OrderReturn | null> { return null; }
-  async refundReturn(input: RefundOrderReturnDTO): Promise<OrderReturn | null> { return null; }
-  async closeReturn(input: CloseOrderReturnDTO): Promise<OrderReturn | null> { return null; }
+  // --- RETURN LOGIC ---
+
+  async listAllReturns(filters?: { status?: string }): Promise<OrderReturn[]> {
+    let sql = `SELECT orr.*, o.order_code, u.name AS customer_name
+               FROM order_returns orr
+               JOIN orders o ON o.order_id = orr.order_id
+               JOIN users u ON u.user_id = orr.requested_by
+               WHERE 1=1`;
+    const params: any[] = [];
+    if (filters?.status && filters.status !== 'all') {
+      sql += ' AND orr.status = ?';
+      params.push(filters.status);
+    }
+    sql += ' ORDER BY orr.requested_at DESC';
+    const [rows] = await pool.execute<RowDataPacket[]>(sql, params);
+    return rows.map(this.mapRowToOrderReturn);
+  }
+
+  async listReturns(orderId: number): Promise<OrderReturn[]> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      'SELECT * FROM order_returns WHERE order_id = ? ORDER BY requested_at DESC',
+      [orderId]
+    );
+    return rows.map(this.mapRowToOrderReturn);
+  }
+
+  async getReturnById(orderId: number, orderReturnId: number): Promise<OrderReturn | null> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      'SELECT * FROM order_returns WHERE order_return_id = ? AND order_id = ?',
+      [orderReturnId, orderId]
+    );
+    if (rows.length === 0) return null;
+    const orderReturn = this.mapRowToOrderReturn(rows[0]);
+
+    const [itemRows] = await pool.execute<RowDataPacket[]>(
+      `SELECT ori.*, od.product_id, od.product_name, od.price
+       FROM order_return_items ori
+       JOIN order_details od ON od.order_detail_id = ori.order_detail_id
+       WHERE ori.order_return_id = ?`,
+      [orderReturnId]
+    );
+    orderReturn.items = itemRows.map(this.mapRowToOrderReturnItem);
+    return orderReturn;
+  }
+
+  async createReturn(input: CreateOrderReturnDTO): Promise<OrderReturn> {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const now = new Date();
+      const requestCode = this.generateReturnCode();
+
+      const evidenceJson = input.evidenceImages?.length
+        ? JSON.stringify(input.evidenceImages)
+        : null;
+
+      const [result] = await connection.execute<ResultSetHeader>(
+        `INSERT INTO order_returns (order_id, request_code, requested_by, status, reason, customer_note, evidence_images, requested_at, updated_at)
+         VALUES (?, ?, ?, 'requested', ?, ?, ?, ?, ?)`,
+        [input.orderId, requestCode, input.requestedBy, input.reason, input.customerNote || null, evidenceJson, now, now]
+      );
+      const orderReturnId = result.insertId;
+
+      for (const item of input.items) {
+        await connection.execute(
+          `INSERT INTO order_return_items (order_return_id, order_detail_id, quantity, reason, restock_action, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [orderReturnId, item.orderDetailId, item.quantity, item.reason || null, item.restockAction || 'inspect', now]
+        );
+      }
+
+      await this.appendEventWithConnection(connection, {
+        orderId: input.orderId,
+        eventType: 'return_requested',
+        toStatus: 'requested',
+        actorUserId: input.requestedBy,
+        actorRole: 'customer',
+        note: input.reason,
+      });
+
+      await connection.commit();
+      const created = await this.getReturnById(input.orderId, orderReturnId);
+      return created!;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async reviewReturn(input: ReviewOrderReturnDTO): Promise<OrderReturn | null> {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const now = new Date();
+      const isApproved = input.decision === 'approved';
+
+      const timestampCol = isApproved ? 'approved_at' : 'rejected_at';
+      await connection.execute(
+        `UPDATE order_returns SET status = ?, ${timestampCol} = ?, admin_note = ?, updated_at = ?
+         WHERE order_return_id = ? AND order_id = ? AND status = 'requested'`,
+        [input.decision, now, input.adminNote || null, now, input.orderReturnId, input.orderId]
+      );
+
+      await this.appendEventWithConnection(connection, {
+        orderId: input.orderId,
+        eventType: isApproved ? 'return_approved' : 'return_rejected',
+        toStatus: input.decision,
+        actorUserId: input.actorUserId,
+        actorRole: input.actorRole,
+        note: input.adminNote,
+      });
+
+      await connection.commit();
+      return this.getReturnById(input.orderId, input.orderReturnId);
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async receiveReturn(input: ReceiveOrderReturnDTO): Promise<OrderReturn | null> {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const now = new Date();
+
+      await connection.execute(
+        `UPDATE order_returns SET status = 'received', received_at = ?, admin_note = ?, updated_at = ?
+         WHERE order_return_id = ? AND order_id = ? AND status = 'approved'`,
+        [now, input.adminNote || null, now, input.orderReturnId, input.orderId]
+      );
+
+      await this.appendEventWithConnection(connection, {
+        orderId: input.orderId,
+        eventType: 'return_received',
+        toStatus: 'received',
+        actorUserId: input.actorUserId,
+        actorRole: input.actorRole,
+        note: input.adminNote,
+      });
+
+      await connection.commit();
+      return this.getReturnById(input.orderId, input.orderReturnId);
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async refundReturn(input: RefundOrderReturnDTO): Promise<OrderReturn | null> {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const now = new Date();
+
+      // Tính tổng tiền hoàn dựa trên sản phẩm trong phiếu trả
+      const [itemRows] = await connection.execute<RowDataPacket[]>(
+        `SELECT ori.order_detail_id, ori.quantity, ori.restock_action,
+                od.price, od.product_id, od.variant_id
+         FROM order_return_items ori
+         JOIN order_details od ON od.order_detail_id = ori.order_detail_id
+         WHERE ori.order_return_id = ?`,
+        [input.orderReturnId]
+      );
+      const refundAmount = (itemRows as RowDataPacket[]).reduce(
+        (sum, row) => sum + Number(row.price) * Number(row.quantity), 0
+      );
+
+      // Lấy userId và payment_status từ phiếu trả + đơn hàng
+      const [retRows] = await connection.execute<RowDataPacket[]>(
+        'SELECT requested_by FROM order_returns WHERE order_return_id = ?',
+        [input.orderReturnId]
+      );
+      const userId = retRows[0]?.requested_by;
+
+      const [orderRows] = await connection.execute<RowDataPacket[]>(
+        'SELECT payment_status, payment_method FROM orders WHERE order_id = ?',
+        [input.orderId]
+      );
+      const paymentStatus = orderRows[0]?.payment_status;
+      const paymentMethod = orderRows[0]?.payment_method;
+
+      // Fix #6: Chỉ hoàn tiền vào ví nếu khách đã thanh toán (paid)
+      // COD chưa trả tiền thì KHÔNG cộng ví
+      let refundNote = '';
+      if (userId && refundAmount > 0 && paymentStatus === 'paid') {
+        await connection.execute(
+          'UPDATE users SET wallet_balance = wallet_balance + ? WHERE user_id = ?',
+          [refundAmount, userId]
+        );
+        refundNote = `Hoàn ${refundAmount.toLocaleString('vi-VN')}đ vào ví`;
+      } else if (paymentStatus !== 'paid') {
+        refundNote = `Đơn ${paymentMethod?.toUpperCase()} chưa thanh toán — không hoàn tiền`;
+      }
+
+      // Fix #5: Hoàn kho theo restockAction
+      for (const row of itemRows as RowDataPacket[]) {
+        if (row.restock_action === 'restock' || row.restock_action === 'inspect') {
+          if (row.variant_id) {
+            await connection.execute(
+              'UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE variant_id = ?',
+              [row.quantity, row.variant_id]
+            );
+          }
+          await connection.execute(
+            'UPDATE products SET stock_quantity = stock_quantity + ? WHERE product_id = ?',
+            [row.quantity, row.product_id]
+          );
+        }
+        // 'discard' → không cộng lại kho
+      }
+
+      await connection.execute(
+        `UPDATE order_returns SET status = 'refunded', refunded_at = ?, admin_note = ?, updated_at = ?
+         WHERE order_return_id = ? AND order_id = ? AND status = 'received'`,
+        [now, input.adminNote || null, now, input.orderReturnId, input.orderId]
+      );
+
+      // Cập nhật trạng thái đơn hàng → returned
+      const newPaymentStatus = paymentStatus === 'paid' ? 'refunded' : paymentStatus;
+      await connection.execute(
+        `UPDATE orders SET status = 'returned', payment_status = ?, updated_at = ? WHERE order_id = ?`,
+        [newPaymentStatus, now, input.orderId]
+      );
+
+      await this.appendEventWithConnection(connection, {
+        orderId: input.orderId,
+        eventType: 'return_refunded',
+        toStatus: 'refunded',
+        actorUserId: input.actorUserId,
+        actorRole: input.actorRole,
+        note: input.adminNote || refundNote,
+      });
+
+      await connection.commit();
+      return this.getReturnById(input.orderId, input.orderReturnId);
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async closeReturn(input: CloseOrderReturnDTO): Promise<OrderReturn | null> {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const now = new Date();
+
+      await connection.execute(
+        `UPDATE order_returns SET status = 'closed', closed_at = ?, admin_note = ?, updated_at = ?
+         WHERE order_return_id = ? AND order_id = ?`,
+        [now, input.adminNote || null, now, input.orderReturnId, input.orderId]
+      );
+
+      await this.appendEventWithConnection(connection, {
+        orderId: input.orderId,
+        eventType: 'return_closed',
+        toStatus: 'closed',
+        actorUserId: input.actorUserId,
+        actorRole: input.actorRole,
+        note: input.adminNote,
+      });
+
+      await connection.commit();
+      return this.getReturnById(input.orderId, input.orderReturnId);
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
   async updatePaymentStatus(input: UpdatePaymentStatusDTO): Promise<Order | null> {
     const connection = await pool.getConnection();
     try {
@@ -293,9 +610,18 @@ export class OrderRepository implements IOrderRepository {
   }
 
   private async findAggregate(options: { orderId: number; userId?: number }): Promise<OrderAggregate | null> {
-    const order = await this.findById(options.orderId);
+    let order: Order | null;
+    if (options.userId) {
+      order = await this.findOwnedById(options.orderId, options.userId);
+    } else {
+      order = await this.findById(options.orderId);
+    }
     if (!order) return null;
-    return { order, items: await this.getOrderDetails(order.orderId), timeline: [], returns: [] };
+    const [items, returns] = await Promise.all([
+      this.getOrderDetails(order.orderId),
+      this.listReturns(order.orderId),
+    ]);
+    return { order, items, timeline: [], returns };
   }
 
   private async getOrderDetailsWithExecutor(executor: SqlExecutor, id: number): Promise<OrderDetail[]> {
@@ -335,5 +661,49 @@ export class OrderRepository implements IOrderRepository {
 
   private mapRowToOrderEvent(row: any): OrderEvent {
     return { orderEventId: row.order_event_id, orderId: row.order_id, eventType: row.event_type, createdAt: row.created_at };
+  }
+
+  private mapRowToOrderReturn(row: any): OrderReturn {
+    let evidenceImages: string[] | undefined;
+    if (row.evidence_images) {
+      try {
+        evidenceImages = typeof row.evidence_images === 'string'
+          ? JSON.parse(row.evidence_images)
+          : row.evidence_images;
+      } catch { evidenceImages = undefined; }
+    }
+    return {
+      orderReturnId: row.order_return_id,
+      orderId:       row.order_id,
+      requestCode:   row.request_code,
+      requestedBy:   row.requested_by,
+      status:        row.status,
+      reason:        row.reason,
+      customerNote:  row.customer_note ?? undefined,
+      adminNote:     row.admin_note ?? undefined,
+      evidenceImages,
+      requestedAt:   row.requested_at,
+      approvedAt:    row.approved_at ?? undefined,
+      rejectedAt:    row.rejected_at ?? undefined,
+      receivedAt:    row.received_at ?? undefined,
+      refundedAt:    row.refunded_at ?? undefined,
+      closedAt:      row.closed_at ?? undefined,
+      updatedAt:     row.updated_at,
+    };
+  }
+
+  private mapRowToOrderReturnItem(row: any): OrderReturnItem {
+    return {
+      orderReturnItemId: row.order_return_item_id,
+      orderReturnId:     row.order_return_id,
+      orderDetailId:     row.order_detail_id,
+      productId:         row.product_id,
+      variantId:         row.variant_id ?? undefined,
+      productName:       row.product_name ?? undefined,
+      quantity:          Number(row.quantity),
+      reason:            row.reason ?? undefined,
+      restockAction:     row.restock_action ?? 'inspect',
+      createdAt:         row.created_at,
+    };
   }
 }

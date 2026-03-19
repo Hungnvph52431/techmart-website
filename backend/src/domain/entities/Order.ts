@@ -2,13 +2,13 @@
 export type OrderStatus =
   | 'pending'
   | 'confirmed'
-  | 'processing'
   | 'shipping'
   | 'delivered'
+  | 'completed'
   | 'cancelled'
   | 'returned';
 
-export type PaymentMethod = 'cod' | 'bank_transfer' | 'momo' | 'vnpay' | 'zalopay';
+export type PaymentMethod = 'cod' | 'bank_transfer' | 'momo' | 'vnpay' | 'zalopay' | 'wallet';
 
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 
@@ -129,6 +129,7 @@ export interface OrderReturn {
   reason: string;
   customerNote?: string;
   adminNote?: string;
+  evidenceImages?: string[];
   requestedAt: Date;
   approvedAt?: Date;
   rejectedAt?: Date;
@@ -208,7 +209,7 @@ export interface UpdatePaymentStatusDTO {
   orderId: number;
   currentStatus: PaymentStatus;
   nextStatus: PaymentStatus;
-  actorUserId: number;
+  actorUserId: number | null;
   actorRole: OrderActorRole;
   note?: string;
 }
@@ -228,6 +229,7 @@ export interface CreateOrderReturnDTO {
   requestedBy: number;
   reason: string;
   customerNote?: string;
+  evidenceImages?: string[];
   items: Array<{
     orderDetailId: number;
     quantity: number;

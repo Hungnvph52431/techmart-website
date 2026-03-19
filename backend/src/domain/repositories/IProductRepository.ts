@@ -33,6 +33,11 @@ export interface ProductFilters {
   isFeatured?: boolean;
   isNew?: boolean;
   isBestseller?: boolean;
+  ram?: string;
+  storage?: string;
+  chip?: string;
+  need?: string;
+  feature?: string;
   status?: string;
   limit?: number;
   offset?: number;
