@@ -1,18 +1,23 @@
 import nodemailer from 'nodemailer';
+import type { Transporter } from 'nodemailer';
 
-// Cấu hình transporter từ biến môi trường
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: Number(process.env.SMTP_PORT) || 587,
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER || '',
-    pass: process.env.SMTP_PASS || '',
-  },
-});
+// Lazy initialization — tránh đọc env trước khi dotenv.config() chạy
+let _transporter: Transporter | null = null;
 
-const FROM_NAME = process.env.SMTP_FROM_NAME || 'TechMart';
-const FROM_EMAIL = process.env.SMTP_USER || 'noreply@techmart.vn';
+function getTransporter(): Transporter {
+  if (!_transporter) {
+    _transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER || '',
+        pass: process.env.SMTP_PASS || '',
+      },
+    });
+  }
+  return _transporter;
+}
 
 // ──────────────────────────────────────────────────────────────
 // Gửi email thông báo thanh toán thành công
@@ -56,6 +61,9 @@ export async function sendPaymentSuccessEmail(data: PaymentSuccessData): Promise
     console.warn('[Email] SMTP_USER chưa cấu hình — bỏ qua gửi email');
     return;
   }
+
+  const fromName = process.env.SMTP_FROM_NAME || 'TechMart';
+  const fromEmail = process.env.SMTP_USER;
 
   const itemsHtml = data.items
     .map(
@@ -120,15 +128,82 @@ export async function sendPaymentSuccessEmail(data: PaymentSuccessData): Promise
   </div>`;
 
   try {
-    await transporter.sendMail({
-      from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
+    await getTransporter().sendMail({
+      from: `"${fromName}" <${fromEmail}>`,
       to: data.customerEmail,
       subject: `[TechMart] Thanh toán thành công — Đơn hàng #${data.orderCode}`,
       html,
     });
     console.log(`[Email] Đã gửi email thanh toán thành công cho ${data.customerEmail} (đơn ${data.orderCode})`);
   } catch (error) {
-    // Không throw — email là tính năng phụ, không được chặn flow chính
     console.error('[Email] Lỗi gửi email:', error);
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
+// Gửi email thông báo nạp ví thành công
+// ──────────────────────────────────────────────────────────────
+interface WalletTopupSuccessData {
+  customerName: string;
+  customerEmail: string;
+  referenceCode: string;
+  amount: number;
+  newBalance: number;
+}
+
+export async function sendWalletTopupEmail(data: WalletTopupSuccessData): Promise<void> {
+  if (!process.env.SMTP_USER) {
+    console.warn('[Email] SMTP_USER chưa cấu hình — bỏ qua gửi email');
+    return;
+  }
+
+  const fromName = process.env.SMTP_FROM_NAME || 'TechMart';
+  const fromEmail = process.env.SMTP_USER;
+
+  const html = `
+  <div style="max-width:600px;margin:0 auto;font-family:'Segoe UI',Arial,sans-serif;color:#333;">
+    <div style="background:#f97316;padding:24px;text-align:center;border-radius:8px 8px 0 0;">
+      <h1 style="color:#fff;margin:0;font-size:22px;">Nạp ví thành công!</h1>
+    </div>
+    <div style="padding:24px;background:#fff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
+      <p>Xin chào <strong>${data.customerName}</strong>,</p>
+      <p>Ví TechMart của bạn đã được nạp thành công.</p>
+
+      <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+        <tr style="background:#f9fafb;">
+          <td style="padding:8px 12px;"><strong>Mã giao dịch</strong></td>
+          <td style="padding:8px 12px;">${data.referenceCode}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 12px;"><strong>Số tiền nạp</strong></td>
+          <td style="padding:8px 12px;color:#f97316;font-weight:bold;font-size:18px;">+${formatCurrency(data.amount)}</td>
+        </tr>
+        <tr style="background:#f9fafb;">
+          <td style="padding:8px 12px;"><strong>Số dư hiện tại</strong></td>
+          <td style="padding:8px 12px;color:#2563eb;font-weight:bold;font-size:18px;">${formatCurrency(data.newBalance)}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 12px;"><strong>Phương thức</strong></td>
+          <td style="padding:8px 12px;">VNPay</td>
+        </tr>
+      </table>
+
+      <hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb;">
+      <p style="font-size:13px;color:#6b7280;">
+        Cảm ơn bạn đã sử dụng ví TechMart! Nếu có bất kỳ thắc mắc nào, vui lòng liên hệ hotline <strong>1900 1234</strong>.
+      </p>
+    </div>
+  </div>`;
+
+  try {
+    await getTransporter().sendMail({
+      from: `"${fromName}" <${fromEmail}>`,
+      to: data.customerEmail,
+      subject: `[TechMart] Nạp ví thành công — ${data.referenceCode}`,
+      html,
+    });
+    console.log(`[Email] Đã gửi email nạp ví thành công cho ${data.customerEmail} (${data.referenceCode})`);
+  } catch (error) {
+    console.error('[Email] Lỗi gửi email nạp ví:', error);
   }
 }
