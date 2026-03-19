@@ -62,8 +62,8 @@ export const WalletPage = () => {
       setTopupLoading(true);
       const { paymentUrl } = await walletService.createVNPayTopup(amount);
       window.location.href = paymentUrl;
-    } catch {
-      toast.error('Không thể tạo giao dịch, thử lại sau!');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Không thể tạo giao dịch, thử lại sau!');
       setTopupLoading(false);
     }
   };
