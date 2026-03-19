@@ -14,6 +14,13 @@ import api from '@/services/api';
 import { Layout } from '@/components/layout/Layout';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+const BACKEND_URL = (import.meta.env.VITE_API_URL as string)?.replace('/api', '') || 'http://localhost:5001';
+const getImageUrl = (url?: string | null) => {
+  if (!url) return '';
+  if (url.startsWith('http')) return url;
+  return `${BACKEND_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
 
@@ -653,11 +660,11 @@ export const OrderDetailPage = () => {
                   const qty     = item.quantity ?? 1;
                   const price   = Number(item.price ?? 0);
                   const sub     = Number(item.subtotal ?? price * qty);
-                  const img     = item.productImage ?? item.product_image ?? item.image ?? '';
+                  const img     = getImageUrl(item.productImage ?? item.product_image ?? item.image) || '/placeholder.jpg';
                   return (
                     <div key={item.orderDetailId ?? idx}
                       className="flex gap-4 rounded-2xl border border-gray-100 p-4">
-                      <img src={img || '/placeholder.jpg'} alt={name}
+                      <img src={img} alt={name}
                         className="h-16 w-16 rounded-xl object-cover flex-shrink-0 bg-gray-50"
                         onError={e => { const el = e.target as HTMLImageElement; el.onerror = null; el.src = '/placeholder.jpg'; }} />
                       <div className="flex-1 min-w-0">

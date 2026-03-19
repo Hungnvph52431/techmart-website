@@ -713,7 +713,13 @@ export class OrderRepository implements IOrderRepository {
   }
 
   private async getOrderDetailsWithExecutor(executor: SqlExecutor, id: number): Promise<OrderDetail[]> {
-    const [rows] = await executor.execute<RowDataPacket[]>('SELECT * FROM order_details WHERE order_id = ?', [id]);
+    const [rows] = await executor.execute<RowDataPacket[]>(
+      `SELECT od.*, p.main_image AS product_image
+       FROM order_details od
+       LEFT JOIN products p ON od.product_id = p.product_id
+       WHERE od.order_id = ?`,
+      [id]
+    );
     return rows.map(this.mapRowToOrderDetail);
   }
 
@@ -742,7 +748,8 @@ export class OrderRepository implements IOrderRepository {
   private mapRowToOrderDetail(row: any): OrderDetail {
     return {
       orderDetailId: row.order_detail_id, orderId: row.order_id, productId: row.product_id,
-      productName: row.product_name, price: Number(row.price), quantity: Number(row.quantity),
+      productName: row.product_name, variantName: row.variant_name || '', productImage: row.product_image || '',
+      price: Number(row.price), quantity: Number(row.quantity),
       subtotal: Number(row.subtotal), createdAt: row.created_at
     };
   }
