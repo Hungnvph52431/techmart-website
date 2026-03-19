@@ -7,6 +7,13 @@ import { productService } from '@/services/product.service';
 import { categoryService, type Category } from '@/services/category.service';
 import type { Product } from '@/types';
 
+const BACKEND_URL = (import.meta.env.VITE_API_URL as string)?.replace('/api', '') || 'http://localhost:5001';
+const getImageUrl = (url?: string | null) => {
+  if (!url) return '/placeholder.jpg';
+  if (url.startsWith('http')) return url;
+  return `${BACKEND_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
 export const Header = () => {
   const navigate = useNavigate();
   // Lấy dữ liệu từ Auth Store (Giữ logic của Khanh)
@@ -164,7 +171,7 @@ export const Header = () => {
                           className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-all text-left"
                         >
                           {cat.imageUrl && (
-                            <img src={cat.imageUrl} alt={cat.name} className="w-10 h-10 object-contain rounded-lg bg-gray-50" />
+                            <img src={getImageUrl(cat.imageUrl)} alt={cat.name} className="w-10 h-10 object-contain rounded-lg bg-gray-50" />
                           )}
                           <span className="text-sm font-bold text-gray-700 line-clamp-1">{cat.name}</span>
                         </button>
@@ -192,7 +199,7 @@ export const Header = () => {
                           className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-all text-left"
                         >
                           <img
-                            src={product.mainImage || '/placeholder.jpg'}
+                            src={getImageUrl(product.mainImage)}
                             alt={product.name}
                             className="w-12 h-12 object-contain rounded-lg bg-gray-50 flex-shrink-0"
                           />
@@ -270,7 +277,7 @@ export const Header = () => {
                       {items.slice(-3).reverse().map((item) => (
                         <div key={item.product.productId} className="flex gap-4 py-4 border-b border-gray-50 last:border-0">
                           <img 
-                            src={item.product.mainImage || '/placeholder.jpg'} 
+                            src={getImageUrl(item.product.mainImage)} 
                             alt={item.product.name} 
                             className="w-12 h-12 object-contain bg-gray-50 rounded-xl" 
                           />
