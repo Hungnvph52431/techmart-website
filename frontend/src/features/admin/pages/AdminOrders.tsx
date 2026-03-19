@@ -22,6 +22,7 @@ const STATUS_LABELS: Record<string, string> = {
   processing: 'Đang xử lý',
   shipping: 'Đang giao',
   delivered: 'Đã giao',
+  completed: 'Hoàn thành',
   cancelled: 'Đã hủy',
   returned: 'Đã hoàn/trả',
 };
@@ -32,6 +33,7 @@ const STATUS_BADGES: Record<string, string> = {
   processing: 'bg-blue-100 text-blue-800',
   shipping: 'bg-violet-100 text-violet-800',
   delivered: 'bg-emerald-100 text-emerald-800',
+  completed: 'bg-lime-100 text-lime-800',
   cancelled: 'bg-rose-100 text-rose-800',
   returned: 'bg-slate-200 text-slate-800',
 };
@@ -110,7 +112,7 @@ export const AdminOrders = () => {
 
       {/* TABS LỌC */}
       <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-        {['all', 'pending', 'confirmed', 'shipping', 'delivered', 'cancelled'].map((s) => (
+        {['all', 'pending', 'confirmed', 'shipping', 'delivered', 'completed', 'cancelled', 'returned'].map((s) => (
           <button
             key={s}
             onClick={() => setFilter(s)}
