@@ -1,6 +1,7 @@
 import pool from '../../infrastructure/database/connection';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { createPaymentUrl } from '../services/VNPayService';
+import { sendWalletTopupEmail } from '../services/EmailService';
 
 export interface WalletTopupRequest {
   requestId: number;
@@ -128,6 +129,26 @@ export class WalletUseCase {
       );
 
       await connection.commit();
+
+      // Gửi email thông báo nạp ví thành công (fire-and-forget)
+      try {
+        const [userRows] = await pool.execute<RowDataPacket[]>(
+          'SELECT name, email, wallet_balance FROM users WHERE user_id = ?',
+          [req.userId]
+        );
+        const u = (userRows as RowDataPacket[])[0];
+        if (u?.email) {
+          sendWalletTopupEmail({
+            customerName: u.name || 'Khách hàng',
+            customerEmail: u.email,
+            referenceCode: req.referenceCode,
+            amount: req.amount,
+            newBalance: Number(u.wallet_balance),
+          }).catch((err) => console.error('[WalletUseCase] Lỗi gửi email nạp ví:', err));
+        }
+      } catch (emailErr) {
+        console.error('[WalletUseCase] Lỗi query user cho email:', emailErr);
+      }
     } catch (e) {
       await connection.rollback();
       throw e;
