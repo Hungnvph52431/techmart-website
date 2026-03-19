@@ -121,6 +121,14 @@ export const AdminOrderDetail = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState<string | null>(null);
 
+  // Confirm dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    show: boolean;
+    type: 'status' | 'payment' | 'auto';
+    nextValue: string;
+    label: string;
+  }>({ show: false, type: 'status', nextValue: '', label: '' });
+
   // Return modal state
   const [returnModal, setReturnModal] = useState<{
     type: 'review' | 'receive' | 'refund' | 'close' | null;
@@ -314,12 +322,12 @@ export const AdminOrderDetail = () => {
           {/* NÚT AUTO PROCESS */}
           {canAutoProcess && (
             <button
-              onClick={handleAutoProcess}
+              onClick={() => setConfirmDialog({ show: true, type: 'auto', nextValue: 'auto', label: 'Xử lý nhanh → Hoàn thành' })}
               disabled={!!submitting}
               className="inline-flex items-center gap-2 px-5 py-2 bg-blue-600 rounded-xl text-sm font-black text-white uppercase hover:bg-blue-700 disabled:opacity-60 shadow-lg shadow-blue-200"
             >
               <Zap size={15} />
-              {submitting === 'auto' ? 'Đang xử lý...' : 'Xử lý nhanh → Đã giao'}
+              {submitting === 'auto' ? 'Đang xử lý...' : 'Xử lý nhanh → Hoàn thành'}
             </button>
           )}
         </div>
@@ -524,17 +532,19 @@ export const AdminOrderDetail = () => {
 
           {/* ĐỔI TRẠNG THÁI ĐƠN */}
           <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
-            <h2 className="font-black text-gray-800 uppercase text-sm tracking-wider">Trạng thái đơn hàng</h2>
-            <div className={`px-4 py-3 rounded-xl text-sm font-black uppercase text-center border ${STATUS_STYLES[order.status]}`}>
-              {STATUS_LABELS[order.status]}
-            </div>
+            <h2 className="font-black text-gray-800 uppercase text-sm tracking-wider">
+              Trạng thái đơn hàng:{' '}
+              <span className={`inline-block px-3 py-1 rounded-full text-xs font-black uppercase align-middle ${STATUS_STYLES[order.status]}`}>
+                {STATUS_LABELS[order.status]}
+              </span>
+            </h2>
             {allowedStatuses.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-2 pt-2 border-t border-gray-50">
                 <p className="text-[10px] font-bold text-gray-400 uppercase">Chuyển sang:</p>
                 {allowedStatuses.map((s) => (
                   <button
                     key={s}
-                    onClick={() => handleUpdateStatus(s)}
+                    onClick={() => setConfirmDialog({ show: true, type: 'status', nextValue: s, label: STATUS_LABELS[s] })}
                     disabled={!!submitting}
                     className={`w-full px-4 py-2.5 rounded-xl text-sm font-black uppercase border transition-all disabled:opacity-60 hover:shadow-sm ${STATUS_STYLES[s]}`}
                   >
@@ -543,7 +553,7 @@ export const AdminOrderDetail = () => {
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-gray-400 text-center italic">Trạng thái cuối — không thể thay đổi</p>
+              <p className="text-xs text-gray-400 text-center italic pt-2 border-t border-gray-50">Trạng thái cuối — không thể thay đổi</p>
             )}
           </section>
 
@@ -570,16 +580,19 @@ export const AdminOrderDetail = () => {
             {allowedPayments.length > 0 && (
               <div className="space-y-2 pt-1 border-t border-gray-50">
                 <p className="text-[10px] font-bold text-gray-400 uppercase">Cập nhật:</p>
-                {allowedPayments.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => handleUpdatePayment(s)}
-                    disabled={!!submitting}
-                    className="w-full px-4 py-2.5 rounded-xl text-sm font-bold text-gray-700 bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-all disabled:opacity-60"
-                  >
-                    {submitting === 'payment' ? 'Đang xử lý...' : PAYMENT_STATUS_LABELS[s]}
-                  </button>
-                ))}
+                <div className="flex flex-wrap gap-2">
+                  {allowedPayments.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setConfirmDialog({ show: true, type: 'payment', nextValue: s, label: PAYMENT_STATUS_LABELS[s] })}
+                      disabled={!!submitting}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-700 bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-all disabled:opacity-60"
+                    >
+                      <ChevronRight size={12} />
+                      {PAYMENT_STATUS_LABELS[s]}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </section>
@@ -623,6 +636,43 @@ export const AdminOrderDetail = () => {
           )}
         </div>
       </div>
+
+      {/* MODAL XÁC NHẬN CHUYỂN TRẠNG THÁI */}
+      {confirmDialog.show && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <h3 className="font-black text-gray-800 text-lg">Xác nhận thay đổi</h3>
+            <p className="text-sm text-gray-600">
+              Bạn có muốn chuyển {confirmDialog.type === 'payment' ? 'trạng thái thanh toán' : 'trạng thái đơn hàng'} sang{' '}
+              <span className="font-bold text-blue-600">{confirmDialog.label}</span> không?
+            </p>
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                onClick={() => setConfirmDialog({ show: false, type: 'status', nextValue: '', label: '' })}
+                className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={async () => {
+                  setConfirmDialog({ show: false, type: 'status', nextValue: '', label: '' });
+                  if (confirmDialog.type === 'auto') {
+                    await handleAutoProcess();
+                  } else if (confirmDialog.type === 'payment') {
+                    await handleUpdatePayment(confirmDialog.nextValue);
+                  } else {
+                    await handleUpdateStatus(confirmDialog.nextValue);
+                  }
+                }}
+                disabled={!!submitting}
+                className="px-5 py-2 rounded-xl bg-blue-600 text-white text-sm font-black hover:bg-blue-700 disabled:opacity-60"
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL XÁC NHẬN ACTION HOÀN TRẢ */}
       {returnModal.type && (

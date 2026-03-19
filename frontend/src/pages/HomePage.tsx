@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { ProductCard } from '@/features/products/components/ProductCard';
 import { productService } from '@/services/product.service';
@@ -9,29 +9,12 @@ import { Product } from '@/types';
 import { Banner } from '@/types/banner';
 import {
   ChevronRight, ChevronLeft,
-  Zap, Award, Smartphone, Laptop, Tablet, Watch, Headphones, Package,
+  Zap, Award, Smartphone,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const getImageUrl = (url: string) =>
   url?.startsWith('/') ? `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5001'}${url}` : url;
-
-// Icon map cho categories
-const CATEGORY_ICONS: Record<string, React.ReactNode> = {
-  'dien-thoai': <Smartphone className="w-7 h-7" />,
-  'iphone': <Smartphone className="w-7 h-7" />,
-  'samsung-galaxy': <Smartphone className="w-7 h-7" />,
-  'xiaomi-phone': <Smartphone className="w-7 h-7" />,
-  'oppo-phone': <Smartphone className="w-7 h-7" />,
-  'laptop': <Laptop className="w-7 h-7" />,
-  'tablet': <Tablet className="w-7 h-7" />,
-  'dong-ho-thong-minh': <Watch className="w-7 h-7" />,
-  'phu-kien': <Headphones className="w-7 h-7" />,
-  'tai-nghe': <Headphones className="w-7 h-7" />,
-  'sac-du-phong': <Zap className="w-7 h-7" />,
-  'op-lung': <Smartphone className="w-7 h-7" />,
-  'cap-sac': <Package className="w-7 h-7" />,
-};
 
 const CATEGORY_COLORS: string[] = [
   'bg-blue-50 text-blue-600',
@@ -49,70 +32,82 @@ const CATEGORY_COLORS: string[] = [
 // --- HERO BANNER SLIDER ---
 const HeroBannerSlider = ({ banners }: { banners: Banner[] }) => {
   const [current, setCurrent] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    if (banners.length <= 1) return;
-    const timer = setInterval(() => setCurrent(i => (i + 1) % banners.length), 5000);
-    return () => clearInterval(timer);
+  const resetTimer = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (banners.length > 1) {
+      timerRef.current = setInterval(() => goTo((c: number) => (c + 1) % banners.length), 5000);
+    }
   }, [banners.length]);
+
+  const goTo = useCallback((next: number | ((c: number) => number)) => {
+    if (isTransitioning) return;
+    setIsTransitioning(true);
+    setCurrent(prev => typeof next === 'function' ? next(prev) : next);
+    setTimeout(() => setIsTransitioning(false), 600);
+  }, [isTransitioning]);
+
+  useEffect(() => { resetTimer(); return () => { if (timerRef.current) clearInterval(timerRef.current); }; }, [resetTimer]);
+
+  const handlePrev = () => { goTo((c: number) => (c - 1 + banners.length) % banners.length); resetTimer(); };
+  const handleNext = () => { goTo((c: number) => (c + 1) % banners.length); resetTimer(); };
+  const handleDot = (i: number) => { goTo(i); resetTimer(); };
 
   if (banners.length === 0) {
     return (
       <div className="h-[300px] md:h-[420px] bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-800 rounded-2xl flex items-center px-8 md:px-16 text-white">
         <div>
-          <span className="inline-block px-4 py-1.5 bg-white/20 rounded-full text-xs font-bold mb-4">
-            TechMart Exclusive
-          </span>
-          <h2 className="text-3xl md:text-5xl font-extrabold mb-4">
-            iPhone 15 <br /><span className="text-yellow-400">Pro Max</span>
-          </h2>
-          <Link to="/products" className="inline-block bg-white text-blue-600 px-8 py-3 rounded-xl font-bold text-sm hover:shadow-lg transition-all">
-            Mua ngay
-          </Link>
+          <span className="inline-block px-4 py-1.5 bg-white/20 rounded-full text-xs font-bold mb-4">TechMart Exclusive</span>
+          <h2 className="text-3xl md:text-5xl font-extrabold mb-4">iPhone 15 <br /><span className="text-yellow-400">Pro Max</span></h2>
+          <Link to="/products" className="inline-block bg-white text-blue-600 px-8 py-3 rounded-xl font-bold text-sm hover:shadow-lg transition-all">Mua ngay</Link>
         </div>
       </div>
     );
   }
 
-  const banner = banners[current];
-
   return (
     <div className="relative rounded-2xl overflow-hidden group h-[300px] md:h-[420px]">
-      <img
-        src={getImageUrl(banner.imageUrl)}
-        alt={banner.title}
-        className="w-full h-full object-cover transition-opacity duration-500"
-        onError={e => { (e.currentTarget as HTMLImageElement).src = 'https://placehold.co/900x420/1e40af/ffffff?text=Banner'; }}
-      />
-      <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/20 to-transparent" />
-      <div className="absolute inset-0 flex items-center px-8 md:px-14">
-        <div className="max-w-md text-white">
-          <h2 className="text-3xl md:text-5xl font-extrabold mb-4 leading-tight drop-shadow-lg">
-            {banner.title}
-          </h2>
-          {banner.linkUrl && (
-            <Link to={banner.linkUrl}
-              className="inline-block bg-white text-gray-900 px-8 py-3 rounded-xl font-bold text-sm hover:shadow-xl transition-all">
-              Xem ngay
-            </Link>
-          )}
-        </div>
+      {/* Slide track */}
+      <div className="flex h-full transition-transform duration-500 ease-in-out"
+        style={{ width: `${banners.length * 100}%`, transform: `translateX(-${current * (100 / banners.length)}%)` }}>
+        {banners.map((banner, i) => (
+          <div key={banner.bannerId || i} className="relative h-full shrink-0" style={{ width: `${100 / banners.length}%` }}>
+            <img src={getImageUrl(banner.imageUrl)} alt={banner.title}
+              className="w-full h-full object-cover"
+              onError={e => { (e.currentTarget as HTMLImageElement).src = 'https://placehold.co/900x420/1e40af/ffffff?text=Banner'; }} />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/20 to-transparent" />
+            <div className="absolute inset-0 flex items-center px-8 md:px-14">
+              <div className="max-w-md text-white">
+                <h2 className="text-3xl md:text-5xl font-extrabold mb-4 leading-tight drop-shadow-lg">{banner.title}</h2>
+                {banner.linkUrl && (
+                  <Link to={banner.linkUrl}
+                    className="inline-block bg-white text-gray-900 px-8 py-3 rounded-xl font-bold text-sm hover:shadow-xl transition-all">
+                    Xem ngay
+                  </Link>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
+      {/* Controls */}
       {banners.length > 1 && (
         <>
-          <button onClick={() => setCurrent(i => (i - 1 + banners.length) % banners.length)}
-            className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all">
-            <ChevronLeft size={20} />
+          <button onClick={handlePrev}
+            className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-2.5 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300">
+            <ChevronLeft size={22} />
           </button>
-          <button onClick={() => setCurrent(i => (i + 1) % banners.length)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all">
-            <ChevronRight size={20} />
+          <button onClick={handleNext}
+            className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-2.5 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300">
+            <ChevronRight size={22} />
           </button>
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
             {banners.map((_, i) => (
-              <button key={i} onClick={() => setCurrent(i)}
-                className={`h-1.5 rounded-full transition-all ${i === current ? 'bg-white w-5' : 'bg-white/40 w-1.5'}`} />
+              <button key={i} onClick={() => handleDot(i)}
+                className={`h-2 rounded-full transition-all duration-300 ${i === current ? 'bg-white w-7 shadow-lg' : 'bg-white/40 w-2 hover:bg-white/60'}`} />
             ))}
           </div>
         </>
@@ -230,34 +225,29 @@ export const HomePage = () => {
           </div>
         </section>
 
-        {/* ── DANH MỤC + THƯƠNG HIỆU (giống CellphoneS) ── */}
-        <section className="py-6">
+        {/* ── DANH MỤC + THƯƠNG HIỆU ── */}
+        <section className="py-5">
           <div className="container mx-auto px-4">
-            <div className="bg-white p-6 rounded-2xl border border-gray-100">
+            <div className="bg-white px-6 py-5 rounded-2xl border border-gray-100 space-y-4">
               {/* Danh mục */}
-              <div className="flex items-center gap-6 overflow-x-auto pb-2 scrollbar-hide">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider shrink-0 mr-1">Danh mục:</span>
                 {parentCategories.map((cat, idx) => (
                   <Link key={cat.categoryId} to={`/products?category=${cat.slug}`}
-                    className="flex flex-col items-center gap-2 min-w-[72px] group">
-                    <div className={`w-14 h-14 ${CATEGORY_COLORS[idx % CATEGORY_COLORS.length]} rounded-2xl flex items-center justify-center transition-all group-hover:-translate-y-1 group-hover:shadow-lg`}>
-                      {CATEGORY_ICONS[cat.slug] || <Package className="w-7 h-7" />}
-                    </div>
-                    <span className="text-[11px] font-bold text-gray-600 text-center whitespace-nowrap group-hover:text-blue-600 transition-colors">
-                      {cat.name}
-                    </span>
+                    className={`px-5 py-2.5 rounded-full text-sm font-bold transition-all hover:-translate-y-0.5 hover:shadow-md ${CATEGORY_COLORS[idx % CATEGORY_COLORS.length]} border border-transparent hover:border-current`}>
+                    {cat.name}
                   </Link>
                 ))}
               </div>
 
-              {/* Thương hiệu — hiện chỉ khi có brands */}
+              {/* Thương hiệu */}
               {brands.length > 0 && (
-                <div className="flex items-center gap-3 mt-4 pt-4 border-t border-gray-50 overflow-x-auto scrollbar-hide">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider shrink-0">Hãng:</span>
+                <div className="flex items-center gap-3 flex-wrap pt-4 border-t border-gray-50">
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wider shrink-0 mr-1">Thương hiệu:</span>
                   {brands.map(b => (
                     <Link key={b.brandId} to={`/products?brand=${b.slug}`}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all shrink-0">
-                      {b.logoUrl && <img src={getImageUrl(b.logoUrl)} alt={b.name} className="w-4 h-4 object-contain" />}
-                      <span className="text-xs font-semibold text-gray-600">{b.name}</span>
+                      className="px-5 py-2.5 rounded-full text-sm font-semibold text-gray-600 bg-gray-50 border border-gray-200 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 transition-all hover:-translate-y-0.5 hover:shadow-sm">
+                      {b.name}
                     </Link>
                   ))}
                 </div>

@@ -1,7 +1,7 @@
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import { useEffect } from 'react';
-import { 
+import { useEffect, useState } from 'react';
+import {
   LayoutDashboard,
   Image,
   Package,
@@ -16,6 +16,8 @@ import {
   Star,
   RotateCcw,
   Wallet,
+  Menu,
+  PanelLeftClose,
 } from 'lucide-react';
 
 export const AdminLayout = () => {
@@ -40,6 +42,8 @@ export const AdminLayout = () => {
     return location.pathname.startsWith(path);
   };
 
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
   if (!user || user.role !== 'admin') return null;
 
   // FIX LỖI 2339: Sử dụng fullName từ Store
@@ -50,14 +54,23 @@ export const AdminLayout = () => {
       {/* --- TOP HEADER --- */}
       <header className="h-16 bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30">
         <div className="h-full flex items-center justify-between px-6">
-          <Link to="/admin" className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-xl">T</span>
-            </div>
-            <span className="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 uppercase italic">
-              TechMart Admin
-            </span>
-          </Link>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSidebarOpen(prev => !prev)}
+              className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-blue-600 transition-colors"
+              title={sidebarOpen ? 'Đóng sidebar' : 'Mở sidebar'}
+            >
+              {sidebarOpen ? <PanelLeftClose size={20} /> : <Menu size={20} />}
+            </button>
+            <Link to="/admin" className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-xl">T</span>
+              </div>
+              <span className="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 uppercase italic">
+                TechMart Admin
+              </span>
+            </Link>
+          </div>
 
           <div className="flex items-center space-x-6">
             <div className="flex items-center space-x-2 text-gray-600 bg-gray-100 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-tighter">
@@ -81,11 +94,11 @@ export const AdminLayout = () => {
 
       <div className="flex flex-1">
         {/* --- SIDEBAR (PHÂN LOẠI CHUYÊN NGHIỆP) --- */}
-        <aside className="w-64 bg-white border-r border-gray-200 sticky top-16 h-[calc(100vh-64px)] overflow-y-auto p-4">
-          <nav className="space-y-1">
+        <aside className={`${sidebarOpen ? 'w-64' : 'w-0'} bg-white border-r border-gray-200 sticky top-16 h-[calc(100vh-64px)] overflow-hidden transition-all duration-300 ease-in-out`}>
+          <nav className={`w-64 p-4 space-y-1 ${sidebarOpen ? 'opacity-100' : 'opacity-0'} transition-opacity duration-200`}>
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 mb-3 mt-2">Tổng quan</p>
             <SidebarLink to="/admin" icon={<LayoutDashboard size={18} />} label="Dashboard" active={isActive('/admin')} />
-            
+
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 mt-8 mb-3">Cấu hình TechMart</p>
             <SidebarLink to="/admin/categories" icon={<Layers size={18} />} label="Danh mục" active={isActive('/admin/categories')} />
             <SidebarLink to="/admin/attributes" icon={<Settings2 size={18} />} label="Thuộc tính" active={isActive('/admin/attributes')} />
@@ -94,8 +107,7 @@ export const AdminLayout = () => {
             <SidebarLink to="/admin/products" icon={<Package size={18} />} label="Sản phẩm" active={isActive('/admin/products')} />
             <SidebarLink to="/admin/orders" icon={<ShoppingCart size={18} />} label="Đơn hàng" active={isActive('/admin/orders')} />
             <SidebarLink to="/admin/users" icon={<Users size={18} />} label="Khách hàng" active={isActive('/admin/users')} />
-            
-            {/* Tích hợp Voucher từ bản của Khanh */}
+
             <SidebarLink to="/admin/vouchers" icon={<Ticket size={18} />} label="Mã giảm giá" active={isActive('/admin/vouchers')} />
             <SidebarLink to="/admin/banners" icon={<Image size={18} />} label="Banner" active={isActive('/admin/banners')} />
             <SidebarLink to="/admin/reviews" icon={<Star size={18} />} label="Đánh giá" active={isActive('/admin/reviews')} />

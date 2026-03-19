@@ -139,14 +139,47 @@ export class OrderRepository implements IOrderRepository {
       const orderCode = this.generateOrderCode();
       const subtotal = orderData.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
       const shippingFee = orderData.shippingFee || 0;
-      const total = subtotal + shippingFee;
+
+      // Xử lý coupon nếu có
+      let discountAmount = 0;
+      let couponId: number | null = null;
+      let couponCode: string | null = null;
+
+      if (orderData.couponCode) {
+        const [couponRows] = await connection.execute<RowDataPacket[]>(
+          `SELECT * FROM coupons WHERE code = ? AND is_active = 1
+           AND (valid_from IS NULL OR valid_from <= ?)
+           AND (valid_to IS NULL OR valid_to >= ?)
+           AND (usage_limit IS NULL OR used_count < usage_limit)`,
+          [orderData.couponCode, now, now]
+        );
+        if (couponRows.length > 0) {
+          const coupon = couponRows[0];
+          if (subtotal >= Number(coupon.min_order_value || 0)) {
+            if (coupon.discount_type === 'percentage') {
+              discountAmount = subtotal * Number(coupon.discount_value) / 100;
+              if (coupon.max_discount_amount) {
+                discountAmount = Math.min(discountAmount, Number(coupon.max_discount_amount));
+              }
+            } else {
+              discountAmount = Number(coupon.discount_value);
+            }
+            couponId = coupon.coupon_id;
+            couponCode = coupon.code;
+            // Tăng used_count
+            await connection.execute('UPDATE coupons SET used_count = used_count + 1 WHERE coupon_id = ?', [couponId]);
+          }
+        }
+      }
+
+      const total = subtotal + shippingFee - discountAmount;
 
       const [orderResult] = await connection.execute<ResultSetHeader>(
-        `INSERT INTO orders (order_code, user_id, shipping_name, shipping_phone, shipping_address, shipping_city, 
-         subtotal, shipping_fee, total, payment_method, payment_status, status, order_date, updated_at) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'pending', ?, ?)`,
-        [orderCode, orderData.userId, orderData.shippingName, orderData.shippingPhone, orderData.shippingAddress, 
-         orderData.shippingCity, subtotal, shippingFee, total, orderData.paymentMethod, now, now]
+        `INSERT INTO orders (order_code, user_id, shipping_name, shipping_phone, shipping_address, shipping_city,
+         subtotal, shipping_fee, discount_amount, coupon_id, coupon_code, total, payment_method, payment_status, status, order_date, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'pending', ?, ?)`,
+        [orderCode, orderData.userId, orderData.shippingName, orderData.shippingPhone, orderData.shippingAddress,
+         orderData.shippingCity, subtotal, shippingFee, discountAmount, couponId, couponCode, total, orderData.paymentMethod, now, now]
       );
 
       const orderId = orderResult.insertId;
@@ -155,7 +188,7 @@ export class OrderRepository implements IOrderRepository {
         const product = await this.getProductSnapshot(connection, item.productId);
         await this.decrementInventory(connection, item.productId, item.variantId, item.quantity);
         await connection.execute(
-          `INSERT INTO order_details (order_id, product_id, variant_id, product_name, price, quantity, subtotal, created_at) 
+          `INSERT INTO order_details (order_id, product_id, variant_id, product_name, price, quantity, subtotal, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           [orderId, item.productId, item.variantId || null, product.name, item.price, item.quantity, item.price * item.quantity, now]
         );
@@ -208,6 +241,18 @@ export class OrderRepository implements IOrderRepository {
       await this.appendEventWithConnection(connection, {
         orderId: input.orderId, eventType: 'status_changed', fromStatus: input.currentStatus, toStatus: input.nextStatus, actorUserId: input.actorUserId, actorRole: input.actorRole, note: input.note
       });
+
+      // Cập nhật sold_quantity khi đơn hoàn thành
+      if (input.nextStatus === 'completed') {
+        const details = await this.getOrderDetailsWithExecutor(connection, input.orderId);
+        for (const d of details) {
+          await connection.execute(
+            'UPDATE products SET sold_quantity = sold_quantity + ? WHERE product_id = ?',
+            [d.quantity, d.productId]
+          );
+        }
+      }
+
       await connection.commit();
       return this.findById(input.orderId);
     } catch (error) { await connection.rollback(); throw error; } finally { connection.release(); }
@@ -235,38 +280,81 @@ export class OrderRepository implements IOrderRepository {
 
   // --- STATS ---
   async getStats(): Promise<OrderStats> {
+    // 1. Tổng quan
     const [[summary]] = await pool.execute<RowDataPacket[]>(
-      `SELECT COUNT(*) AS total_orders, COALESCE(SUM(total), 0) AS total_revenue,
-        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending_count,
-        SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) AS delivered_count,
-        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_count
+      `SELECT
+        COUNT(*) AS total_orders,
+        COALESCE(SUM(total), 0) AS total_revenue,
+        COALESCE(SUM(CASE WHEN MONTH(order_date) = MONTH(NOW()) AND YEAR(order_date) = YEAR(NOW()) THEN total ELSE 0 END), 0) AS revenue_this_month,
+        COALESCE(SUM(CASE WHEN DATE(order_date) = CURDATE() THEN total ELSE 0 END), 0) AS revenue_today,
+        SUM(CASE WHEN DATE(order_date) = CURDATE() THEN 1 ELSE 0 END) AS orders_today
        FROM orders WHERE deleted_at IS NULL`
     );
+
+    // 2. Đếm theo từng status
+    const [statusRows] = await pool.execute<RowDataPacket[]>(
+      `SELECT status, COUNT(*) AS cnt FROM orders WHERE deleted_at IS NULL GROUP BY status`
+    );
+    const ordersByStatus: Record<string, number> = {
+      pending: 0, confirmed: 0, shipping: 0, delivered: 0, completed: 0, cancelled: 0, returned: 0,
+    };
+    for (const r of statusRows) {
+      ordersByStatus[r.status] = Number(r.cnt);
+    }
+
+    // 3. Đếm theo payment method
+    const [pmRows] = await pool.execute<RowDataPacket[]>(
+      `SELECT payment_method, COUNT(*) AS cnt FROM orders WHERE deleted_at IS NULL GROUP BY payment_method`
+    );
+    const paymentMethodStats: Record<string, number> = {};
+    for (const r of pmRows) {
+      paymentMethodStats[r.payment_method] = Number(r.cnt);
+    }
+
+    // 4. Đơn hàng mới nhất (10 đơn)
+    const [recentRows] = await pool.execute<RowDataPacket[]>(
+      `SELECT o.order_id, o.order_code, o.total, o.status, o.payment_method, o.payment_status, o.order_date,
+              o.shipping_name, o.shipping_phone
+       FROM orders o WHERE o.deleted_at IS NULL
+       ORDER BY o.order_date DESC LIMIT 10`
+    );
+    const recentOrders = recentRows.map((r: any) => ({
+      orderId: r.order_id,
+      orderCode: r.order_code,
+      totalAmount: parseFloat(r.total),
+      status: r.status,
+      paymentMethod: r.payment_method,
+      paymentStatus: r.payment_status,
+      shippingName: r.shipping_name,
+      shippingPhone: r.shipping_phone,
+      createdAt: r.order_date,
+    }));
+
+    // 5. Doanh thu 7 ngày gần nhất
+    const [dailyRows] = await pool.execute<RowDataPacket[]>(
+      `SELECT DATE(order_date) AS date, COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS order_count
+       FROM orders WHERE deleted_at IS NULL AND order_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+       GROUP BY DATE(order_date) ORDER BY date ASC`
+    );
+    const revenueByDay = dailyRows.map((r: any) => ({
+      date: r.date,
+      revenue: parseFloat(r.revenue),
+      orderCount: Number(r.order_count),
+    }));
+
     const totalOrders = Number(summary.total_orders) || 0;
     return {
       totalOrders,
       totalRevenue: parseFloat(summary.total_revenue),
-      revenueThisMonth: 0,
-      avgOrderValue:
-        totalOrders > 0 ? parseFloat(summary.total_revenue) / totalOrders : 0,
-      ordersByStatus: {
-        pending: Number(summary.pending_count),
-        confirmed: 0,
-        shipping: 0,
-        delivered: Number(summary.delivered_count),
-        cancelled: 0,
-        returned: 0,
-        completed: Number(summary.completed_count),
-      },
-      paymentMethodStats: {
-        cod: 0,
-        bank_transfer: 0,
-        momo: 0,
-        vnpay: 0,
-        zalopay: 0,
-      },
-      recentOrders: [],
-    };
+      revenueThisMonth: parseFloat(summary.revenue_this_month),
+      revenueToday: parseFloat(summary.revenue_today || 0),
+      ordersToday: Number(summary.orders_today || 0),
+      avgOrderValue: totalOrders > 0 ? parseFloat(summary.total_revenue) / totalOrders : 0,
+      ordersByStatus,
+      paymentMethodStats,
+      recentOrders,
+      revenueByDay,
+    } as any;
   }
 
   // --- RETURN LOGIC ---
@@ -605,7 +693,7 @@ export class OrderRepository implements IOrderRepository {
   }
 
   private async appendEventWithConnection(connection: PoolConnection, input: any) {
-    await connection.execute('INSERT INTO order_events (order_id, event_type, to_status, actor_user_id, actor_role, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', 
+    await connection.execute('INSERT INTO order_events (order_id, event_type, to_status, actor_user_id, actor_role, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [input.orderId, input.eventType, input.toStatus || null, input.actorUserId, input.actorRole, input.note || null, new Date()]);
   }
 

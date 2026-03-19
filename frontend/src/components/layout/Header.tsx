@@ -132,40 +132,61 @@ export const Header = () => {
                 
                 {isUserMenuOpen && (
                   <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-2xl py-2 border border-gray-100 animate-in fade-in zoom-in duration-150">
-                    <Link
-                      to="/profile"
-                      onClick={() => setIsUserMenuOpen(false)}
-                      className="block px-5 py-3 text-xs font-bold text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors uppercase"
-                    >
-                      Thông tin cá nhân
-                    </Link>
-                    <Link
-                      to="/orders"
-                      onClick={() => setIsUserMenuOpen(false)}
-                      className="block px-5 py-3 text-xs font-bold text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors uppercase"
-                    >
-                      Đơn hàng của tôi
-                    </Link>
-                    <Link
-                      to="/wallet"
-                      onClick={() => setIsUserMenuOpen(false)}
-                      className="flex items-center justify-between px-5 py-3 text-xs font-bold text-orange-600 hover:bg-orange-50 transition-colors"
-                    >
-                      <span className="flex items-center gap-2 uppercase">
-                        <Wallet className="h-3.5 w-3.5" />
-                        Ví TechMart
-                      </span>
-                      <span className="font-black">
-                        {(user?.walletBalance ?? 0).toLocaleString('vi-VN')}₫
-                      </span>
-                    </Link>
-                    <div className="border-t border-gray-50 my-1"></div>
-                    <button
-                      onClick={handleLogout}
-                      className="block w-full text-left px-5 py-3 text-xs font-black text-red-600 hover:bg-red-50 transition-colors uppercase"
-                    >
-                      Đăng xuất
-                    </button>
+                    {user?.role === 'admin' || user?.role === 'staff' || user?.role === 'warehouse' ? (
+                      <>
+                        <Link
+                          to="/admin"
+                          onClick={() => setIsUserMenuOpen(false)}
+                          className="block px-5 py-3 text-xs font-bold text-blue-700 hover:bg-blue-50 hover:text-blue-600 transition-colors uppercase"
+                        >
+                          Trang quản trị
+                        </Link>
+                        <div className="border-t border-gray-50 my-1"></div>
+                        <button
+                          onClick={handleLogout}
+                          className="block w-full text-left px-5 py-3 text-xs font-black text-red-600 hover:bg-red-50 transition-colors uppercase"
+                        >
+                          Đăng xuất
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <Link
+                          to="/profile"
+                          onClick={() => setIsUserMenuOpen(false)}
+                          className="block px-5 py-3 text-xs font-bold text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors uppercase"
+                        >
+                          Thông tin cá nhân
+                        </Link>
+                        <Link
+                          to="/orders"
+                          onClick={() => setIsUserMenuOpen(false)}
+                          className="block px-5 py-3 text-xs font-bold text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors uppercase"
+                        >
+                          Đơn hàng của tôi
+                        </Link>
+                        <Link
+                          to="/wallet"
+                          onClick={() => setIsUserMenuOpen(false)}
+                          className="flex items-center justify-between px-5 py-3 text-xs font-bold text-orange-600 hover:bg-orange-50 transition-colors"
+                        >
+                          <span className="flex items-center gap-2 uppercase">
+                            <Wallet className="h-3.5 w-3.5" />
+                            Ví TechMart
+                          </span>
+                          <span className="font-black">
+                            {(user?.walletBalance ?? 0).toLocaleString('vi-VN')}₫
+                          </span>
+                        </Link>
+                        <div className="border-t border-gray-50 my-1"></div>
+                        <button
+                          onClick={handleLogout}
+                          className="block w-full text-left px-5 py-3 text-xs font-black text-red-600 hover:bg-red-50 transition-colors uppercase"
+                        >
+                          Đăng xuất
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
