@@ -1,0 +1,317 @@
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+import { Search, SlidersHorizontal, X } from "lucide-react";
+import { brandService, type Brand } from "@/services/brand.service";
+
+// ─── Filter config ───
+const FILTER_GROUPS: {
+  key: string;
+  label: string;
+  paramKey: string;
+  multi: boolean; // true = multi-select, false = single
+  options: { value: string; label: string }[];
+}[] = [
+  {
+    key: "price", label: "Mức giá", paramKey: "price", multi: false,
+    options: [
+      { value: "0-5000000", label: "Dưới 5 triệu" },
+      { value: "5000000-10000000", label: "5 - 10 triệu" },
+      { value: "10000000-20000000", label: "10 - 20 triệu" },
+      { value: "20000000-30000000", label: "20 - 30 triệu" },
+      { value: "30000000-", label: "Trên 30 triệu" },
+    ],
+  },
+  {
+    key: "chip", label: "Chip xử lí", paramKey: "chip", multi: true,
+    options: [
+      { value: "Snapdragon", label: "Snapdragon" },
+      { value: "Apple A", label: "Apple A" },
+      { value: "Dimensity", label: "Dimensity" },
+      { value: "Helio", label: "Helio" },
+      { value: "Exynos", label: "Exynos" },
+      { value: "Unisoc", label: "Unisoc" },
+    ],
+  },
+  {
+    key: "ram", label: "Dung lượng RAM", paramKey: "ram", multi: true,
+    options: [
+      { value: "3GB", label: "3 GB" },
+      { value: "4GB", label: "4 GB" },
+      { value: "6GB", label: "6 GB" },
+      { value: "8GB", label: "8 GB" },
+      { value: "12GB", label: "12 GB" },
+      { value: "16GB", label: "16 GB" },
+    ],
+  },
+  {
+    key: "storage", label: "Bộ nhớ trong", paramKey: "storage", multi: true,
+    options: [
+      { value: "64GB", label: "64 GB" },
+      { value: "128GB", label: "128 GB" },
+      { value: "256GB", label: "256 GB" },
+      { value: "512GB", label: "512 GB" },
+      { value: "1TB", label: "1 TB" },
+    ],
+  },
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+// tempFilters lưu dạng: { ram: "6GB,8GB", chip: "Snapdragon", price: "0-5000000" }
+const getValues = (csv: string): string[] => csv ? csv.split(",") : [];
+const toggleInCsv = (csv: string, value: string): string => {
+  const arr = getValues(csv);
+  const idx = arr.indexOf(value);
+  if (idx >= 0) arr.splice(idx, 1); else arr.push(value);
+  return arr.join(",");
+};
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+export const ProductsFilter = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchInput, setSearchInput] = useState(searchParams.get("search") || "");
+  const [showPanel, setShowPanel] = useState(false);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [tempFilters, setTempFilters] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    brandService.getAll()
+      .then(data => setBrands((data || []).filter((b: Brand) => b.isActive)))
+      .catch(() => {});
+  }, []);
+
+  // Sync tempFilters từ URL
+  useEffect(() => {
+    const current: Record<string, string> = {};
+    FILTER_GROUPS.forEach(g => {
+      if (g.key === "price") {
+        const min = searchParams.get("minPrice");
+        const max = searchParams.get("maxPrice");
+        if (min || max) current.price = `${min || "0"}-${max || ""}`;
+      } else {
+        const val = searchParams.get(g.paramKey);
+        if (val) current[g.paramKey] = val;
+      }
+    });
+    setTempFilters(current);
+  }, [searchParams]);
+
+  const brand = searchParams.get("brand") || "";
+
+  const realActiveCount = FILTER_GROUPS.filter(g => {
+    if (g.key === "price") return searchParams.get("minPrice") || searchParams.get("maxPrice");
+    return searchParams.get(g.paramKey);
+  }).length;
+
+  const updateParams = (updates: Record<string, string>) => {
+    const current: Record<string, string> = {};
+    searchParams.forEach((v, k) => { current[k] = v; });
+    const next = { ...current, ...updates, page: "1" };
+    Object.keys(next).forEach(k => { if (!next[k]) delete next[k]; });
+    setSearchParams(next);
+  };
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateParams({ search: searchInput });
+  };
+
+  // Toggle pill trong panel
+  const toggleTemp = (group: typeof FILTER_GROUPS[0], value: string) => {
+    setTempFilters(prev => {
+      const key = group.paramKey;
+      if (group.multi) {
+        return { ...prev, [key]: toggleInCsv(prev[key] || "", value) };
+      }
+      // single-select (price): toggle on/off
+      return { ...prev, [key]: prev[key] === value ? "" : value };
+    });
+  };
+
+  // Apply filters
+  const applyFilters = () => {
+    const updates: Record<string, string> = {};
+    FILTER_GROUPS.forEach(g => {
+      if (g.key === "price") {
+        const priceVal = tempFilters.price || "";
+        if (priceVal) {
+          const [min, max] = priceVal.split("-");
+          updates.minPrice = min || "";
+          updates.maxPrice = max || "";
+        } else {
+          updates.minPrice = "";
+          updates.maxPrice = "";
+        }
+        updates.price = "";
+      } else {
+        updates[g.paramKey] = tempFilters[g.paramKey] || "";
+      }
+    });
+    updateParams(updates);
+    setShowPanel(false);
+  };
+
+  // Reset panel
+  const resetFilters = () => {
+    setTempFilters({});
+  };
+
+  const clearAll = () => {
+    setSearchInput("");
+    setTempFilters({});
+    setSearchParams({ page: "1" });
+    setShowPanel(false);
+  };
+
+  const hasAnyFilter = brand || realActiveCount > 0 || searchParams.get("search");
+
+  return (
+    <div className="space-y-3">
+
+      {/* ── Search + Brand pills ── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-4">
+        <form onSubmit={handleSearch} className="flex gap-2 mb-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
+            <input value={searchInput} onChange={e => setSearchInput(e.target.value)}
+              placeholder="Tìm iPhone, Samsung, Xiaomi..."
+              className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm font-medium focus:outline-none focus:border-blue-400 focus:bg-white transition-all" />
+            {searchInput && (
+              <button type="button" onClick={() => { setSearchInput(""); updateParams({ search: "" }); }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <X size={15} />
+              </button>
+            )}
+          </div>
+          <button type="submit"
+            className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors">
+            Tìm
+          </button>
+        </form>
+
+        {/* Brand pills */}
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => updateParams({ brand: "" })}
+            className={`px-3.5 py-1.5 rounded-xl text-sm font-semibold border transition-all ${
+              !brand ? "border-blue-600 bg-blue-600 text-white" : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
+            }`}>
+            Tất cả
+          </button>
+          {brands.map(b => (
+            <button key={b.brandId} onClick={() => updateParams({ brand: brand === b.slug ? "" : b.slug! })}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-sm font-semibold border transition-all ${
+                brand === b.slug ? "border-blue-600 bg-blue-600 text-white" : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
+              }`}>
+              {b.logoUrl && <img src={b.logoUrl.startsWith('/') ? `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5001'}${b.logoUrl}` : b.logoUrl} alt="" className="w-4 h-4 object-contain" />}
+              {b.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Filter bar ── */}
+      <div className="bg-white rounded-2xl border border-gray-100 px-4 py-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={() => setShowPanel(p => !p)}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold border-2 transition-all ${
+              showPanel
+                ? "border-red-400 bg-red-50 text-red-600"
+                : realActiveCount > 0
+                  ? "border-blue-500 bg-blue-50 text-blue-700"
+                  : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+            }`}>
+            <SlidersHorizontal size={15} />
+            Bộ lọc
+            {realActiveCount > 0 && (
+              <span className="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-md font-bold">{realActiveCount}</span>
+            )}
+          </button>
+
+          {/* Active filter tags */}
+          {FILTER_GROUPS.map(g => {
+            let val = "";
+            if (g.key === "price") {
+              const min = searchParams.get("minPrice");
+              const max = searchParams.get("maxPrice");
+              if (min || max) val = `${min || "0"}-${max || ""}`;
+            } else {
+              val = searchParams.get(g.paramKey) || "";
+            }
+            if (!val) return null;
+
+            // Multi-value: hiện từng giá trị
+            const values = getValues(val);
+            const labels = values.map(v => g.options.find(o => o.value === v)?.label || v);
+
+            return (
+              <span key={g.key}
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold border border-blue-100">
+                {g.label}: {labels.join(", ")}
+                <button onClick={() => {
+                  if (g.key === "price") {
+                    updateParams({ minPrice: "", maxPrice: "", price: "" });
+                  } else {
+                    updateParams({ [g.paramKey]: "" });
+                  }
+                }}
+                  className="text-blue-400 hover:text-blue-700 ml-0.5">
+                  <X size={11} />
+                </button>
+              </span>
+            );
+          })}
+
+          {hasAnyFilter && (
+            <button onClick={clearAll}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-semibold text-red-500 border border-red-100 bg-red-50 hover:bg-red-100 transition-colors ml-auto">
+              <X size={13} /> Xóa lọc
+            </button>
+          )}
+        </div>
+
+        {/* ── Filter panel (CellphoneS style) ── */}
+        {showPanel && (
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {FILTER_GROUPS.map(g => {
+                const activeValues = getValues(tempFilters[g.paramKey] || "");
+                return (
+                  <div key={g.key}>
+                    <h4 className="text-sm font-bold text-gray-800 mb-2">{g.label}</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {g.options.map(opt => {
+                        const isActive = activeValues.includes(opt.value);
+                        return (
+                          <button key={opt.value}
+                            onClick={() => toggleTemp(g, opt.value)}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
+                              isActive
+                                ? "border-blue-500 bg-blue-50 text-blue-700"
+                                : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
+                            }`}>
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-3 mt-5 pt-4 border-t border-gray-100">
+              <button onClick={resetFilters}
+                className="flex-1 py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 transition-all">
+                Reset
+              </button>
+              <button onClick={applyFilters}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-all">
+                Xem kết quả
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

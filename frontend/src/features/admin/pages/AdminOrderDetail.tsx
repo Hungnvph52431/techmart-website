@@ -1,0 +1,713 @@
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import {
+  ArrowLeft,
+  RefreshCw,
+  ChevronRight,
+  Zap,
+  Package,
+  Clock,
+  CreditCard,
+  RotateCcw,
+  CheckCircle,
+  XCircle,
+  Truck,
+  AlertCircle,
+} from 'lucide-react';
+import { adminOrderService } from '@/services/admin/order.service';
+
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+
+const ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
+  pending: ['confirmed', 'cancelled'],
+  confirmed: ['shipping', 'cancelled'],
+  shipping: ['delivered'],
+  delivered: ['completed'],
+  completed: [],
+  cancelled: [],
+  returned: [],
+};
+
+// Chuỗi auto-process: bấm 1 nút đi thẳng đến completed
+const AUTO_PROCESS_CHAIN: Record<string, string[]> = {
+  pending: ['confirmed', 'shipping', 'delivered', 'completed'],
+  confirmed: ['shipping', 'delivered', 'completed'],
+  shipping: ['delivered', 'completed'],
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: 'Chờ xử lý',
+  confirmed: 'Đã xác nhận',
+  shipping: 'Đang giao',
+  delivered: 'Đã giao',
+  completed: 'Hoàn thành',
+  cancelled: 'Đã hủy',
+  returned: 'Đã hoàn/trả',
+};
+
+const STATUS_STYLES: Record<string, string> = {
+  pending: 'bg-amber-100 text-amber-800 border-amber-200',
+  confirmed: 'bg-sky-100 text-sky-800 border-sky-200',
+  shipping: 'bg-violet-100 text-violet-800 border-violet-200',
+  delivered: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  completed: 'bg-lime-100 text-lime-800 border-lime-200',
+  cancelled: 'bg-rose-100 text-rose-800 border-rose-200',
+  returned: 'bg-slate-100 text-slate-700 border-slate-200',
+};
+
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  pending: 'Chưa thanh toán',
+  paid: 'Đã thanh toán',
+  failed: 'Thất bại',
+  refunded: 'Đã hoàn tiền',
+};
+
+const PAYMENT_STATUS_TRANSITIONS: Record<string, string[]> = {
+  pending: ['paid', 'failed'],
+  paid: [],
+  failed: ['pending'],
+  refunded: [],
+};
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  cod: 'Ship COD',
+  online: 'Chuyển khoản / QR',
+};
+
+const RETURN_STATUS_LABELS: Record<string, string> = {
+  requested: 'Chờ duyệt',
+  approved: 'Đã duyệt',
+  rejected: 'Từ chối',
+  received: 'Đã nhận hàng',
+  refunded: 'Đã hoàn tiền',
+  closed: 'Đã đóng',
+};
+
+const RETURN_STATUS_STYLES: Record<string, string> = {
+  requested: 'bg-amber-100 text-amber-800',
+  approved: 'bg-sky-100 text-sky-800',
+  rejected: 'bg-rose-100 text-rose-800',
+  received: 'bg-violet-100 text-violet-800',
+  refunded: 'bg-emerald-100 text-emerald-800',
+  closed: 'bg-slate-100 text-slate-600',
+};
+
+const EVENT_LABELS: Record<string, string> = {
+  order_created: 'Đơn hàng được tạo',
+  status_changed: 'Thay đổi trạng thái',
+  payment_received: 'Nhận thanh toán',
+  payment_refunded: 'Hoàn tiền',
+  order_cancelled: 'Đơn hàng bị hủy',
+  return_requested: 'Yêu cầu hoàn trả',
+  return_approved: 'Duyệt hoàn trả',
+  return_rejected: 'Từ chối hoàn trả',
+  return_received: 'Đã nhận hàng hoàn trả',
+  return_refunded: 'Hoàn tiền thành công',
+};
+
+const fmt = (n: number) => n?.toLocaleString('vi-VN') + '₫';
+const fmtDate = (d: string) =>
+  d ? new Date(d).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+
+// ─── COMPONENT ────────────────────────────────────────────────────────────────
+
+export const AdminOrderDetail = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const orderId = Number(id);
+
+  const [detail, setDetail] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState<string | null>(null);
+
+  // Confirm dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    show: boolean;
+    type: 'status' | 'payment' | 'auto';
+    nextValue: string;
+    label: string;
+  }>({ show: false, type: 'status', nextValue: '', label: '' });
+
+  // Return modal state
+  const [returnModal, setReturnModal] = useState<{
+    type: 'review' | 'receive' | 'refund' | 'close' | null;
+    returnId: number | null;
+    adminNote: string;
+  }>({ type: null, returnId: null, adminNote: '' });
+
+  const loadDetail = async () => {
+    try {
+      setLoading(true);
+      const [detailData, timelineData, returnsData] = await Promise.allSettled([
+        adminOrderService.getById(orderId),
+        adminOrderService.getTimeline(orderId),
+        adminOrderService.getReturns(orderId),
+      ]);
+
+      const base = detailData.status === 'fulfilled' ? detailData.value : null;
+      if (!base) {
+        toast.error('Không tìm thấy đơn hàng');
+        navigate('/admin/orders');
+        return;
+      }
+
+      setDetail({
+        ...base,
+        timeline: timelineData.status === 'fulfilled' ? timelineData.value : [],
+        returns: returnsData.status === 'fulfilled' ? returnsData.value : [],
+      });
+    } catch {
+      toast.error('Lỗi tải chi tiết đơn hàng');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadDetail();
+  }, [orderId]);
+
+  // ── Đổi trạng thái đơn ──────────────────────────────────────────────────────
+  const handleUpdateStatus = async (nextStatus: string, note?: string) => {
+    try {
+      setSubmitting('status');
+      await adminOrderService.updateStatus(orderId, nextStatus as any, note);
+      toast.success(`Chuyển sang: ${STATUS_LABELS[nextStatus]}`);
+      await loadDetail();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Cập nhật thất bại');
+    } finally {
+      setSubmitting(null);
+    }
+  };
+
+  // ── Auto process: chạy qua từng bước đến delivered ──────────────────────────
+  const handleAutoProcess = async () => {
+    const chain = AUTO_PROCESS_CHAIN[detail?.order?.status];
+    if (!chain?.length) return;
+
+    try {
+      setSubmitting('auto');
+      for (const step of chain) {
+        await adminOrderService.updateStatus(orderId, step as any);
+        await new Promise((r) => setTimeout(r, 300));
+      }
+      toast.success('Đã xử lý đơn hàng thành công!');
+      await loadDetail();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Xử lý tự động thất bại');
+    } finally {
+      setSubmitting(null);
+    }
+  };
+
+  // ── Đổi trạng thái thanh toán ────────────────────────────────────────────────
+  const handleUpdatePayment = async (nextStatus: string) => {
+    try {
+      setSubmitting('payment');
+      await adminOrderService.updatePaymentStatus(orderId, nextStatus as any);
+      toast.success(`Thanh toán: ${PAYMENT_STATUS_LABELS[nextStatus]}`);
+      await loadDetail();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Cập nhật thanh toán thất bại');
+    } finally {
+      setSubmitting(null);
+    }
+  };
+
+  // ── Xử lý hoàn trả ──────────────────────────────────────────────────────────
+  const handleReturnAction = async () => {
+    const { type, returnId, adminNote } = returnModal;
+    if (!type || !returnId) return;
+
+    try {
+      setSubmitting('return');
+      const payload = { adminNote: adminNote.trim() || undefined };
+
+      if (type === 'review') {
+        // Không dùng ở đây, dùng reviewReturn riêng
+      } else if (type === 'receive') {
+        await adminOrderService.receiveReturn(orderId, returnId, payload);
+        toast.success('Đã xác nhận nhận hàng hoàn trả');
+      } else if (type === 'refund') {
+        await adminOrderService.refundReturn(orderId, returnId, payload);
+        toast.success('Đã hoàn tiền thành công');
+      } else if (type === 'close') {
+        await adminOrderService.closeReturn(orderId, returnId, payload);
+        toast.success('Đã đóng yêu cầu hoàn trả');
+      }
+
+      setReturnModal({ type: null, returnId: null, adminNote: '' });
+      await loadDetail();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Thao tác thất bại');
+    } finally {
+      setSubmitting(null);
+    }
+  };
+
+  const handleReviewReturn = async (returnId: number, decision: 'approved' | 'rejected', note?: string) => {
+    try {
+      setSubmitting(`review-${returnId}`);
+      await adminOrderService.reviewReturn(orderId, returnId, { decision, adminNote: note });
+      toast.success(decision === 'approved' ? 'Đã duyệt yêu cầu hoàn trả' : 'Đã từ chối yêu cầu hoàn trả');
+      await loadDetail();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Thao tác thất bại');
+    } finally {
+      setSubmitting(null);
+    }
+  };
+
+  // ── Loading / Not found ──────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="text-xl font-black text-blue-600 uppercase italic animate-pulse">
+          Đang tải đơn hàng...
+        </div>
+      </div>
+    );
+  }
+
+  if (!detail) return null;
+
+  const order = detail.order || detail;
+  const items = detail.items || [];
+  const timeline: any[] = detail.timeline || [];
+  const returns: any[] = detail.returns || [];
+
+  const allowedStatuses = ORDER_STATUS_TRANSITIONS[order.status] || [];
+  const allowedPayments = PAYMENT_STATUS_TRANSITIONS[order.paymentStatus] || [];
+  const canAutoProcess = !!AUTO_PROCESS_CHAIN[order.status];
+
+  return (
+    <div className="space-y-6">
+      {/* HEADER */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <button
+            onClick={() => navigate('/admin/orders')}
+            className="inline-flex items-center gap-2 text-sm font-bold text-gray-400 hover:text-gray-700 transition-colors"
+          >
+            <ArrowLeft size={16} /> Quay lại danh sách
+          </button>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-black text-gray-800 uppercase italic tracking-tight">
+              #{order.orderCode}
+            </h1>
+            <span className={`px-3 py-1 rounded-full text-xs font-black uppercase border ${STATUS_STYLES[order.status]}`}>
+              {STATUS_LABELS[order.status]}
+            </span>
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600 border border-gray-200">
+              {PAYMENT_METHOD_LABELS[order.paymentMethod] || order.paymentMethod}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-gray-400 font-bold uppercase">
+            Đặt lúc {fmtDate(order.orderDate || order.createdAt)}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={loadDetail}
+            disabled={!!submitting}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          >
+            <RefreshCw size={15} className={submitting ? 'animate-spin' : ''} />
+            Làm mới
+          </button>
+
+          {/* NÚT AUTO PROCESS */}
+          {canAutoProcess && (
+            <button
+              onClick={() => setConfirmDialog({ show: true, type: 'auto', nextValue: 'auto', label: 'Xử lý nhanh → Hoàn thành' })}
+              disabled={!!submitting}
+              className="inline-flex items-center gap-2 px-5 py-2 bg-blue-600 rounded-xl text-sm font-black text-white uppercase hover:bg-blue-700 disabled:opacity-60 shadow-lg shadow-blue-200"
+            >
+              <Zap size={15} />
+              {submitting === 'auto' ? 'Đang xử lý...' : 'Xử lý nhanh → Hoàn thành'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_380px]">
+        {/* CỘT TRÁI */}
+        <div className="space-y-6">
+
+          {/* SẢN PHẨM */}
+          <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-50">
+              <h2 className="font-black text-gray-800 uppercase text-sm tracking-wider flex items-center gap-2">
+                <Package size={16} className="text-blue-500" /> Sản phẩm trong đơn
+              </h2>
+              <span className="text-sm font-black text-red-500">{fmt(order.total || order.totalAmount)}</span>
+            </div>
+            <div className="divide-y divide-gray-50">
+              {items.length > 0 ? items.map((item: any) => (
+                <div key={item.orderDetailId} className="flex gap-4 px-6 py-4">
+                  <img
+                    src={item.productImage || '/placeholder.jpg'}
+                    alt={item.productName}
+                    className="h-16 w-16 rounded-xl object-cover bg-gray-100 flex-shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-gray-800 truncate">{item.productName}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{item.variantName || item.sku || `SKU #${item.productId}`}</p>
+                    <p className="text-xs text-gray-500 mt-1">SL: {item.quantity} × {fmt(item.price)}</p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="font-black text-gray-800">{fmt(item.subtotal)}</p>
+                  </div>
+                </div>
+              )) : (
+                <div className="px-6 py-8 text-center text-sm text-gray-400">Không có dữ liệu sản phẩm</div>
+              )}
+            </div>
+            {/* Tổng kết */}
+            <div className="px-6 py-4 bg-gray-50 space-y-2 text-sm">
+              <div className="flex justify-between text-gray-500">
+                <span>Tạm tính</span><span>{fmt(order.subtotal)}</span>
+              </div>
+              <div className="flex justify-between text-gray-500">
+                <span>Phí vận chuyển</span><span>{fmt(order.shippingFee)}</span>
+              </div>
+              {order.discountAmount > 0 && (
+                <div className="flex justify-between text-emerald-600">
+                  <span>Giảm giá</span><span>- {fmt(order.discountAmount)}</span>
+                </div>
+              )}
+              <div className="flex justify-between font-black text-gray-800 text-base border-t border-gray-200 pt-2 mt-2">
+                <span>Tổng cộng</span><span className="text-red-600">{fmt(order.total || order.totalAmount)}</span>
+              </div>
+            </div>
+          </section>
+
+          {/* TIMELINE */}
+          <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-50">
+              <h2 className="font-black text-gray-800 uppercase text-sm tracking-wider flex items-center gap-2">
+                <Clock size={16} className="text-violet-500" /> Lịch sử xử lý
+              </h2>
+            </div>
+            <div className="px-6 py-4 space-y-4">
+              {timeline.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-4">Chưa có sự kiện nào</p>
+              ) : timeline.map((event: any, i: number) => (
+                <div key={event.orderEventId || i} className="flex gap-4">
+                  <div className="flex flex-col items-center">
+                    <div className="h-3 w-3 rounded-full bg-slate-800 mt-1 flex-shrink-0" />
+                    {i < timeline.length - 1 && <div className="w-px flex-1 bg-gray-100 mt-1" />}
+                  </div>
+                  <div className="pb-4 min-w-0">
+                    <p className="font-bold text-gray-800 text-sm">
+                      {EVENT_LABELS[event.eventType] || event.eventType}
+                    </p>
+                    {(event.fromStatus || event.toStatus) && (
+                      <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+                        {event.fromStatus && <span className="font-medium">{STATUS_LABELS[event.fromStatus] || event.fromStatus}</span>}
+                        {event.fromStatus && event.toStatus && <ChevronRight size={10} />}
+                        {event.toStatus && <span className="font-medium text-blue-600">{STATUS_LABELS[event.toStatus] || event.toStatus}</span>}
+                      </p>
+                    )}
+                    {event.note && <p className="text-xs text-gray-500 mt-0.5 italic">"{event.note}"</p>}
+                    <p className="text-[10px] text-gray-400 mt-1">{fmtDate(event.createdAt)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* HOÀN TRẢ */}
+          {returns.length > 0 && (
+            <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-50">
+                <h2 className="font-black text-gray-800 uppercase text-sm tracking-wider flex items-center gap-2">
+                  <RotateCcw size={16} className="text-rose-500" /> Yêu cầu hoàn/trả hàng
+                </h2>
+              </div>
+              <div className="divide-y divide-gray-50">
+                {returns.map((ret: any) => (
+                  <div key={ret.orderReturnId} className="p-6 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="font-black text-gray-800">{ret.requestCode}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">Yêu cầu lúc {fmtDate(ret.requestedAt)}</p>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-black uppercase ${RETURN_STATUS_STYLES[ret.status]}`}>
+                        {RETURN_STATUS_LABELS[ret.status]}
+                      </span>
+                    </div>
+
+                    <p className="text-sm text-gray-600">
+                      <span className="font-bold text-gray-800">Lý do:</span> {ret.reason}
+                    </p>
+
+                    {ret.items?.length > 0 && (
+                      <div className="space-y-2">
+                        {ret.items.map((item: any) => (
+                          <div key={item.orderReturnItemId} className="text-xs text-gray-600 bg-gray-50 rounded-xl px-3 py-2">
+                            <span className="font-bold">{item.productName || `SP #${item.productId}`}</span>
+                            {' '} — SL: {item.quantity}
+                            {item.reason && ` | ${item.reason}`}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Ảnh bằng chứng từ khách hàng */}
+                    {ret.evidenceImages?.length > 0 && (
+                      <div>
+                        <p className="text-xs font-bold text-gray-500 mb-1.5">Ảnh bằng chứng ({ret.evidenceImages.length}):</p>
+                        <div className="flex flex-wrap gap-2">
+                          {ret.evidenceImages.map((img: string, idx: number) => (
+                            <a key={idx} href={img} target="_blank" rel="noopener noreferrer"
+                              className="block w-20 h-20 rounded-xl overflow-hidden border-2 border-gray-100 hover:border-blue-400 transition-colors">
+                              <img src={img} alt={`evidence-${idx}`} className="w-full h-full object-cover" />
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ACTION BUTTONS theo trạng thái */}
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {ret.status === 'requested' && (
+                        <>
+                          <button
+                            onClick={() => handleReviewReturn(ret.orderReturnId, 'approved')}
+                            disabled={!!submitting}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase hover:bg-emerald-700 disabled:opacity-60"
+                          >
+                            <CheckCircle size={13} /> Duyệt
+                          </button>
+                          <button
+                            onClick={() => handleReviewReturn(ret.orderReturnId, 'rejected')}
+                            disabled={!!submitting}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-black uppercase hover:bg-rose-700 disabled:opacity-60"
+                          >
+                            <XCircle size={13} /> Từ chối
+                          </button>
+                        </>
+                      )}
+                      {ret.status === 'approved' && (
+                        <button
+                          onClick={() => setReturnModal({ type: 'receive', returnId: ret.orderReturnId, adminNote: '' })}
+                          disabled={!!submitting}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 bg-violet-600 text-white rounded-xl text-xs font-black uppercase hover:bg-violet-700 disabled:opacity-60"
+                        >
+                          <Truck size={13} /> Xác nhận nhận hàng
+                        </button>
+                      )}
+                      {ret.status === 'received' && (
+                        <button
+                          onClick={() => setReturnModal({ type: 'refund', returnId: ret.orderReturnId, adminNote: '' })}
+                          disabled={!!submitting}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-black uppercase hover:bg-blue-700 disabled:opacity-60"
+                        >
+                          <CreditCard size={13} /> Hoàn tiền
+                        </button>
+                      )}
+                      {(ret.status === 'refunded' || ret.status === 'rejected') && ret.status !== 'closed' && (
+                        <button
+                          onClick={() => setReturnModal({ type: 'close', returnId: ret.orderReturnId, adminNote: '' })}
+                          disabled={!!submitting}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-600 text-white rounded-xl text-xs font-black uppercase hover:bg-slate-700 disabled:opacity-60"
+                        >
+                          <AlertCircle size={13} /> Đóng yêu cầu
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+
+        {/* CỘT PHẢI */}
+        <div className="space-y-6">
+
+          {/* ĐỔI TRẠNG THÁI ĐƠN */}
+          <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+            <h2 className="font-black text-gray-800 uppercase text-sm tracking-wider">
+              Trạng thái đơn hàng:{' '}
+              <span className={`inline-block px-3 py-1 rounded-full text-xs font-black uppercase align-middle ${STATUS_STYLES[order.status]}`}>
+                {STATUS_LABELS[order.status]}
+              </span>
+            </h2>
+            {allowedStatuses.length > 0 ? (
+              <div className="space-y-2 pt-2 border-t border-gray-50">
+                <p className="text-[10px] font-bold text-gray-400 uppercase">Chuyển sang:</p>
+                {allowedStatuses.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setConfirmDialog({ show: true, type: 'status', nextValue: s, label: STATUS_LABELS[s] })}
+                    disabled={!!submitting}
+                    className={`w-full px-4 py-2.5 rounded-xl text-sm font-black uppercase border transition-all disabled:opacity-60 hover:shadow-sm ${STATUS_STYLES[s]}`}
+                  >
+                    {submitting === 'status' ? 'Đang xử lý...' : STATUS_LABELS[s]}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 text-center italic pt-2 border-t border-gray-50">Trạng thái cuối — không thể thay đổi</p>
+            )}
+          </section>
+
+          {/* ĐỔI TRẠNG THÁI THANH TOÁN */}
+          <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+            <h2 className="font-black text-gray-800 uppercase text-sm tracking-wider flex items-center gap-2">
+              <CreditCard size={15} className="text-emerald-500" /> Thanh toán
+            </h2>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-gray-500">Phương thức</span>
+              <span className="font-bold text-gray-800">{PAYMENT_METHOD_LABELS[order.paymentMethod] || order.paymentMethod}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-gray-500">Trạng thái</span>
+              <span className={`px-2.5 py-1 rounded-full text-xs font-black ${
+                order.paymentStatus === 'paid' ? 'bg-emerald-100 text-emerald-800' :
+                order.paymentStatus === 'refunded' ? 'bg-blue-100 text-blue-800' :
+                order.paymentStatus === 'failed' ? 'bg-rose-100 text-rose-800' :
+                'bg-amber-100 text-amber-800'
+              }`}>
+                {PAYMENT_STATUS_LABELS[order.paymentStatus] || order.paymentStatus}
+              </span>
+            </div>
+            {allowedPayments.length > 0 && (
+              <div className="space-y-2 pt-1 border-t border-gray-50">
+                <p className="text-[10px] font-bold text-gray-400 uppercase">Cập nhật:</p>
+                <div className="flex flex-wrap gap-2">
+                  {allowedPayments.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setConfirmDialog({ show: true, type: 'payment', nextValue: s, label: PAYMENT_STATUS_LABELS[s] })}
+                      disabled={!!submitting}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-700 bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-all disabled:opacity-60"
+                    >
+                      <ChevronRight size={12} />
+                      {PAYMENT_STATUS_LABELS[s]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* THÔNG TIN GIAO HÀNG */}
+          <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-3">
+            <h2 className="font-black text-gray-800 uppercase text-sm tracking-wider">Thông tin giao hàng</h2>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Người nhận</span>
+                <span className="font-bold text-gray-800">{order.shipping?.name || order.shippingName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Điện thoại</span>
+                <span className="font-bold text-gray-800">{order.shipping?.phone || order.shippingPhone}</span>
+              </div>
+              <div className="pt-1">
+                <p className="text-gray-500 mb-1">Địa chỉ</p>
+                <p className="font-medium text-gray-700 text-xs leading-relaxed">
+                  {order.shipping?.fullAddress || order.shippingAddress || '—'}
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* GHI CHÚ */}
+          {(order.customerNote || order.cancelReason) && (
+            <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-3">
+              <h2 className="font-black text-gray-800 uppercase text-sm tracking-wider">Ghi chú</h2>
+              {order.customerNote && (
+                <p className="text-sm text-gray-600">
+                  <span className="font-bold text-gray-800">Khách hàng:</span> {order.customerNote}
+                </p>
+              )}
+              {order.cancelReason && (
+                <p className="text-sm text-rose-600">
+                  <span className="font-bold">Lý do hủy:</span> {order.cancelReason}
+                </p>
+              )}
+            </section>
+          )}
+        </div>
+      </div>
+
+      {/* MODAL XÁC NHẬN CHUYỂN TRẠNG THÁI */}
+      {confirmDialog.show && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <h3 className="font-black text-gray-800 text-lg">Xác nhận thay đổi</h3>
+            <p className="text-sm text-gray-600">
+              Bạn có muốn chuyển {confirmDialog.type === 'payment' ? 'trạng thái thanh toán' : 'trạng thái đơn hàng'} sang{' '}
+              <span className="font-bold text-blue-600">{confirmDialog.label}</span> không?
+            </p>
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                onClick={() => setConfirmDialog({ show: false, type: 'status', nextValue: '', label: '' })}
+                className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={async () => {
+                  setConfirmDialog({ show: false, type: 'status', nextValue: '', label: '' });
+                  if (confirmDialog.type === 'auto') {
+                    await handleAutoProcess();
+                  } else if (confirmDialog.type === 'payment') {
+                    await handleUpdatePayment(confirmDialog.nextValue);
+                  } else {
+                    await handleUpdateStatus(confirmDialog.nextValue);
+                  }
+                }}
+                disabled={!!submitting}
+                className="px-5 py-2 rounded-xl bg-blue-600 text-white text-sm font-black hover:bg-blue-700 disabled:opacity-60"
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL XÁC NHẬN ACTION HOÀN TRẢ */}
+      {returnModal.type && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+            <h3 className="font-black text-gray-800 text-lg uppercase">
+              {returnModal.type === 'receive' && 'Xác nhận nhận hàng hoàn trả'}
+              {returnModal.type === 'refund' && 'Xác nhận hoàn tiền'}
+              {returnModal.type === 'close' && 'Đóng yêu cầu hoàn trả'}
+            </h3>
+            <textarea
+              value={returnModal.adminNote}
+              onChange={(e) => setReturnModal((prev) => ({ ...prev, adminNote: e.target.value }))}
+              rows={3}
+              placeholder="Ghi chú admin (tùy chọn)..."
+              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-blue-400 focus:outline-none"
+            />
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setReturnModal({ type: null, returnId: null, adminNote: '' })}
+                className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleReturnAction}
+                disabled={submitting === 'return'}
+                className="px-5 py-2 rounded-xl bg-blue-600 text-white text-sm font-black uppercase hover:bg-blue-700 disabled:opacity-60"
+              >
+                {submitting === 'return' ? 'Đang xử lý...' : 'Xác nhận'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
