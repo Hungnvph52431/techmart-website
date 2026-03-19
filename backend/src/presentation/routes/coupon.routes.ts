@@ -5,6 +5,9 @@ import { authMiddleware, adminMiddleware } from '../middlewares/auth.middleware'
 export const createCouponRoutes = (couponController: CouponController) => {
     const router = Router();
 
+    // Public: lấy danh sách coupon khả dụng
+    router.get('/available', couponController.getAvailable);
+
     // Public: validate coupon (authenticated users)
     router.post('/validate', authMiddleware, couponController.validate);
 

@@ -71,15 +71,17 @@ export class CategoryUseCase {
   }
 
   async deleteCategory(categoryId: number) {
-    // Giữ lại logic kiểm tra ràng buộc của Khanh để tránh lỗi DB
+    // Không cho xóa nếu còn danh mục con
     const hasChildren = await this.categoryRepository.hasChildren(categoryId);
     if (hasChildren) {
       throw new Error('Category still has child categories');
     }
 
+    // Nếu còn sản phẩm → chuyển sang danh mục "Không xác định" thay vì chặn
     const hasProducts = await this.categoryRepository.hasProducts(categoryId);
     if (hasProducts) {
-      throw new Error('Category still has products');
+      const uncategorized = await this.categoryRepository.findOrCreateUncategorized();
+      await this.categoryRepository.moveProductsToCategory(categoryId, uncategorized.categoryId);
     }
 
     return this.categoryRepository.delete(categoryId);

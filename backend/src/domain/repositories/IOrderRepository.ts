@@ -27,9 +27,9 @@ export interface OrderStats {
   ordersByStatus: {
     pending: number;
     confirmed: number;
-    processing: number;
     shipping: number;
     delivered: number;
+    completed: number;
     cancelled: number;
     returned: number;
   };
@@ -78,6 +78,7 @@ export interface IOrderRepository {
   cancel(input: CancelOrderDTO): Promise<Order | null>;
   
   // 6. Quản lý Đổi/Trả (Returns)
+  listAllReturns(filters?: { status?: string }): Promise<OrderReturn[]>;
   listReturns(orderId: number): Promise<OrderReturn[]>;
   getReturnById(orderId: number, orderReturnId: number): Promise<OrderReturn | null>;
   createReturn(input: CreateOrderReturnDTO): Promise<OrderReturn>;

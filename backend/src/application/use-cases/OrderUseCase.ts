@@ -13,7 +13,11 @@ import {
   canRequestReturn,
   getAllowedNextOrderStatuses,
   getAllowedNextPaymentStatuses,
-} from '../policies/OrderLifecycle'; // Đảm bảo Khanh đã có file Policy này
+  RETURN_DEADLINE_DAYS,
+} from '../policies/OrderLifecycle';
+import { sendPaymentSuccessEmail } from '../services/EmailService';
+import pool from '../../infrastructure/database/connection';
+import { RowDataPacket } from 'mysql2';
 
 export class OrderUseCase {
   constructor(
@@ -41,12 +45,12 @@ export class OrderUseCase {
   }
 
   async updateOrderPaymentStatus(
-    orderId: number,
-    paymentStatus: PaymentStatus,
-    actorUserId: number,
-    actorRole: OrderActorRole,
-    note?: string
-  ) {
+  orderId: number,
+  paymentStatus: PaymentStatus,
+  actorUserId: number | null,  // cho phép null
+  actorRole: OrderActorRole,
+  note?: string
+) {
     const order = await this.orderRepository.findById(orderId);
     if (!order) return null;
 
@@ -55,7 +59,7 @@ export class OrderUseCase {
       throw new Error(`Không thể chuyển trạng thái thanh toán từ ${order.paymentStatus} sang ${paymentStatus}`);
     }
 
-    return this.orderRepository.updatePaymentStatus({
+    const updated = await this.orderRepository.updatePaymentStatus({
       orderId,
       currentStatus: order.paymentStatus,
       nextStatus: paymentStatus,
@@ -63,6 +67,17 @@ export class OrderUseCase {
       actorRole,
       note,
     });
+
+    // Gửi email thông báo thanh toán thành công (không chặn flow chính)
+    if (updated && paymentStatus === 'paid') {
+      this.sendPaymentEmail(orderId).catch(() => {});
+    }
+
+    return updated;
+  }
+
+  async getAdminAllReturns(filters?: { status?: string }) {
+    return this.orderRepository.listAllReturns(filters);
   }
 
   async getOrderReturns(orderId: number, userId?: number) {
@@ -89,7 +104,12 @@ export class OrderUseCase {
     // Gọi repository để lấy chi tiết yêu cầu hoàn trả kèm danh sách sản phẩm
     return this.orderRepository.getReturnById(orderId, orderReturnId);
   }
- 
+  async getOrderById(orderId: number) {
+  return this.orderRepository.findById(orderId);
+}
+ async getOrderByCode(orderCode: string) {
+  return this.orderRepository.findByOrderCode(orderCode);
+}
   async receiveReturn(
     orderId: number,
     orderReturnId: number,
@@ -113,6 +133,7 @@ export class OrderUseCase {
     });
   }
 
+  // Fix #4: Validate status trước khi close
   async closeReturn(
     orderId: number,
     orderReturnId: number,
@@ -120,11 +141,11 @@ export class OrderUseCase {
     actorRole: OrderActorRole,
     adminNote?: string
   ) {
-    const aggregate = await this.orderRepository.findAdminDetail(orderId);
-    if (!aggregate) return null;
-
-    const orderReturn = aggregate.returns.find((item) => item.orderReturnId === orderReturnId);
+    const orderReturn = await this.orderRepository.getReturnById(orderId, orderReturnId);
     if (!orderReturn) return null;
+    if (!['refunded', 'rejected'].includes(orderReturn.status)) {
+      throw new Error('Chỉ có thể đóng yêu cầu đã hoàn tiền hoặc đã từ chối');
+    }
 
     return this.orderRepository.closeReturn({
       orderId,
@@ -182,7 +203,14 @@ export class OrderUseCase {
     }
 
     // Repository sẽ tự động thực hiện trừ kho trong Transaction
-    return this.orderRepository.create(orderData);
+    const newOrder = await this.orderRepository.create(orderData);
+
+    // Wallet payment → đã paid ngay → gửi email
+    if (orderData.paymentMethod === 'wallet' && newOrder) {
+      this.sendPaymentEmail(newOrder.orderId).catch(() => {});
+    }
+
+    return newOrder;
   }
 
   // --- QUẢN LÝ TRẠNG THÁI & HỦY ĐƠN ---
@@ -209,6 +237,52 @@ export class OrderUseCase {
       actorRole,
       note,
     });
+  }
+
+  async confirmDeliveredByCustomer(orderId: number, userId: number) {
+    const order = await this.orderRepository.findOwnedById(orderId, userId);
+    if (!order) return null;
+
+    // Đơn đang giao → chuyển shipping → delivered → completed (2 bước)
+    if (order.status === 'shipping') {
+      await this.orderRepository.transitionStatus({
+        orderId,
+        currentStatus: 'shipping',
+        nextStatus: 'delivered',
+        actorUserId: userId,
+        actorRole: 'customer',
+        note: 'Khách hàng xác nhận đã nhận hàng',
+      });
+      return this.orderRepository.transitionStatus({
+        orderId,
+        currentStatus: 'delivered',
+        nextStatus: 'completed',
+        actorUserId: userId,
+        actorRole: 'customer',
+        note: 'Tự động hoàn thành sau khi khách xác nhận nhận hàng',
+      });
+    }
+
+    // Đơn đã giao → chuyển thẳng sang completed
+    if (order.status === 'delivered') {
+      return this.orderRepository.transitionStatus({
+        orderId,
+        currentStatus: 'delivered',
+        nextStatus: 'completed',
+        actorUserId: userId,
+        actorRole: 'customer',
+        note: 'Khách hàng xác nhận đã nhận hàng',
+      });
+    }
+
+    // Đã completed rồi → trả về luôn
+    if (order.status === 'completed') {
+      return order;
+    }
+
+    throw new Error(
+      `Chỉ có thể xác nhận đã nhận hàng khi đơn đang giao hoặc đã giao (hiện tại: ${order.status})`
+    );
   }
 
   async cancelOrder(
@@ -249,21 +323,91 @@ export class OrderUseCase {
       throw new Error('Chỉ có thể yêu cầu trả hàng cho đơn đã giao thành công');
     }
 
+    // Fix #8: Kiểm tra thời hạn hoàn trả (N ngày kể từ ngày giao)
+    const deliveredAt = aggregate.order.deliveredAt;
+    if (deliveredAt) {
+      const deadline = new Date(deliveredAt);
+      deadline.setDate(deadline.getDate() + RETURN_DEADLINE_DAYS);
+      if (new Date() > deadline) {
+        throw new Error(`Đã quá thời hạn ${RETURN_DEADLINE_DAYS} ngày để yêu cầu hoàn trả`);
+      }
+    }
+
+    // Fix #2: Không cho tạo yêu cầu hoàn trả nếu đã có yêu cầu đang xử lý
+    const existingReturns = await this.orderRepository.listReturns(orderId);
+    const hasActiveReturn = existingReturns.some(
+      (r) => !['closed', 'rejected'].includes(r.status)
+    );
+    if (hasActiveReturn) {
+      throw new Error('Đơn hàng này đã có yêu cầu hoàn trả đang xử lý');
+    }
+
     return this.orderRepository.createReturn({
       orderId,
       requestedBy: userId,
       reason: payload.reason.trim(),
       customerNote: payload.customerNote?.trim(),
       items: payload.items,
+      evidenceImages: payload.evidenceImages,
     });
   }
 
   // Các hàm duyệt và xử lý hoàn trả dành cho Admin
   async reviewReturn(orderId: number, orderReturnId: number, actorUserId: number, actorRole: OrderActorRole, decision: 'approved' | 'rejected', adminNote?: string) {
+    const orderReturn = await this.orderRepository.getReturnById(orderId, orderReturnId);
+    if (!orderReturn) return null;
+    if (orderReturn.status !== 'requested') {
+      throw new Error('Chỉ có thể duyệt/từ chối yêu cầu đang ở trạng thái "Chờ duyệt"');
+    }
     return this.orderRepository.reviewReturn({ orderId, orderReturnId, actorUserId, actorRole, decision, adminNote });
   }
 
+  // Fix #3: Validate status trước khi refund
   async refundReturn(orderId: number, orderReturnId: number, actorUserId: number, actorRole: OrderActorRole, adminNote?: string) {
+    const orderReturn = await this.orderRepository.getReturnById(orderId, orderReturnId);
+    if (!orderReturn) return null;
+    if (orderReturn.status !== 'received') {
+      throw new Error('Chỉ có thể hoàn tiền khi đã nhận lại hàng (received)');
+    }
     return this.orderRepository.refundReturn({ orderId, orderReturnId, actorUserId, actorRole, adminNote });
+  }
+
+  // --- EMAIL THÔNG BÁO THANH TOÁN ---
+  private async sendPaymentEmail(orderId: number): Promise<void> {
+    try {
+      const aggregate = await this.orderRepository.findAdminDetail(orderId);
+      if (!aggregate) return;
+
+      const order = aggregate.order;
+
+      // Lấy thông tin user (email, name)
+      const [userRows] = await pool.execute<RowDataPacket[]>(
+        'SELECT name, email FROM users WHERE user_id = ?',
+        [order.userId]
+      );
+      const user = userRows[0];
+      if (!user?.email) return;
+
+      await sendPaymentSuccessEmail({
+        customerName: user.name,
+        customerEmail: user.email,
+        orderCode: order.orderCode,
+        orderId: order.orderId,
+        total: order.total,
+        paymentMethod: order.paymentMethod,
+        items: aggregate.items.map((item) => ({
+          productName: item.productName,
+          quantity: item.quantity,
+          price: item.price,
+          subtotal: item.subtotal,
+        })),
+        shippingName: order.shippingName,
+        shippingPhone: order.shippingPhone,
+        shippingAddress: order.shippingAddress,
+        shippingCity: order.shippingCity,
+      });
+    } catch (error) {
+      console.error('[OrderUseCase] sendPaymentEmail failed:', error);
+    }
   }
 }

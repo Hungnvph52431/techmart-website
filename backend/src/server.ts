@@ -9,6 +9,7 @@ import { OrderScheduler } from './application/schedulers/OrderScheduler';
 
 
 // --- REPOSITORIES ---
+import { AddressRepository } from './infrastructure/repositories/AddressRepository';
 import { UserRepository } from './infrastructure/repositories/UserRepository';
 import { ProductRepository } from './infrastructure/repositories/ProductRepository';
 import { OrderRepository } from './infrastructure/repositories/OrderRepository';
@@ -34,6 +35,7 @@ import { CouponUseCase } from './application/use-cases/CouponUseCase'; //
 import { BannerUseCase } from './application/use-cases/BannerUseCase';
 
 // --- CONTROLLERS ---
+import { AddressController } from './presentation/controllers/AddressController';
 import { AuthController } from './presentation/controllers/AuthController';
 import { ProductController } from './presentation/controllers/ProductController';
 import { AdminProductController } from './presentation/controllers/AdminProductController';
@@ -43,12 +45,17 @@ import { UserController } from './presentation/controllers/UserControllers';
 import { VoucherController } from './presentation/controllers/VoucherController';
 import { CategoryController } from './presentation/controllers/CategoryController';
 import { AttributeController } from './presentation/controllers/AttributeController';
-import { ReviewController } from './presentation/controllers/ReviewController';
 import { BrandController } from './presentation/controllers/BrandController'; //
 import { CouponController } from './presentation/controllers/CouponController'; //
 import { BannerController } from './presentation/controllers/BannerController';
-
+import { PaymentController } from './presentation/controllers/PaymentController';
+import { ReviewController } from './presentation/controllers/Reviewcontroller ';
+import { WalletUseCase } from './application/use-cases/WalletUseCase';
+import { WalletController } from './presentation/controllers/WalletController';
+import { createWalletRoutes } from './presentation/routes/wallet.routes';
 // --- ROUTES ---
+import { createAddressRoutes } from './presentation/routes/address.routes';
+import { createPaymentRoutes } from './presentation/routes/payment.routes';
 import { createAuthRoutes } from './presentation/routes/auth.routes';
 import { createProductRoutes } from './presentation/routes/product.routes';
 import { createOrderRoutes } from './presentation/routes/order.routes';
@@ -59,10 +66,10 @@ import { createAdminProductRoutes } from './presentation/routes/admin/product.ro
 import { createAdminCategoryRoutes } from './presentation/routes/admin/category.routes';
 import { createAdminAttributeRoutes } from './presentation/routes/admin/attribute.routes';
 import { createAdminOrderRoutes } from './presentation/routes/admin/order.routes';
-import { createOrderReviewRoutes } from './presentation/routes/order-review.routes';
 import { createBrandRoutes } from './presentation/routes/brand.routes'; //
 import { createCouponRoutes } from './presentation/routes/coupon.routes'; //
 import { createBannerRoutes, createAdminBannerRoutes } from './presentation/routes/banner.routes';
+import { createReviewRoutes, createAdminReviewRoutes } from './presentation/routes/review.routes';
 import path from 'path';
 
 dotenv.config();
@@ -100,6 +107,7 @@ const reviewRepository = new ReviewRepository();
 const brandRepository = new BrandRepository(); //
 const couponRepository = new CouponRepository(); //
 const bannerRepository = new BannerRepository(); // db là pool MySQL của bạn
+const addressRepository = new AddressRepository();
 
 // Use Cases
 const authUseCase = new AuthUseCase(userRepository);
@@ -124,23 +132,29 @@ const userController = new UserController(userUseCase);
 const voucherController = new VoucherController(voucherUseCase);
 const categoryController = new CategoryController(categoryUseCase);
 const attributeController = new AttributeController(attributeUseCase);
-const reviewController = new ReviewController(reviewUseCase);
+const reviewController = new ReviewController();
 const brandController = new BrandController(brandUseCase); //
 const couponController = new CouponController(couponUseCase); //
 const bannerController = new BannerController(bannerUseCase);
-
+const walletUseCase = new WalletUseCase();
+const paymentController = new PaymentController(orderUseCase, walletUseCase);
+const addressController = new AddressController(addressRepository);
+const walletController = new WalletController(walletUseCase);
 // --- ROUTES MOUNTING ---
 // Public & Customer Routes
 app.use('/api/auth', createAuthRoutes(authController));
 app.use('/api/products', createProductRoutes(productController));
 app.use('/api/categories', createCategoryRoutes(categoryController));
 app.use('/api/orders', createOrderRoutes(orderController));
-app.use('/api/orders', createOrderReviewRoutes(reviewController));
 app.use('/api/users', createUserRoutes(userController));
 app.use('/api/vouchers', createVoucherRoutes(voucherController));
 app.use('/api/brands', createBrandRoutes(brandController)); //
 app.use('/api/coupons', createCouponRoutes(couponController)); //
 app.use('/api/banners', createBannerRoutes(bannerController));
+app.use('/api/payment', createPaymentRoutes(paymentController));
+app.use('/api/reviews', createReviewRoutes(reviewController));
+app.use('/api/addresses', createAddressRoutes(addressController));
+app.use('/api/wallet', createWalletRoutes(walletController));
 
 // Admin Routes
 app.use('/api/admin/products', createAdminProductRoutes(adminProductController));
@@ -148,6 +162,7 @@ app.use('/api/admin/categories', createAdminCategoryRoutes(categoryController));
 app.use('/api/admin/attributes', createAdminAttributeRoutes(attributeController));
 app.use('/api/admin/orders', createAdminOrderRoutes(adminOrderController));
 app.use('/api/admin/banners', createAdminBannerRoutes(bannerController));
+app.use('/api/admin/reviews', createAdminReviewRoutes(reviewController));
 
 // --- HEALTH CHECK ---
 app.get('/health', (_req, res) => {

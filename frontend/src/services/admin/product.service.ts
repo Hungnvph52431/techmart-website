@@ -14,78 +14,81 @@ export const adminProductService = {
         }
       });
     }
-    const response = await api.get(`/products?${params.toString()}`);
+    const response = await api.get(`/admin/products?${params.toString()}`);
     return response.data;
   },
 
-  // 2. TẠO SẢN PHẨM (Bản chốt hạ)
+  // 2. TẠO SẢN PHẨM — gửi đúng route admin + payload nested
   create: async (payload: SaveAdminProductPayload): Promise<AdminProduct> => {
     const p = payload.product;
-    
-    // GỬI CẢ 2 CHUẨN ĐỂ VƯỢT QUA LỚP VALIDATION VÀ LỚP DATABASE
+
     const finalData = {
-      // --- CHUẨN CAMELCASE (Để vượt qua cửa bảo vệ Validation) ---
-      name: p.name,
-      slug: p.slug,
-      sku: p.sku,
-      categoryId: Number(p.categoryId),
-      price: Number(p.price),
-      salePrice: p.salePrice ? Number(p.salePrice) : undefined,
-      costPrice: p.costPrice ? Number(p.costPrice) : undefined,
-      stockQuantity: Number(p.stockQuantity),
-      description: p.description || '',
-      mainImage: p.mainImage || '',
-      status: p.status || 'active',
-      isFeatured: p.isFeatured ? 1 : 0,
-      isNew: p.isNew ? 1 : 0,
-      isBestseller: p.isBestseller ? 1 : 0,
-
-      // --- CHUẨN SNAKE_CASE (Để lưu mượt mà vào Database MySQL) ---
-      category_id: Number(p.categoryId),
-      sale_price: p.salePrice ? Number(p.salePrice) : null,
-      cost_price: p.costPrice ? Number(p.costPrice) : null,
-      stock_quantity: Number(p.stockQuantity),
-      main_image: p.mainImage || '',
-      is_featured: p.isFeatured ? 1 : 0,
-      is_new: p.isNew ? 1 : 0,
-      is_bestseller: p.isBestseller ? 1 : 0,
-
-      // --- Mảng phụ ---
+      product: {
+        name: p.name,
+        slug: p.slug,
+        sku: p.sku,
+        categoryId: Number(p.categoryId),
+        brandId: p.brandId || null,
+        price: Number(p.price),
+        salePrice: p.salePrice ? Number(p.salePrice) : null,
+        costPrice: p.costPrice ? Number(p.costPrice) : null,
+        stockQuantity: Number(p.stockQuantity),
+        description: p.description || '',
+        mainImage: p.mainImage || '',
+        status: p.status || 'active',
+        isFeatured: p.isFeatured || false,
+        isNew: p.isNew || false,
+        isBestseller: p.isBestseller || false,
+        specifications: p.specifications || {},
+      },
       images: payload.images || [],
-      variants: payload.variants || []
+      variants: payload.variants || [],
     };
 
-    console.log("🚀 Dữ liệu finalData gửi đi:", finalData); // Khanh soi ở Console nhé!
+    console.log("🚀 Dữ liệu finalData gửi đi:", finalData);
 
-    const response = await api.post('/products', finalData);
+    // ✅ POST /admin/products (gọi AdminProductController.create → saveProduct)
+    const response = await api.post('/admin/products', finalData);
     return response.data;
   },
 
-  // 3. Cập nhật sản phẩm
-  // frontend/src/services/admin/product.service.ts
+  // 3. CẬP NHẬT SẢN PHẨM
+  update: async (productId: number, payload: SaveAdminProductPayload): Promise<AdminProduct> => {
+    const p = payload.product;
 
-update: async (productId: number, payload: SaveAdminProductPayload): Promise<AdminProduct> => {
-  const p = payload.product;
-  
-  // Gửi cả camelCase và snake_case để vượt qua mọi lớp kiểm tra
-  const finalData = {
-    ...p,
-    category_id: Number(p.categoryId),
-    sale_price: p.salePrice ? Number(p.salePrice) : null,
-    cost_price: p.costPrice ? Number(p.costPrice) : null,
-    stock_quantity: Number(p.stockQuantity),
-    main_image: p.mainImage || '',
-    is_featured: p.isFeatured ? 1 : 0,
-    is_new: p.isNew ? 1 : 0,
-    is_bestseller: p.isBestseller ? 1 : 0,
-    images: payload.images || [],
-    variants: payload.variants || []
-  };
+    const finalData = {
+      product: {
+        name: p.name,
+        slug: p.slug,
+        sku: p.sku,
+        categoryId: Number(p.categoryId),
+        brandId: p.brandId || null,
+        price: Number(p.price),
+        salePrice: p.salePrice ? Number(p.salePrice) : null,
+        costPrice: p.costPrice ? Number(p.costPrice) : null,
+        stockQuantity: Number(p.stockQuantity),
+        description: p.description || '',
+        mainImage: p.mainImage || '',
+        status: p.status || 'active',
+        isFeatured: p.isFeatured || false,
+        isNew: p.isNew || false,
+        isBestseller: p.isBestseller || false,
+        specifications: p.specifications || {},
+      },
+      images: payload.images || [],
+      variants: payload.variants || [],
+    };
 
-  const response = await api.put(`/products/${productId}`, finalData);
-  return response.data;
-},
+    // ✅ PUT /admin/products/:id (gọi AdminProductController.update → saveProduct)
+    const response = await api.put(`/admin/products/${productId}`, finalData);
+    return response.data;
+  },
 
-getById: async (id: number) => (await api.get(`/admin/products/${id}`)).data,
-  archive: async (id: number) => await api.patch(`/products/${id}/archive`),
+  // 4. Lấy chi tiết
+  getById: async (id: number) => {
+    const response = await api.get(`/admin/products/${id}`);
+    return response.data;
+  },
+
+  archive: async (id: number) => await api.patch(`/admin/products/${id}/archive`),
 };

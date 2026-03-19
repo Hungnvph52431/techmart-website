@@ -13,6 +13,16 @@ export class CouponController {
         }
     };
 
+    // Public: lấy danh sách coupon đang còn hiệu lực cho khách hàng chọn
+    getAvailable = async (req: Request, res: Response) => {
+        try {
+            const coupons = await this.couponUseCase.getAvailableCoupons();
+            res.json(coupons);
+        } catch (error: any) {
+            res.status(500).json({ message: error.message });
+        }
+    };
+
     getById = async (req: Request, res: Response) => {
         try {
             const coupon = await this.couponUseCase.getCouponById(Number(req.params.id));

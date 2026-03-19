@@ -1,3 +1,6 @@
+// frontend/src/features/products/pages/ProductListPage.tsx
+// Thêm các filter spec vào filters object
+
 import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Product } from "@/types";
@@ -14,8 +17,6 @@ export const ProductListPage = () => {
   const [totalPages, setTotalPages] = useState(1);
 
   const [searchParams] = useSearchParams();
-
-  // Lấy trang hiện tại từ URL
   const page = Number(searchParams.get("page")) || 1;
 
   useEffect(() => {
@@ -23,27 +24,33 @@ export const ProductListPage = () => {
       try {
         setLoading(true);
 
-        // Chuẩn bị tham số lọc khớp với Backend mà chúng ta vừa gộp
         const filters = {
-  categorySlug: searchParams.get("category")?.toLowerCase() || undefined,
-  brandSlug: searchParams.get("brand")?.toLowerCase() || undefined,
-  search: searchParams.get("search") || undefined,
-isFeatured: searchParams.get("featured") === "true" ? true : undefined,
-  sort: searchParams.get("sort") || undefined,
-  page,
-  limit: 12,
-};
+          categorySlug: searchParams.get("category")?.toLowerCase() || undefined,
+          brandSlug:    searchParams.get("brand")?.toLowerCase()    || undefined,
+          search:       searchParams.get("search")                  || undefined,
+          isFeatured:   searchParams.get("featured") === "true" ? true : undefined,
+          sort:         searchParams.get("sort")                    || undefined,
+          // ✅ Thêm spec filters
+          ram:          searchParams.get("ram")                     || undefined,
+          storage:      searchParams.get("storage")                 || undefined,
+          chip:         searchParams.get("chip")                    || undefined,
+          need:         searchParams.get("need")                    || undefined,
+          feature:      searchParams.get("feature")                 || undefined,
+          minPrice:     searchParams.get("minPrice")                || undefined,
+          maxPrice:     searchParams.get("maxPrice")                || undefined,
+          page,
+          limit: 12,
+        };
 
         const data = await productService.getAll(filters) as any;
 
-        // Xử lý dữ liệu trả về linh hoạt
-      if (Array.isArray(data)) {
-  setProducts(data);
-  setTotalPages(1);
-} else {
-  setProducts(data?.data || []);        // ✅ đổi "products" → "data"
-  setTotalPages(data?.totalPages || 1); // ✅ cái này đúng rồi
-}
+        if (Array.isArray(data)) {
+          setProducts(data);
+          setTotalPages(1);
+        } else {
+          setProducts(data?.data || data?.products || []);
+          setTotalPages(data?.totalPages || 1);
+        }
       } catch (error) {
         console.error("Lỗi tải danh sách sản phẩm:", error);
       } finally {
@@ -57,53 +64,51 @@ isFeatured: searchParams.get("featured") === "true" ? true : undefined,
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
           <h1 className="text-3xl font-black text-gray-800 uppercase italic tracking-tight">
             Kho máy TechMart
           </h1>
           <ProductsSort />
         </div>
-        
-        {/* Bộ lọc thông minh của Khanh */}
-        <div className="mb-8">
+
+        {/* Bộ lọc mới */}
+        <div className="mb-6">
           <ProductsFilter />
         </div>
-        
+
         <div className="flex items-center justify-between mb-6">
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-            Tìm thấy <span className="text-blue-600 font-black">{products.length}</span> siêu phẩm phù hợp
+            Tìm thấy{" "}
+            <span className="text-blue-600 font-black">{products.length}</span>{" "}
+            siêu phẩm phù hợp
           </p>
         </div>
-        
+
         {loading ? (
           <div className="text-center py-24">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
-            <p className="mt-4 text-[10px] font-black text-gray-400 uppercase italic tracking-widest">Đang quét kho hàng...</p>
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent" />
+            <p className="mt-4 text-[10px] font-black text-gray-400 uppercase italic tracking-widest">
+              Đang quét kho hàng...
+            </p>
           </div>
         ) : products.length === 0 ? (
           <div className="text-center py-24 bg-gray-50 rounded-[40px] border-2 border-dashed border-gray-200">
             <div className="text-6xl mb-4 opacity-20 italic font-black">EMPTY</div>
-            <p className="text-gray-400 font-black uppercase italic text-xs tracking-widest">Hết hàng hoặc không tìm thấy máy nào!</p>
+            <p className="text-gray-400 font-black uppercase italic text-xs tracking-widest">
+              Hết hàng hoặc không tìm thấy máy nào!
+            </p>
           </div>
         ) : (
           <>
-            {/* Grid sản phẩm responsive: 2 cột mobile, 4 cột desktop */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-12">
               {products.map((product) => (
-                <ProductCard
-                  key={product.productId} 
-                  product={product}
-                />
+                <ProductCard key={product.productId} product={product} />
               ))}
             </div>
-            
-            {/* Thanh điều hướng trang (Pagination) cực kỳ quan trọng */}
+
             {totalPages > 1 && (
               <div className="flex justify-center pt-12 border-t border-gray-100">
-                <Pagination
-                  currentPage={page}
-                  totalPages={totalPages}
-                />
+                <Pagination currentPage={page} totalPages={totalPages} />
               </div>
             )}
           </>

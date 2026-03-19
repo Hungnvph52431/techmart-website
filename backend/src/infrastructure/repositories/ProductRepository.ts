@@ -18,31 +18,31 @@ export class ProductRepository implements IProductRepository {
   
  async findAll(filters?: any): Promise<Product[]> {
   const { query, params } = this.buildBaseListQuery(true, filters);
-  // PHẢI GHÉP CHỮ SELECT VÀO ĐẦY ĐỦ NHƯ THẾ NÀY
   const fullSql = `SELECT p.*, c.name as categoryName, b.name as brandName ${query} ORDER BY p.created_at DESC`;
-  
   const [rows] = await this.pool.query<RowDataPacket[]>(fullSql, params);
-  return rows.map(row => this.mapRowToProduct(row));
+  const products = rows.map(row => this.mapRowToProduct(row));
+  // ✅ Load ảnh để ProductList hiển thị đúng
+  return this.attachRelations(products, { includeVariants: false });
 }
 
   // Thêm tính năng phân trang từ bản Tuấn Anh
  async findAllPaginated(filters: any, page: number, limit: number): Promise<PaginatedResult<Product>> {
   const offset = (Number(page) - 1) * Number(limit);
-  // publicOnly = true để trang Client chỉ hiện hàng 'Đang bán'
   const { query, params } = this.buildBaseListQuery(true, filters);
 
-  // 1. Lấy dữ liệu (Dùng .query để tránh lỗi Incorrect arguments với LIMIT/OFFSET)
   const dataSql = `SELECT p.*, c.name as categoryName, b.name as brandName ${query} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`;
   const [rows] = await this.pool.query<RowDataPacket[]>(dataSql, [...params, Number(limit), Number(offset)]);
 
-  // 2. Đếm tổng số máy thỏa mãn bộ lọc
   const countSql = `SELECT COUNT(*) as total ${query}`;
   const [countResult]: any = await this.pool.query(countSql, params);
   const total = countResult[0].total;
 
+  const products = rows.map(row => this.mapRowToProduct(row));
+  // ✅ Load ảnh để ProductList hiển thị đúng
+  const productsWithImages = await this.attachRelations(products, { includeVariants: false });
+
   return {
-    // QUAN TRỌNG: Phải dùng mapRowToProduct để đổi snake_case sang camelCase cho Frontend
-    data: rows.map(row => this.mapRowToProduct(row)), 
+    data: productsWithImages,
     total,
     page: Number(page),
     limit: Number(limit),
@@ -60,13 +60,78 @@ export class ProductRepository implements IProductRepository {
   // --- 2. TÌM CHI TIẾT (ID & SLUG) ---
 
   async findById(id: number): Promise<Product | null> {
-    const [rows]: any = await this.pool.execute('SELECT * FROM products WHERE product_id = ?', [id]);
+    const [rows]: any = await this.pool.execute('SELECT * FROM products WHERE product_id = ? AND deleted_at IS NULL', [id]);
     return rows.length > 0 ? rows[0] : null;
   }
 
   async findAdminById(productId: number): Promise<Product | null> {
-    return this.findById(productId);
-  }
+  // 1. Lấy thông tin sản phẩm + category + brand
+  const [rows] = await this.pool.execute<RowDataPacket[]>(
+    `SELECT p.*, 
+      c.name as categoryName, c.slug as categorySlug,
+      b.name as brandName, b.slug as brandSlug
+     FROM products p
+     LEFT JOIN categories c ON p.category_id = c.category_id
+     LEFT JOIN brands b ON p.brand_id = b.brand_id
+     WHERE p.product_id = ? AND p.deleted_at IS NULL`,
+    [productId]
+  );
+
+  if ((rows as any[]).length === 0) return null;
+  const product = this.mapRowToProduct(rows[0]);
+ 
+  // 2. Load ảnh sản phẩm
+  const [images] = await this.pool.execute<RowDataPacket[]>(
+    'SELECT * FROM product_images WHERE product_id = ? ORDER BY display_order ASC, is_primary DESC',
+    [productId]
+  );
+ 
+  // 3. Load biến thể (bao gồm cả inactive để admin thấy đủ)
+  const [variants] = await this.pool.execute<RowDataPacket[]>(
+    'SELECT * FROM product_variants WHERE product_id = ? ORDER BY variant_id ASC',
+    [productId]
+  );
+ 
+  return {
+    ...product,
+    images: (images as any[]).map(img => ({
+      imageId: img.image_id,
+      productId: img.product_id,
+      imageUrl: img.image_url,
+      altText: img.alt_text || '',
+      displayOrder: img.display_order,
+      isPrimary: Boolean(img.is_primary),
+      createdAt: img.created_at,
+    })),
+    variants: (variants as any[]).map(v => ({
+      variantId: v.variant_id,
+      productId: v.product_id,
+      variantName: v.variant_name,
+      sku: v.sku,
+      // Parse attributes JSON nếu lưu dạng string
+      attributes: (() => {
+        try {
+          return typeof v.attributes === 'string' 
+            ? JSON.parse(v.attributes) 
+            : (v.attributes || {});
+        } catch { return {}; }
+      })(),
+      priceAdjustment: parseFloat(v.price_adjustment) || 0,
+      stockQuantity: v.stock_quantity || 0,
+      imageUrl: v.image_url || '',
+      isActive: Boolean(v.is_active),
+      createdAt: v.created_at,
+      updatedAt: v.updated_at,
+    })),
+    // Parse specifications JSON
+    specifications: (() => {
+      try {
+        const spec = rows[0].specifications;
+        return typeof spec === 'string' ? JSON.parse(spec) : (spec || {});
+      } catch { return {}; }
+    })(),
+  } as any;
+}
 
   async findBySlug(slug: string): Promise<Product | null> {
   const [rows] = await this.pool.execute<RowDataPacket[]>(
@@ -74,7 +139,7 @@ export class ProductRepository implements IProductRepository {
      FROM products p
      LEFT JOIN categories c ON p.category_id = c.category_id
      LEFT JOIN brands b ON p.brand_id = b.brand_id
-     WHERE p.slug = ?`,
+     WHERE p.slug = ? AND p.deleted_at IS NULL`,
     [slug]
   );
   
@@ -93,10 +158,36 @@ export class ProductRepository implements IProductRepository {
     [product.productId]
   );
 
+  // Parse specifications JSON
+  const specs = (() => {
+    try {
+      const s = rows[0].specifications;
+      return typeof s === 'string' ? JSON.parse(s) : (s || null);
+    } catch { return null; }
+  })();
+
   return {
     ...product,
+    specifications: specs,
     images: images.map(this.mapRowToProductImage),
-    variants: variants.map(this.mapRowToProductVariant),
+    variants: (variants as any[]).map(v => ({
+      variantId:       v.variant_id,
+      productId:       v.product_id,
+      variantName:     v.variant_name,
+      sku:             v.sku,
+      // Parse attributes JSON
+      attributes: (() => {
+        try {
+          return typeof v.attributes === 'string'
+            ? JSON.parse(v.attributes)
+            : (v.attributes || {});
+        } catch { return {}; }
+      })(),
+      priceAdjustment: parseFloat(v.price_adjustment) || 0,
+      stockQuantity:   v.stock_quantity || 0,
+      imageUrl:        v.image_url || '',
+      isActive:        Boolean(v.is_active),
+    })),
   } as any;
 }
 
@@ -154,32 +245,117 @@ async getImages(productId: number): Promise<ProductImage[]> {
   }
 
 async addImage(data: CreateProductImageDTO): Promise<ProductImage> {
-    const [result] = await this.pool.execute<ResultSetHeader>(
-      'INSERT INTO product_images (product_id, image_url, is_primary) VALUES (?, ?, ?)',
-      [data.productId, data.imageUrl, data.isPrimary]
-    );
-    return { 
-  imageId: result.insertId, 
-  ...data, 
-  createdAt: new Date() // Đổi từ .toISOString() sang new Date()
-} as ProductImage;
-  }
+  const [result] = await this.pool.execute<ResultSetHeader>(
+    'INSERT INTO product_images (product_id, image_url, alt_text, display_order, is_primary) VALUES (?, ?, ?, ?, ?)',
+    [data.productId, data.imageUrl, data.altText || '', data.displayOrder ?? 0, data.isPrimary ? 1 : 0]
+  );
+  return {
+    imageId: result.insertId,
+    ...data,
+    createdAt: new Date()
+  } as ProductImage;
+}
 
 
   async save(payload: SaveProductPayload, productId?: number): Promise<Product> {
-    const connection = await pool.getConnection();
-    try {
-      await connection.beginTransaction();
-      // Logic Transaction phức tạp giữ nguyên...
-      await connection.commit();
-      return (await this.findById(productId || 0))!; 
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const p = payload.product;
+    const specsJson = p.specifications ? JSON.stringify(p.specifications) : null;
+    const isNew = !productId;
+
+    if (isNew) {
+      // ── Tạo mới ──
+      const [result] = await connection.execute<ResultSetHeader>(
+        `INSERT INTO products (
+          name, slug, sku, category_id, brand_id,
+          price, sale_price, cost_price, stock_quantity,
+          description, specifications, main_image, status,
+          is_featured, is_new, is_bestseller,
+          meta_title, meta_description, meta_keywords
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          p.name, p.slug, p.sku,
+          p.categoryId, p.brandId || null,
+          p.price, p.salePrice || null, p.costPrice || null,
+          p.stockQuantity || 0,
+          p.description || '', specsJson,
+          p.mainImage || '', p.status || 'draft',
+          p.isFeatured ? 1 : 0, p.isNew ? 1 : 0, p.isBestseller ? 1 : 0,
+          p.metaTitle || null, p.metaDescription || null, p.metaKeywords || null,
+        ]
+      );
+      productId = result.insertId;
+    } else {
+      // ── Cập nhật ──
+      await connection.execute(
+        `UPDATE products SET
+          name = ?, slug = ?, sku = ?, category_id = ?, brand_id = ?,
+          price = ?, sale_price = ?, cost_price = ?, stock_quantity = ?,
+          description = ?, specifications = ?, main_image = ?, status = ?,
+          is_featured = ?, is_new = ?, is_bestseller = ?,
+          meta_title = ?, meta_description = ?, meta_keywords = ?
+        WHERE product_id = ?`,
+        [
+          p.name, p.slug, p.sku,
+          p.categoryId, p.brandId || null,
+          p.price, p.salePrice || null, p.costPrice || null,
+          p.stockQuantity || 0,
+          p.description || '', specsJson,
+          p.mainImage || '', p.status || 'draft',
+          p.isFeatured ? 1 : 0, p.isNew ? 1 : 0, p.isBestseller ? 1 : 0,
+          p.metaTitle || null, p.metaDescription || null, p.metaKeywords || null,
+          productId,
+        ]
+      );
+      // Xóa ảnh và variants cũ để insert lại
+      await connection.execute('DELETE FROM product_images WHERE product_id = ?', [productId]);
+      await connection.execute('DELETE FROM product_variants WHERE product_id = ?', [productId]);
     }
+
+    // ── Lưu ảnh ──
+    if (payload.images?.length) {
+      for (let i = 0; i < payload.images.length; i++) {
+        const img = payload.images[i];
+        if (!img.imageUrl) continue;
+        await connection.execute(
+          'INSERT INTO product_images (product_id, image_url, alt_text, display_order, is_primary) VALUES (?, ?, ?, ?, ?)',
+          [productId, img.imageUrl, img.altText || '', i, img.isPrimary ? 1 : 0]
+        );
+      }
+    }
+
+    // ── Lưu biến thể ──
+    if (payload.variants?.length) {
+      for (const v of payload.variants) {
+        if (!v.variantName || !v.sku) continue;
+        await connection.execute(
+          `INSERT INTO product_variants
+            (product_id, variant_name, sku, attributes, price_adjustment, stock_quantity, image_url, is_active)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            productId, v.variantName, v.sku,
+            JSON.stringify(v.attributes || {}),
+            v.priceAdjustment || 0,
+            v.stockQuantity || 0,
+            v.imageUrl || '',
+            v.isActive ? 1 : 0,
+          ]
+        );
+      }
+    }
+
+    await connection.commit();
+    return (await this.findAdminById(productId!))!;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
   }
+}
 async create(data: any): Promise<Product> {
     const [result] = await this.pool.execute<ResultSetHeader>(
       // BỔ SUNG ĐẦY ĐỦ CÁC CỘT (Đặc biệt là category_id)
@@ -239,16 +415,20 @@ async update(data: any): Promise<Product | null> {
 }
 
 async delete(id: number): Promise<boolean> {
-    const [result] = await this.pool.execute<ResultSetHeader>('DELETE FROM products WHERE product_id = ?', [id]);
+    // Soft delete: đánh dấu deleted_at thay vì xóa cứng để bảo toàn thống kê
+    const [result] = await this.pool.execute<ResultSetHeader>(
+      'UPDATE products SET deleted_at = NOW(), status = ? WHERE product_id = ? AND deleted_at IS NULL',
+      ['archived', id]
+    );
     return result.affectedRows > 0;
   }
   async getStats(): Promise<ProductStats> {
     const [result]: any = await this.pool.execute(`
-      SELECT 
+      SELECT
         COUNT(*) as totalProducts,
         SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as activeProducts,
         SUM(CASE WHEN stock_quantity = 0 THEN 1 ELSE 0 END) as outOfStockCount
-      FROM products
+      FROM products WHERE deleted_at IS NULL
     `);
     return result[0];
   }
@@ -295,6 +475,13 @@ async delete(id: number): Promise<boolean> {
     mainImage: row.main_image || '', // QUAN TRỌNG: Fix ảnh không hiện
     description: row.description || '',
     status: row.status as ProductStatus,
+    // ✅ Parse specifications JSON string → object
+    specifications: (() => {
+      try {
+        const s = row.specifications;
+        return typeof s === 'string' ? JSON.parse(s) : (s || null);
+      } catch { return null; }
+    })(),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     images: [],
@@ -307,7 +494,23 @@ async delete(id: number): Promise<boolean> {
   }
 
   private mapRowToProductVariant(row: any): ProductVariant {
-    return { variantId: row.variant_id, variantName: row.variant_name, priceAdjustment: parseFloat(row.price_adjustment), stockQuantity: row.stock_quantity } as any;
+    return {
+      variantId:       row.variant_id,
+      productId:       row.product_id,
+      variantName:     row.variant_name,
+      sku:             row.sku || '',
+      // ✅ Parse attributes JSON string → object
+      attributes: (() => {
+        try {
+          const a = row.attributes;
+          return typeof a === 'string' ? JSON.parse(a) : (a || {});
+        } catch { return {}; }
+      })(),
+      priceAdjustment: parseFloat(row.price_adjustment) || 0,
+      stockQuantity:   row.stock_quantity || 0,
+      imageUrl:        row.image_url || '',
+      isActive:        Boolean(row.is_active ?? 1),
+    } as any;
   }
 
   private async attachRelations(products: Product[], options: { includeVariants: boolean }): Promise<Product[]> {
@@ -329,10 +532,10 @@ async delete(id: number): Promise<boolean> {
 
  private buildBaseListQuery(publicOnly: boolean, filters?: any) {
   let query = `
-    FROM products p 
-    LEFT JOIN categories c ON p.category_id = c.category_id 
-    LEFT JOIN brands b ON p.brand_id = b.brand_id 
-    WHERE 1=1
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.category_id
+    LEFT JOIN brands b ON p.brand_id = b.brand_id
+    WHERE p.deleted_at IS NULL
   `;
   const params: any[] = [];
 
@@ -366,6 +569,48 @@ async delete(id: number): Promise<boolean> {
   if (filters?.isFeatured === true || filters?.featured === 'true') query += ' AND p.is_featured = 1';
   if (filters?.isNew === true) query += ' AND p.is_new = 1';
   if (filters?.isBestseller === true) query += ' AND p.is_bestseller = 1';
+ if (filters?.ram) {
+    const ramValues = String(filters.ram).split(',').map(v => v.trim()).filter(Boolean);
+    if (ramValues.length === 1) {
+      query += ` AND JSON_UNQUOTE(JSON_EXTRACT(p.specifications, '$.ram')) = ?`;
+      params.push(ramValues[0]);
+    } else if (ramValues.length > 1) {
+      query += ` AND JSON_UNQUOTE(JSON_EXTRACT(p.specifications, '$.ram')) IN (${ramValues.map(() => '?').join(',')})`;
+      params.push(...ramValues);
+    }
+  }
+  if (filters?.storage) {
+    const storageValues = String(filters.storage).split(',').map(v => v.trim()).filter(Boolean);
+    if (storageValues.length === 1) {
+      query += ` AND JSON_CONTAINS(JSON_EXTRACT(p.specifications, '$.storage'), JSON_QUOTE(?))`;
+      params.push(storageValues[0]);
+    } else if (storageValues.length > 1) {
+      const orClauses = storageValues.map(() => `JSON_CONTAINS(JSON_EXTRACT(p.specifications, '$.storage'), JSON_QUOTE(?))`);
+      query += ` AND (${orClauses.join(' OR ')})`;
+      params.push(...storageValues);
+    }
+  }
+  if (filters?.chip) {
+    const chipValues = String(filters.chip).split(',').map(v => v.trim()).filter(Boolean);
+    if (chipValues.length === 1) {
+      query += ` AND JSON_UNQUOTE(JSON_EXTRACT(p.specifications, '$.chip')) LIKE ?`;
+      params.push(`%${chipValues[0]}%`);
+    } else if (chipValues.length > 1) {
+      const orClauses = chipValues.map(() => `JSON_UNQUOTE(JSON_EXTRACT(p.specifications, '$.chip')) LIKE ?`);
+      query += ` AND (${orClauses.join(' OR ')})`;
+      params.push(...chipValues.map(v => `%${v}%`));
+    }
+  }
+
+  // 4. Lọc theo giá (minPrice / maxPrice)
+  if (filters?.minPrice) {
+    query += ` AND COALESCE(p.sale_price, p.price) >= ?`;
+    params.push(Number(filters.minPrice));
+  }
+  if (filters?.maxPrice) {
+    query += ` AND COALESCE(p.sale_price, p.price) <= ?`;
+    params.push(Number(filters.maxPrice));
+  }
 
   return { query, params };
 }

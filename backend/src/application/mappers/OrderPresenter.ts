@@ -76,6 +76,7 @@ const toReturn = (item: OrderReturn, actor: 'admin' | 'customer') => ({
   reason: item.reason,
   customerNote: item.customerNote,
   adminNote: actor === 'admin' ? item.adminNote : undefined,
+  evidenceImages: item.evidenceImages,
   requestedAt: item.requestedAt,
   approvedAt: item.approvedAt,
   rejectedAt: item.rejectedAt,
@@ -101,7 +102,7 @@ const toReturn = (item: OrderReturn, actor: 'admin' | 'customer') => ({
 
 const toLifecycleFlags = (status: OrderStatus, actorRole: 'admin' | 'customer') => ({
   canCancel: canCancelOrder(status, actorRole),
-  canRequestReturn: actorRole === 'customer' ? canRequestReturn(status) : status === 'delivered',
+  canRequestReturn: actorRole === 'customer' ? canRequestReturn(status) : canRequestReturn(status),
   allowedNextStatuses: actorRole === 'admin' ? getAllowedNextOrderStatuses(status) : [],
 });
 

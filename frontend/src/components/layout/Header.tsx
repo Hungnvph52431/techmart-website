@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingCart, User, Search } from 'lucide-react';
+import { ShoppingCart, User, Search, Wallet } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useCartStore } from '@/store/cartStore';
 
@@ -145,6 +145,19 @@ export const Header = () => {
                       className="block px-5 py-3 text-xs font-bold text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors uppercase"
                     >
                       Đơn hàng của tôi
+                    </Link>
+                    <Link
+                      to="/wallet"
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className="flex items-center justify-between px-5 py-3 text-xs font-bold text-orange-600 hover:bg-orange-50 transition-colors"
+                    >
+                      <span className="flex items-center gap-2 uppercase">
+                        <Wallet className="h-3.5 w-3.5" />
+                        Ví TechMart
+                      </span>
+                      <span className="font-black">
+                        {(user?.walletBalance ?? 0).toLocaleString('vi-VN')}₫
+                      </span>
                     </Link>
                     <div className="border-t border-gray-50 my-1"></div>
                     <button

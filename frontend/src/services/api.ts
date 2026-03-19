@@ -2,9 +2,10 @@ import axios from 'axios';
 
 const api = axios.create({
   // Đảm bảo cổng 5001 khớp với cấu hình Backend của bạn
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5001/api',
+  baseURL: import.meta.env.VITE_API_URL || 'https://perhaps-robbie-ntsc-proceed.trycloudflare.com/',
   headers: {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
   },
 });
 

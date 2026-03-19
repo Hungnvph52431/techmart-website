@@ -4,7 +4,14 @@
 
 // --- 1. CÁC KIỂU TRẠNG THÁI (ENUM-LIKE) ---
 export type ProductStatus = 'draft' | 'active' | 'inactive' | 'out_of_stock' | 'pre_order' | 'archived';
-export type OrderStatus = 'pending' | 'confirmed' | 'processing' | 'shipping' | 'delivered' | 'cancelled' | 'returned';
+export type OrderStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'shipping'
+  | 'delivered'
+  | 'completed'
+  | 'cancelled'
+  | 'returned';
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 
 // --- 2. LIÊN QUAN ĐẾN SẢN PHẨM ---
@@ -103,6 +110,7 @@ export interface User {
   status: 'active' | 'inactive' | 'banned';
   points: number;
   membershipLevel: 'bronze' | 'silver' | 'gold' | 'platinum';
+  walletBalance: number;
   createdAt?: string;
 }
 

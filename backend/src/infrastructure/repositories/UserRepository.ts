@@ -57,6 +57,7 @@ export class UserRepository implements IUserRepository {
       status: 'active',
       points: 0,
       membershipLevel: 'bronze',
+      walletBalance: 0,
       createdAt: now,
       updatedAt: now,
     };
@@ -143,6 +144,7 @@ export class UserRepository implements IUserRepository {
       status: row.status,
       points: row.points,
       membershipLevel: row.membership_level,
+      walletBalance: Number(row.wallet_balance ?? 0),
       lastLogin: row.last_login,
       createdAt: row.created_at,
       updatedAt: row.updated_at,

@@ -42,14 +42,14 @@ const formatShortCurrency = (value: number) => {
 const ORDER_STATUS_LABELS: Record<string, string> = {
   pending: 'Chờ xử lý',
   confirmed: 'Đã xác nhận',
-  processing: 'Đang xử lý',
   shipping: 'Đang giao',
   delivered: 'Đã giao',
+  completed: 'Hoàn thành',
   cancelled: 'Đã hủy',
   returned: 'Đã hoàn trả',
 };
 
-const ORDER_STATUS_COLORS = ['#F59E0B', '#3B82F6', '#8B5CF6', '#06B6D4', '#10B981', '#EF4444', '#6B7280'];
+const ORDER_STATUS_COLORS = ['#F59E0B', '#3B82F6', '#06B6D4', '#10B981', '#84CC16', '#EF4444', '#6B7280'];
 const STATUS_BADGE: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800',
   delivered: 'bg-green-100 text-green-800',
@@ -182,10 +182,10 @@ export const AdminDashboard = () => {
                   <tr key={order.orderId} className="hover:bg-gray-50/50 transition-colors">
                     <td className="py-4 font-mono text-xs text-blue-600 font-bold">{order.orderCode}</td>
                     <td className="py-4 text-sm text-gray-600">{order.shippingName}</td>
-                    <td className="py-4 text-sm font-bold text-gray-800">{formatShortCurrency(order.total)}</td>
+                    <td className="py-4 text-sm font-bold text-gray-800">{formatShortCurrency(order.totalAmount || 0)}</td>
                     <td className="py-4">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${STATUS_BADGE[order.status] || 'bg-gray-100 text-gray-600'}`}>
-                        {ORDER_STATUS_LABELS[order.status] || order.status}
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${STATUS_BADGE[order.status || 'pending'] || 'bg-gray-100 text-gray-600'}`}>
+                        {ORDER_STATUS_LABELS[order.status || 'pending'] || order.status}
                       </span>
                     </td>
                   </tr>

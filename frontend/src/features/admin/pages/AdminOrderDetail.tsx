@@ -21,28 +21,27 @@ import { adminOrderService } from '@/services/admin/order.service';
 
 const ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
   pending: ['confirmed', 'cancelled'],
-  confirmed: ['processing', 'cancelled'],
-  processing: ['shipping', 'cancelled'],
+  confirmed: ['shipping', 'cancelled'],
   shipping: ['delivered'],
-  delivered: [],
+  delivered: ['completed'],
+  completed: [],
   cancelled: [],
   returned: [],
 };
 
-// Chuỗi auto-process: bấm 1 nút đi thẳng đến delivered
+// Chuỗi auto-process: bấm 1 nút đi thẳng đến completed
 const AUTO_PROCESS_CHAIN: Record<string, string[]> = {
-  pending: ['confirmed', 'processing', 'shipping', 'delivered'],
-  confirmed: ['processing', 'shipping', 'delivered'],
-  processing: ['shipping', 'delivered'],
-  shipping: ['delivered'],
+  pending: ['confirmed', 'shipping', 'delivered', 'completed'],
+  confirmed: ['shipping', 'delivered', 'completed'],
+  shipping: ['delivered', 'completed'],
 };
 
 const STATUS_LABELS: Record<string, string> = {
   pending: 'Chờ xử lý',
   confirmed: 'Đã xác nhận',
-  processing: 'Đang xử lý',
   shipping: 'Đang giao',
   delivered: 'Đã giao',
+  completed: 'Hoàn thành',
   cancelled: 'Đã hủy',
   returned: 'Đã hoàn/trả',
 };
@@ -50,9 +49,9 @@ const STATUS_LABELS: Record<string, string> = {
 const STATUS_STYLES: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-800 border-amber-200',
   confirmed: 'bg-sky-100 text-sky-800 border-sky-200',
-  processing: 'bg-blue-100 text-blue-800 border-blue-200',
   shipping: 'bg-violet-100 text-violet-800 border-violet-200',
   delivered: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  completed: 'bg-lime-100 text-lime-800 border-lime-200',
   cancelled: 'bg-rose-100 text-rose-800 border-rose-200',
   returned: 'bg-slate-100 text-slate-700 border-slate-200',
 };
@@ -66,7 +65,7 @@ const PAYMENT_STATUS_LABELS: Record<string, string> = {
 
 const PAYMENT_STATUS_TRANSITIONS: Record<string, string[]> = {
   pending: ['paid', 'failed'],
-  paid: ['refunded'],
+  paid: [],
   failed: ['pending'],
   refunded: [],
 };
@@ -77,7 +76,7 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 };
 
 const RETURN_STATUS_LABELS: Record<string, string> = {
-  pending: 'Chờ duyệt',
+  requested: 'Chờ duyệt',
   approved: 'Đã duyệt',
   rejected: 'Từ chối',
   received: 'Đã nhận hàng',
@@ -86,7 +85,7 @@ const RETURN_STATUS_LABELS: Record<string, string> = {
 };
 
 const RETURN_STATUS_STYLES: Record<string, string> = {
-  pending: 'bg-amber-100 text-amber-800',
+  requested: 'bg-amber-100 text-amber-800',
   approved: 'bg-sky-100 text-sky-800',
   rejected: 'bg-rose-100 text-rose-800',
   received: 'bg-violet-100 text-violet-800',
@@ -450,9 +449,24 @@ export const AdminOrderDetail = () => {
                       </div>
                     )}
 
+                    {/* Ảnh bằng chứng từ khách hàng */}
+                    {ret.evidenceImages?.length > 0 && (
+                      <div>
+                        <p className="text-xs font-bold text-gray-500 mb-1.5">Ảnh bằng chứng ({ret.evidenceImages.length}):</p>
+                        <div className="flex flex-wrap gap-2">
+                          {ret.evidenceImages.map((img: string, idx: number) => (
+                            <a key={idx} href={img} target="_blank" rel="noopener noreferrer"
+                              className="block w-20 h-20 rounded-xl overflow-hidden border-2 border-gray-100 hover:border-blue-400 transition-colors">
+                              <img src={img} alt={`evidence-${idx}`} className="w-full h-full object-cover" />
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* ACTION BUTTONS theo trạng thái */}
                     <div className="flex flex-wrap gap-2 pt-1">
-                      {ret.status === 'pending' && (
+                      {ret.status === 'requested' && (
                         <>
                           <button
                             onClick={() => handleReviewReturn(ret.orderReturnId, 'approved')}
