@@ -222,14 +222,14 @@ export class ProductRepository implements IProductRepository {
   async addVariant(v: CreateProductVariantDTO): Promise<ProductVariant> {
     const [res] = await pool.execute<ResultSetHeader>(
       `INSERT INTO product_variants (product_id, variant_name, sku, price_adjustment, stock_quantity) VALUES (?, ?, ?, ?, ?)`,
-      [v.productId, v.variantName, v.sku ?? '', v.priceAdjustment ?? 0, v.stockQuantity ?? 0]
+      [v.productId, v.variantName, v.sku, v.priceAdjustment, v.stockQuantity] as any
     );
     return { ...v, variantId: res.insertId } as any;
   }
 
   async updateVariant(v: UpdateProductVariantDTO): Promise<ProductVariant | null> {
-    await pool.execute(`UPDATE product_variants SET variant_name = ?, price_adjustment = ? WHERE variant_id = ?`, 
-      [v.variantName ?? '', v.priceAdjustment ?? 0, v.variantId]);
+    await pool.execute(`UPDATE product_variants SET variant_name = ?, price_adjustment = ? WHERE variant_id = ?`,
+      [v.variantName, v.priceAdjustment, v.variantId] as any);
     return this.findVariantById(v.variantId);
   }
 
@@ -265,27 +265,6 @@ async addImage(data: CreateProductImageDTO): Promise<ProductImage> {
     const p = payload.product;
     const specsJson = p.specifications ? JSON.stringify(p.specifications) : null;
     const isNew = !productId;
-    let persistedProductId = productId;
-    const normalized = {
-      name: p.name ?? '',
-      slug: p.slug ?? '',
-      sku: p.sku ?? '',
-      categoryId: p.categoryId ?? 0,
-      brandId: p.brandId ?? null,
-      price: p.price ?? 0,
-      salePrice: p.salePrice ?? null,
-      costPrice: p.costPrice ?? null,
-      stockQuantity: p.stockQuantity ?? 0,
-      description: p.description ?? '',
-      mainImage: p.mainImage ?? '',
-      status: p.status ?? 'draft',
-      isFeatured: p.isFeatured ? 1 : 0,
-      isNew: p.isNew ? 1 : 0,
-      isBestseller: p.isBestseller ? 1 : 0,
-      metaTitle: p.metaTitle ?? null,
-      metaDescription: p.metaDescription ?? null,
-      metaKeywords: p.metaKeywords ?? null,
-    };
 
     if (isNew) {
       // ── Tạo mới ──
@@ -298,21 +277,18 @@ async addImage(data: CreateProductImageDTO): Promise<ProductImage> {
           meta_title, meta_description, meta_keywords
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          normalized.name, normalized.slug, normalized.sku,
-          normalized.categoryId, normalized.brandId,
-          normalized.price, normalized.salePrice, normalized.costPrice,
-          normalized.stockQuantity,
-          normalized.description, specsJson,
-          normalized.mainImage, normalized.status,
-          normalized.isFeatured, normalized.isNew, normalized.isBestseller,
-          normalized.metaTitle, normalized.metaDescription, normalized.metaKeywords,
-        ]
+          p.name, p.slug, p.sku,
+          p.categoryId, p.brandId || null,
+          p.price, p.salePrice || null, p.costPrice || null,
+          p.stockQuantity || 0,
+          p.description || '', specsJson,
+          p.mainImage || '', p.status || 'draft',
+          p.isFeatured ? 1 : 0, p.isNew ? 1 : 0, p.isBestseller ? 1 : 0,
+          p.metaTitle || null, p.metaDescription || null, p.metaKeywords || null,
+        ] as any
       );
-      persistedProductId = result.insertId;
+      productId = result.insertId;
     } else {
-      if (!persistedProductId) {
-        throw new Error('Missing productId for product update');
-      }
       // ── Cập nhật ──
       await connection.execute(
         `UPDATE products SET
@@ -323,24 +299,20 @@ async addImage(data: CreateProductImageDTO): Promise<ProductImage> {
           meta_title = ?, meta_description = ?, meta_keywords = ?
         WHERE product_id = ?`,
         [
-          normalized.name, normalized.slug, normalized.sku,
-          normalized.categoryId, normalized.brandId,
-          normalized.price, normalized.salePrice, normalized.costPrice,
-          normalized.stockQuantity,
-          normalized.description, specsJson,
-          normalized.mainImage, normalized.status,
-          normalized.isFeatured, normalized.isNew, normalized.isBestseller,
-          normalized.metaTitle, normalized.metaDescription, normalized.metaKeywords,
-          persistedProductId,
-        ]
+          p.name, p.slug, p.sku,
+          p.categoryId, p.brandId || null,
+          p.price, p.salePrice || null, p.costPrice || null,
+          p.stockQuantity || 0,
+          p.description || '', specsJson,
+          p.mainImage || '', p.status || 'draft',
+          p.isFeatured ? 1 : 0, p.isNew ? 1 : 0, p.isBestseller ? 1 : 0,
+          p.metaTitle || null, p.metaDescription || null, p.metaKeywords || null,
+          productId,
+        ] as any
       );
       // Xóa ảnh và variants cũ để insert lại
-      await connection.execute('DELETE FROM product_images WHERE product_id = ?', [persistedProductId]);
-      await connection.execute('DELETE FROM product_variants WHERE product_id = ?', [persistedProductId]);
-    }
-
-    if (!persistedProductId) {
-      throw new Error('Failed to resolve productId during product save');
+      await connection.execute('DELETE FROM product_images WHERE product_id = ?', [productId] as any);
+      await connection.execute('DELETE FROM product_variants WHERE product_id = ?', [productId] as any);
     }
 
     // ── Lưu ảnh ──
@@ -350,7 +322,7 @@ async addImage(data: CreateProductImageDTO): Promise<ProductImage> {
         if (!img.imageUrl) continue;
         await connection.execute(
           'INSERT INTO product_images (product_id, image_url, alt_text, display_order, is_primary) VALUES (?, ?, ?, ?, ?)',
-          [persistedProductId, img.imageUrl, img.altText || '', i, img.isPrimary ? 1 : 0]
+          [productId, img.imageUrl, img.altText || '', i, img.isPrimary ? 1 : 0] as any
         );
       }
     }
@@ -364,19 +336,19 @@ async addImage(data: CreateProductImageDTO): Promise<ProductImage> {
             (product_id, variant_name, sku, attributes, price_adjustment, stock_quantity, image_url, is_active)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            persistedProductId, v.variantName, v.sku,
+            productId, v.variantName, v.sku,
             JSON.stringify(v.attributes || {}),
             v.priceAdjustment || 0,
             v.stockQuantity || 0,
             v.imageUrl || '',
             v.isActive ? 1 : 0,
-          ]
+          ] as any
         );
       }
     }
 
     await connection.commit();
-    return (await this.findAdminById(persistedProductId))!;
+    return (await this.findAdminById(productId!))!;
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -420,24 +392,25 @@ async create(data: any): Promise<Product> {
 
 async update(data: any): Promise<Product | null> {
   const id = data.productId; 
-  const categoryId = data.category_id ?? data.categoryId ?? null;
-  const salePrice = data.sale_price ?? data.salePrice ?? null;
-  const stockQuantity = data.stock_quantity ?? data.stockQuantity ?? 0;
 
   // BỔ SUNG ĐẦY ĐỦ CÁC CỘT CẦN CẬP NHẬT
   await this.pool.execute(
-    `UPDATE products SET 
-      name = ?, slug = ?, sku = ?, category_id = ?, 
-      price = ?, sale_price = ?, stock_quantity = ?, 
-      status = ?, main_image = ?, description = ?
+    `UPDATE products SET
+      name = ?, slug = ?, sku = ?, category_id = ?,
+      price = ?, sale_price = ?, stock_quantity = ?,
+      status = ?, main_image = ?, description = ?,
+      is_featured = ?, is_new = ?, is_bestseller = ?
      WHERE product_id = ?`,
     [
-      data.name, data.slug, data.sku, 
-      categoryId,
-      data.price, salePrice,
-      stockQuantity,
+      data.name, data.slug, data.sku,
+      data.category_id || data.categoryId,
+      data.price, data.sale_price || data.salePrice || null,
+      data.stock_quantity || data.stockQuantity,
       data.status, data.main_image || data.mainImage || '',
       data.description || '',
+      data.is_featured ?? data.isFeatured ?? 0,
+      data.is_new ?? data.isNew ?? 0,
+      data.is_bestseller ?? data.isBestseller ?? 0,
       id
     ]
   );
@@ -454,14 +427,49 @@ async delete(id: number): Promise<boolean> {
     return result.affectedRows > 0;
   }
   async getStats(): Promise<ProductStats> {
-    const [result]: any = await this.pool.execute(`
+    // 1. Tổng quan
+    const [summary]: any = await this.pool.execute(`
       SELECT
         COUNT(*) as totalProducts,
         SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as activeProducts,
         SUM(CASE WHEN stock_quantity = 0 THEN 1 ELSE 0 END) as outOfStockCount
       FROM products WHERE deleted_at IS NULL
     `);
-    return result[0];
+
+    // 2. Top sản phẩm bán chạy
+    const [topSelling]: any = await this.pool.execute(`
+      SELECT product_id, name, sold_quantity, stock_quantity, main_image
+      FROM products
+      WHERE deleted_at IS NULL AND sold_quantity > 0
+      ORDER BY sold_quantity DESC
+      LIMIT 10
+    `);
+
+    // 3. Sản phẩm hết hàng / sắp hết (stock <= 5)
+    const [lowStock]: any = await this.pool.execute(`
+      SELECT product_id, name, stock_quantity, main_image
+      FROM products
+      WHERE deleted_at IS NULL AND status = 'active' AND stock_quantity <= 5
+      ORDER BY stock_quantity ASC
+      LIMIT 10
+    `);
+
+    return {
+      ...summary[0],
+      topSellingProducts: topSelling.map((r: any) => ({
+        productId: r.product_id,
+        name: r.name,
+        soldQuantity: r.sold_quantity,
+        stockQuantity: r.stock_quantity,
+        mainImage: r.main_image || null,
+      })),
+      lowStockProducts: lowStock.map((r: any) => ({
+        productId: r.product_id,
+        name: r.name,
+        stockQuantity: r.stock_quantity,
+        mainImage: r.main_image || null,
+      })),
+    };
   }
   async archive(productId: number): Promise<boolean> {
     const [result] = await pool.execute<ResultSetHeader>(
@@ -513,6 +521,9 @@ async delete(id: number): Promise<boolean> {
         return typeof s === 'string' ? JSON.parse(s) : (s || null);
       } catch { return null; }
     })(),
+    isFeatured: Boolean(row.is_featured),
+    isNew: Boolean(row.is_new),
+    isBestseller: Boolean(row.is_bestseller),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     images: [],
@@ -578,8 +589,10 @@ async delete(id: number): Promise<boolean> {
     params.push(Number(filters.categoryId));
   }
   if (filters?.categorySlug || filters?.category) {
-    query += ' AND c.slug = ?';
-    params.push(filters.categorySlug || filters.category);
+    const slug = filters.categorySlug || filters.category;
+    // Tìm cả sản phẩm thuộc category con (parent_id trỏ tới category có slug này)
+    query += ` AND (c.slug = ? OR c.parent_id IN (SELECT cat.category_id FROM categories cat WHERE cat.slug = ?))`;
+    params.push(slug, slug);
   }
 
   // 2. MỚI: Lọc theo Thương hiệu (brandId hoặc brandSlug)

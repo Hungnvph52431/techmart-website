@@ -30,7 +30,39 @@ export const uploadImage = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
 });
 
-// --- 2. Upload ảnh bằng chứng hoàn trả (tối đa 5 ảnh, mỗi ảnh 5MB) ---
+// --- 2. Upload ảnh avatar ---
+const avatarDir = path.join(process.cwd(), 'public', 'images', 'avatars');
+ensureDir(avatarDir);
+
+export const uploadAvatar = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, avatarDir),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, `avatar-${Date.now()}-${Math.round(Math.random() * 1e6)}${ext}`);
+    },
+  }),
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+// --- 3. Upload ảnh banner user ---
+const bannerUserDir = path.join(process.cwd(), 'public', 'images', 'banners', 'user');
+ensureDir(bannerUserDir);
+
+export const uploadBanner = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, bannerUserDir),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, `banner-${Date.now()}-${Math.round(Math.random() * 1e6)}${ext}`);
+    },
+  }),
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+// --- 4. Upload ảnh bằng chứng hoàn trả (tối đa 5 ảnh, mỗi ảnh 5MB) ---
 const returnDir = path.join(process.cwd(), 'public', 'images', 'returns');
 ensureDir(returnDir);
 

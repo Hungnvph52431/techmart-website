@@ -31,8 +31,8 @@ export const adminAttributeService = {
     return response.data;
   },
 
-  assignCategoryAttributes: async (categoryId: number | string, attributeIds: number[]) => {
-    const response = await api.put(`/admin/attributes/category/${categoryId}`, { attributeIds });
+  assignCategoryAttributes: async (categoryId: number | string, attributes: any[]) => {
+    const response = await api.put(`/admin/attributes/category/${categoryId}`, { attributes });
     return response.data;
   },
 };

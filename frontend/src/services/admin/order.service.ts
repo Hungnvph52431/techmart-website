@@ -2,27 +2,27 @@ import api from '../api';
 
 export const adminOrderService = {
   getAll: async () => {
-    const response = await api.get('/orders');
+    const response = await api.get('/admin/orders');
     return response.data;
   },
 
   getById: async (orderId: number | string) => {
-    const response = await api.get(`/orders/${orderId}`);
+    const response = await api.get(`/admin/orders/${orderId}`);
     return response.data;
   },
 
   getTimeline: async (orderId: number | string) => {
-    const response = await api.get(`/orders/${orderId}/timeline`);
+    const response = await api.get(`/admin/orders/${orderId}/timeline`);
     return response.data;
   },
 
   getReturns: async (orderId: number | string) => {
-    const response = await api.get(`/orders/${orderId}/returns`);
+    const response = await api.get(`/admin/orders/${orderId}/returns`);
     return response.data;
   },
 
   updateStatus: async (orderId: number | string, status: string, note?: string) => {
-    const response = await api.patch(`/orders/${orderId}/status`, {
+    const response = await api.patch(`/admin/orders/${orderId}/status`, {
       status,
       actorRole: 'admin',
       note: note || '',
@@ -31,27 +31,27 @@ export const adminOrderService = {
   },
 
   updatePaymentStatus: async (orderId: number | string, paymentStatus: string) => {
-    const response = await api.patch(`/orders/${orderId}/payment-status`, { paymentStatus });
+    const response = await api.patch(`/admin/orders/${orderId}/payment-status`, { paymentStatus });
     return response.data;
   },
 
   reviewReturn: async (orderId: number | string, returnId: number | string, payload: { decision: string; adminNote?: string }) => {
-    const response = await api.patch(`/orders/${orderId}/returns/${returnId}/review`, payload);
+    const response = await api.patch(`/admin/orders/${orderId}/returns/${returnId}/review`, payload);
     return response.data;
   },
 
   receiveReturn: async (orderId: number | string, returnId: number | string, payload?: { adminNote?: string }) => {
-    const response = await api.patch(`/orders/${orderId}/returns/${returnId}/receive`, payload || {});
+    const response = await api.patch(`/admin/orders/${orderId}/returns/${returnId}/receive`, payload || {});
     return response.data;
   },
 
   refundReturn: async (orderId: number | string, returnId: number | string, payload?: { adminNote?: string }) => {
-    const response = await api.patch(`/orders/${orderId}/returns/${returnId}/refund`, payload || {});
+    const response = await api.patch(`/admin/orders/${orderId}/returns/${returnId}/refund`, payload || {});
     return response.data;
   },
 
   closeReturn: async (orderId: number | string, returnId: number | string, payload?: { adminNote?: string }) => {
-    const response = await api.patch(`/orders/${orderId}/returns/${returnId}/close`, payload || {});
+    const response = await api.patch(`/admin/orders/${orderId}/returns/${returnId}/close`, payload || {});
     return response.data;
   },
 

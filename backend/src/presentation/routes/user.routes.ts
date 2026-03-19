@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { UserController } from "../controllers/UserControllers";
 import { authMiddleware, adminMiddleware } from "../middlewares/auth.middleware";
-import { uploadImage } from "../middlewares/upload.middleware";
+import { uploadAvatar, uploadBanner } from "../middlewares/upload.middleware";
 import pool  from "../../infrastructure/database/connection";
 import type { AuthRequest } from "../middlewares/auth.middleware";
 import type { Response } from "express";
@@ -10,7 +10,7 @@ export const createUserRoutes = (userController: UserController) => {
   const router = Router();
 
   // ✅ Route upload avatar/banner — chỉ cần đăng nhập, KHÔNG cần admin
-  router.post('/me/avatar', authMiddleware, uploadImage.single('image'), async (req: AuthRequest, res: Response) => {
+  router.post('/me/avatar', authMiddleware, uploadAvatar.single('image'), async (req: AuthRequest, res: Response) => {
     try {
       if (!req.file) return res.status(400).json({ message: 'Không có file được upload' });
       const avatarUrl = `/images/avatars/${req.file.filename}`;
@@ -21,7 +21,7 @@ export const createUserRoutes = (userController: UserController) => {
     }
   });
 
-  router.post('/me/banner', authMiddleware, uploadImage.single('image'), async (req: AuthRequest, res: Response) => {
+  router.post('/me/banner', authMiddleware, uploadBanner.single('image'), async (req: AuthRequest, res: Response) => {
     try {
       if (!req.file) return res.status(400).json({ message: 'Không có file được upload' });
       const bannerUrl = `/images/banners/user/${req.file.filename}`;

@@ -107,7 +107,7 @@ export const OrdersPage = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto max-w-5xl px-4 py-8 space-y-6">
 
       {/* ── Thống kê nhanh ── */}
       <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
