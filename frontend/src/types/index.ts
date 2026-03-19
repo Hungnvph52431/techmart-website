@@ -1,0 +1,205 @@
+/**
+ * TECHMART - THƯ VIỆN TYPES THỐNG NHẤT
+ */
+
+// --- 1. CÁC KIỂU TRẠNG THÁI (ENUM-LIKE) ---
+export type ProductStatus = 'draft' | 'active' | 'inactive' | 'out_of_stock' | 'pre_order' | 'archived';
+export type OrderStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'shipping'
+  | 'delivered'
+  | 'completed'
+  | 'cancelled'
+  | 'returned';
+export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
+
+// --- 2. LIÊN QUAN ĐẾN SẢN PHẨM ---
+
+export interface ProductImage {
+  imageId: number;
+  productId: number;
+  imageUrl: string;
+  altText?: string;
+  displayOrder: number;
+  isPrimary: boolean;
+  createdAt: string; // Bổ sung để dập lỗi TS ở Repository
+}
+
+export interface ProductVariant {
+  variantId: number;
+  productId: number;
+  variantName: string;
+  sku: string;
+  attributes: Record<string, any>;
+  priceAdjustment: number;
+  stockQuantity: number;
+  imageUrl?: string;
+  isActive: boolean;
+}
+
+export interface Product {
+  productId: number; // Chốt: Dùng productId kiểu number cho toàn hệ thống
+  name: string;
+  slug: string;
+  sku: string;
+  categoryId: number;
+  categoryName?: string;
+  categorySlug?: string;
+  brandId?: number;
+  brandName?: string;
+  brandSlug?: string;
+  price: number;
+  salePrice?: number;
+  costPrice?: number; // Thêm trường giá vốn từ bản Tuấn Anh
+  description?: string;
+  specifications?: Record<string, any>;
+  mainImage?: string;
+  images?: ProductImage[];
+  variants?: ProductVariant[];
+  stockQuantity: number;
+  soldQuantity: number;
+  viewCount: number;
+  ratingAvg: number;
+  reviewCount: number;
+  isFeatured: boolean;
+  isNew: boolean;
+  isBestseller: boolean;
+  status: ProductStatus | string;
+  // Các trường SEO từ bản Tuấn Anh
+  metaTitle?: string;
+  metaDescription?: string;
+  metaKeywords?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// --- 3. LIÊN QUAN ĐẾN DANH MỤC & HÃNG ---
+
+export interface Category {
+  categoryId: number;
+  name: string;
+  slug: string;
+  description?: string;
+  parentId?: number | null;
+  imageUrl?: string;
+  displayOrder: number;
+  isActive: boolean;
+  children?: Category[]; // Hỗ trợ cấu trúc cây của Khanh
+}
+
+export interface Brand {
+  brandId: number;
+  name: string;
+  slug: string;
+  logoUrl?: string;
+  description?: string;
+  isActive: boolean;
+}
+
+// --- 4. NGƯỜI DÙNG & GIỎ HÀNG ---
+
+export interface User {
+  userId: number; // Sử dụng duy nhất userId thống nhất với Backend
+  email: string;
+  fullName: string; // Dùng fullName thay vì name
+  phone?: string;
+  address?: string;
+  role: 'admin' | 'customer' | 'staff' | 'warehouse';
+  avatar?: string;
+  status: 'active' | 'inactive' | 'banned';
+  points: number;
+  membershipLevel: 'bronze' | 'silver' | 'gold' | 'platinum';
+  walletBalance: number;
+  createdAt?: string;
+}
+
+export interface CartItem {
+  product: Product;
+  quantity: number;
+}
+
+// --- 5. ĐƠN HÀNG ---
+
+export interface OrderItem {
+  productId: number;
+  productName: string;
+  productImage: string;
+  quantity: number;
+  price: number;
+}
+
+export interface Order {
+  orderId: number;
+  userId: number;
+  orderCode: string; // Mã đơn hàng (TM-XXXX)
+  items: OrderItem[];
+  totalAmount: number;
+  shippingAddress: string;
+  shippingName: string;
+  shippingPhone: string;
+  paymentMethod: 'cod' | 'online';
+  paymentStatus: PaymentStatus;
+  status: OrderStatus;
+  note?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// --- 6. PHẢN HỒI API & THỐNG KÊ (Dành cho Admin) ---
+
+export interface ProductResponse {
+  products: Product[];
+  totalPages: number;
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface ProductStats {
+  totalProducts: number;
+  activeProducts: number;
+  inactiveProducts: number;
+  outOfStockCount: number;
+  lowStockCount: number;
+  topSellingProducts: Array<{
+    productId: number;
+    name: string;
+    soldQuantity: number;
+    stockQuantity: number;
+    mainImage: string | null;
+  }>;
+  lowStockProducts: Array<{
+    productId: number;
+    name: string;
+    stockQuantity: number;
+  }>;
+}
+
+export interface UserStats {
+  totalUsers: number;
+  activeUsers: number;
+  usersByRole: Record<string, number>;
+  usersByMembership: Record<string, number>;
+}
+
+export interface OrderStats {
+  totalOrders: number;
+  totalRevenue: number;
+  revenueThisMonth: number;
+  avgOrderValue: number;
+  ordersByStatus: Record<string, number>;
+  recentOrders: Array<Partial<Order>>;
+}
+
+export interface ProductFilter {
+  search?: string;
+  categoryId?: number;
+  categorySlug?: string;
+  brandSlug?: string;
+  status?: string;
+  isFeatured?: boolean;
+  sort?: string;
+  page?: number;
+  limit?: number;
+}

@@ -1,0 +1,142 @@
+import api from './api';
+
+// --- INTERFACES & TYPES ---
+
+export interface User {
+  // Khớp với user_id trong DB
+  userId: number; 
+  email: string;
+  name: string;
+  phone?: string;
+  
+  // ENUM khớp 100% với DB
+  role: 'customer' | 'admin' | 'staff' | 'warehouse';  
+  status: 'active' | 'inactive' | 'banned';  
+  points: number;
+  
+  // membership_level trong DB
+  membershipLevel: 'bronze' | 'silver' | 'gold' | 'platinum'; 
+  
+  createdAt: string; // created_at
+  updatedAt: string; // updated_at
+  lastLogin?: string; // last_login (Mới thêm)
+}
+
+export type UserRole = User['role'];
+export type UserStatus = User['status'];
+export type MembershipLevel = User['membershipLevel'];
+
+export interface UserFilters {
+  search?: string;
+  role?: UserRole;
+  status?: UserStatus;
+}
+
+export interface CreateUserPayload {
+  email: string;
+  password: string;
+  name: string;
+  phone?: string;
+  role?: UserRole;
+}
+
+export interface UpdateUserPayload {
+  email?: string;
+  name?: string;
+  phone?: string;
+  role?: UserRole;
+  status?: UserStatus;
+  points?: number;
+  membershipLevel?: MembershipLevel;
+}
+
+export interface UserStats {
+  totalUsers: number;
+  activeUsers: number;
+  inactiveUsers: number;
+  bannedUsers: number;
+  usersByRole: Record<string, number>;
+  usersByMembership: Record<string, number>;
+}
+
+export interface DeleteUserResponse {
+  action: 'deleted' | 'deactivated';
+}
+
+// --- HELPER FUNCTIONS ---
+
+type ApiEnvelope<T> = {
+  success?: boolean;
+  data?: T;
+  message?: string;
+};
+
+// Hàm bóc tách dữ liệu từ API
+const unwrapData = <T>(payload: T | ApiEnvelope<T>): T => {
+  if (payload && typeof payload === 'object' && 'data' in (payload as ApiEnvelope<T>)) {
+    const envelope = payload as ApiEnvelope<T>;
+    return (envelope.data ?? payload) as T;
+  }
+  return payload as T;
+};
+
+const buildQueryString = (filters?: UserFilters): string => {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, String(value));
+      }
+    });
+  }
+  return params.toString();
+};
+
+// --- SERVICE OBJECT ---
+
+export const userService = {
+  getAllUsers: async (filters?: UserFilters): Promise<User[]> => {
+    const query = buildQueryString(filters);
+    const response = await api.get(query ? `/users?${query}` : '/users');
+    return unwrapData<User[]>(response.data);
+  },
+
+  getById: async (userId: number): Promise<User> => {
+    const response = await api.get(`/users/${userId}`);
+    return unwrapData<User>(response.data);
+  },
+
+  createUser: async (payload: CreateUserPayload): Promise<User> => {
+    const response = await api.post('/users', payload);
+    return unwrapData<User>(response.data);
+  },
+
+  updateUser: async (userId: number, payload: UpdateUserPayload): Promise<User> => {
+    const response = await api.put(`/users/${userId}`, payload);
+    return unwrapData<User>(response.data);
+  },
+
+  deleteUser: async (userId: number): Promise<DeleteUserResponse> => {
+    const response = await api.delete(`/users/${userId}`);
+    return unwrapData<DeleteUserResponse>(response.data);
+  },
+
+  async updateUserStatus(userId: number, status: UserStatus): Promise<User> {
+    const response = await api.patch(`/users/${userId}/status`, { status });
+    return unwrapData<User>(response.data);
+  },
+
+  async updateUserPoints(userId: number, points: number): Promise<User> {
+    const response = await api.patch(`/users/${userId}/points`, { points });
+    return unwrapData<User>(response.data);
+  },
+
+  async getUserStats(): Promise<UserStats> {
+    const response = await api.get('/users/stats');
+    return unwrapData<UserStats>(response.data);
+  },
+
+  async changePassword(userId: number, oldPassword: string, newPassword: string): Promise<void> {
+    await api.post(`/users/${userId}/password`, { oldPassword, newPassword });
+  }
+};

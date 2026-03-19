@@ -1,0 +1,72 @@
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: techmart-mysql
+    restart: always
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --character-set-client-handshake=FALSE
+    environment:
+      MYSQL_ROOT_PASSWORD: techmart123
+      MYSQL_DATABASE: mobile_shop
+      MYSQL_USER: techmart_user
+      MYSQL_PASSWORD: techmart123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/src/infrastructure/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./backend/src/infrastructure/database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+    networks:
+      - techmart-network
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      timeout: 20s
+      retries: 10
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: techmart-backend
+    restart: always
+    ports:
+      - "5001:5000"
+    env_file:
+      - ./backend/.env
+    environment:
+      - DB_HOST=mysql
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - techmart-network
+
+  # Frontend App
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: techmart-frontend
+    restart: always
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:5001/api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - techmart-network
+
+networks:
+  techmart-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
