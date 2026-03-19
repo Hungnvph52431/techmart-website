@@ -5,6 +5,13 @@ import { Trash2, Plus, Minus, ShoppingCart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
+const BACKEND_URL = (import.meta.env.VITE_API_URL as string)?.replace('/api', '') || 'http://localhost:5001';
+const getImageUrl = (url?: string | null) => {
+  if (!url) return '/placeholder.jpg';
+  if (url.startsWith('http')) return url;
+  return `${BACKEND_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
 export const CartPage = () => {
   const {
     items,
@@ -107,9 +114,10 @@ export const CartPage = () => {
                       className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                     />
                     <img
-                      src={item.product.mainImage || '/placeholder.jpg'}
+                      src={getImageUrl(item.product.mainImage)}
                       alt={item.product.name}
                       className="w-24 h-24 object-cover rounded shadow-sm"
+                      onError={e => { const el = e.target as HTMLImageElement; el.onerror = null; el.src = '/placeholder.jpg'; }}
                     />
 
                     <div className="flex-1">
