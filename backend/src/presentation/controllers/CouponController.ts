@@ -23,6 +23,7 @@ export class CouponController {
         }
     };
 
+
     getById = async (req: Request, res: Response) => {
         try {
             const coupon = await this.couponUseCase.getCouponById(Number(req.params.id));

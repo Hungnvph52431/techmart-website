@@ -18,10 +18,10 @@ export const Header = () => {
   const navigate = useNavigate();
   // Lấy dữ liệu từ Auth Store (Giữ logic của Khanh)
   const { user, isAuthenticated, clearAuth } = useAuthStore();
-  
+
   // Lấy dữ liệu từ Cart Store (Tích hợp thêm Mini Cart của Tuấn Anh)
   const { getTotalItems, items, getTotalPrice } = useCartStore();
-  
+
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -251,7 +251,7 @@ export const Header = () => {
 
           {/* Actions */}
           <div className="flex items-center space-x-6">
-            
+
             {/* --- KHỐI GIỎ HÀNG (MINI CART DROP DOWN) --- */}
             <div className="relative group">
               <Link to="/cart" className="relative p-2 hover:bg-gray-50 rounded-full transition-colors flex items-center">
@@ -322,7 +322,7 @@ export const Header = () => {
                     {displayName}
                   </span>
                 </button>
-                
+
                 {isUserMenuOpen && (
                   <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-2xl py-2 border border-gray-100 animate-in fade-in zoom-in duration-150">
                     {user?.role === 'admin' || user?.role === 'staff' || user?.role === 'warehouse' ? (

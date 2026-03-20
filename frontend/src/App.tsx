@@ -71,9 +71,7 @@ function App() {
             <Route index element={<OrdersPage />} />
             <Route path=":id" element={<OrderDetailPage />} />
           </Route>
-          
-          {/* Khanh ưu tiên chuyển Profile về trang Đơn hàng */}
-          {/* Nếu muốn dùng trang Profile của Tuấn Anh, hãy đổi Navigate thành <ProfilePage /> */}
+
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/wallet" element={<WalletPage />} />
         </Route>
@@ -85,11 +83,10 @@ function App() {
           <Route path="attributes" element={<AdminAttributes />} />
           <Route path="products" element={<AdminProducts />} />
           <Route path="banners" element={<AdminBanners />} />
-          
-          
+
           {/* Chốt dùng AdminProductFormPage cho đồng bộ */}
           <Route path="products/new" element={<AdminProductFormPage />} />
-          <Route path="products/edit/:id" element={<AdminProductFormPage />} />          
+          <Route path="products/edit/:id" element={<AdminProductFormPage />} />
           <Route path="orders" element={<AdminOrders />} />
           <Route path="/admin/orders/:id" element={<AdminOrderDetail />} />
           <Route path="users" element={<AdminUsers />} />

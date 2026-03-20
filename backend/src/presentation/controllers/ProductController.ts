@@ -56,7 +56,6 @@ getAll = async (req: Request, res: Response) => {
       isNew: req.query.isNew === 'true',
       isBestseller: req.query.isBestseller === 'true',
       status: req.query.status as string || undefined,
-      // ✅ Spec filters
       ram:      req.query.ram      as string || undefined,
       storage:  req.query.storage  as string || undefined,
       chip:     req.query.chip     as string || undefined,
@@ -83,7 +82,7 @@ getAll = async (req: Request, res: Response) => {
     try {
       const product = await this.productUseCase.getProductById(Number(req.params.id));
       if (!product) return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
-      
+
       res.json(toStorefrontProduct(product));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -93,7 +92,7 @@ getAll = async (req: Request, res: Response) => {
   getBySlug = async (req: Request, res: Response) => {
     try {
       // Giữ lại log để Khanh dễ debug lỗi 404
-      console.log(">>> Backend đang tìm sản phẩm với Slug:", req.params.slug); 
+      console.log(">>> Backend đang tìm sản phẩm với Slug:", req.params.slug);
       const product = await this.productUseCase.getProductBySlug(req.params.slug);
 
       if (!product) {

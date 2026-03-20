@@ -29,7 +29,7 @@ export const authService = {
     const response = await api.post('/auth/login', { email, password });
     return {
       token: response.data.token,
-      user: normalizeAuthUser(response.data.user), // Chuẩn hóa ngay khi nhận
+      user: normalizeAuthUser(response.data.user),
     };
   },
 
@@ -41,11 +41,10 @@ export const authService = {
     phone: string;
     address?: string;
   }): Promise<AuthResponse> => {
-    // Mapping payload: Tuấn Anh dùng 'name' cho backend
     const payload = {
       email: userData.email,
       password: userData.password,
-      name: userData.fullName, // Map fullName sang name cho khớp DB của Tuấn Anh
+      name: userData.fullName,
       phone: userData.phone,
       address: userData.address,
     };
