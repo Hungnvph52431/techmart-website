@@ -7,8 +7,8 @@ interface CartState {
   /** Danh sách productId đang được chọn để thanh toán */
   selectedProductIds: number[];
   addItem: (product: Product, quantity?: number) => void;
-  removeItem: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
+  removeItem: (productId: number) => void;
+  updateQuantity: (productId: number, quantity: number) => void;
   clearCart: () => void;
   // Chọn/bỏ chọn sản phẩm
   toggleSelect: (productId: number) => void;

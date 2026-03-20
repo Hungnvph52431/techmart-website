@@ -39,7 +39,7 @@ export interface ProductVariant {
 }
 
 export interface Product {
-  productId: number; // Chốt: Dùng productId kiểu number cho toàn hệ thống
+  productId: number;
   name: string;
   slug: string;
   sku: string;
@@ -51,7 +51,7 @@ export interface Product {
   brandSlug?: string;
   price: number;
   salePrice?: number;
-  costPrice?: number; // Thêm trường giá vốn từ bản Tuấn Anh
+  costPrice?: number;
   description?: string;
   specifications?: Record<string, any>;
   mainImage?: string;
@@ -66,7 +66,6 @@ export interface Product {
   isNew: boolean;
   isBestseller: boolean;
   status: ProductStatus | string;
-  // Các trường SEO từ bản Tuấn Anh
   metaTitle?: string;
   metaDescription?: string;
   metaKeywords?: string;

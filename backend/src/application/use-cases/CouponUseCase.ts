@@ -21,6 +21,7 @@ export class CouponUseCase {
         });
     }
 
+
     async getCouponById(id: number) {
         return this.couponRepository.findById(id);
     }

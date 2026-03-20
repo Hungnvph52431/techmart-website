@@ -19,7 +19,7 @@ interface ProductCardProps {
 export const ProductCard = ({ product }: ProductCardProps) => {
   const { addItem, items } = useCartStore();
 
-  // Logic kiểm tra tồn kho (Gộp từ bản Tuấn Anh)
+  // Logic kiểm tra tồn kho
   const currentCartItem = items.find(item => item.product.productId === product.productId);
   const cartQuantity = currentCartItem ? currentCartItem.quantity : 0;
   const isOutOfStock = product.stockQuantity <= 0;
@@ -33,7 +33,6 @@ export const ProductCard = ({ product }: ProductCardProps) => {
     toast.success(`Đã thêm ${product.name} vào giỏ hàng!`);
   };
 
-  // Logic tính toán giá & giảm giá (Chuẩn hóa từ cả 2 bản)
   const originalPrice = product.price ?? 0;
   const currentPrice = product.salePrice ?? originalPrice;
   const discount = (product.salePrice && originalPrice > product.salePrice)
@@ -53,8 +52,8 @@ export const ProductCard = ({ product }: ProductCardProps) => {
           className="absolute inset-0 h-full w-full object-contain p-4 transition-transform duration-500 group-hover:scale-110"
           onError={(e) => { const el = e.target as HTMLImageElement; el.onerror = null; el.src = '/placeholder.jpg'; }}
         />
-        
-        {/* Badges - Thông tin Nổi bật và Giảm giá (Phong cách Khanh) */}
+
+        {/* Badges */}
         <div className="absolute left-3 top-3 flex flex-col gap-2">
           {discount > 0 && !isDisabled && (
             <span className="rounded-lg bg-red-600 px-2 py-1 text-[10px] font-black uppercase text-white shadow-sm">
@@ -68,7 +67,7 @@ export const ProductCard = ({ product }: ProductCardProps) => {
           )}
         </div>
 
-        {/* Overlay Hết hàng (Logic Tuấn Anh) */}
+        {/* Overlay Hết hàng */}
         {isDisabled && (
           <div className="absolute inset-0 bg-white/60 flex items-center justify-center backdrop-blur-[2px]">
             <span className="bg-gray-800 text-white px-4 py-2 rounded-xl font-black text-[10px] tracking-widest uppercase shadow-lg italic">

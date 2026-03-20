@@ -98,7 +98,6 @@ export class ProductUseCase {
   }
 
   async getProductVariants(productId: number) {
-    // Thêm các hàm chi tiết từ Tuấn Anh để Admin quản lý dễ hơn
     return this.productRepository.findVariants(productId);
   }
 

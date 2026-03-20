@@ -5,12 +5,12 @@ import { authMiddleware, adminMiddleware } from '../middlewares/auth.middleware'
 export const createProductRoutes = (productController: ProductController) => {
   const router = Router();
  router.get(
-    '/stats', 
-    authMiddleware, 
-    adminMiddleware, 
+    '/stats',
+    authMiddleware,
+    adminMiddleware,
     productController.getStats
   );
-  
+
   // --- 1. ROUTES CÔNG KHAI (STOREFRONT) ---
   router.get('/', productController.getAll);
   router.get('/slug/:slug', productController.getBySlug);
@@ -28,28 +28,28 @@ export const createProductRoutes = (productController: ProductController) => {
   router.delete('/:id/variants/:variantId', authMiddleware, adminMiddleware, productController.deleteVariant);
 
   // --- 4. ROUTES QUẢN TRỊ (ADMIN CRUD & STATS) ---
-  
+
   // Lưu ý quan trọng: /stats phải đặt TRƯỚC các route có :id để không bị bắt nhầm tham số
- 
+
 
   router.post(
-    '/', 
-    authMiddleware, 
-    adminMiddleware, 
+    '/',
+    authMiddleware,
+    adminMiddleware,
     productController.create
   );
 
   router.put(
-    '/:id', 
-    authMiddleware, 
-    adminMiddleware, 
+    '/:id',
+    authMiddleware,
+    adminMiddleware,
     productController.update
   );
 
   router.delete(
-    '/:id', 
-    authMiddleware, 
-    adminMiddleware, 
+    '/:id',
+    authMiddleware,
+    adminMiddleware,
     productController.delete
   );
 

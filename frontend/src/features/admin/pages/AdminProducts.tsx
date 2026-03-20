@@ -171,15 +171,14 @@ export const AdminProducts = () => {
                 <tr key={product.productId} className="hover:bg-blue-50/20 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-4">
-                      {/* Image fallback từ bản Tuấn Anh */}
                      <img
   src={getImageUrl(product.mainImage)}
   alt={product.name}
   className="w-14 h-14 object-contain bg-gray-100 rounded-2xl border border-gray-100 shadow-sm"
-  onError={(e) => { 
+  onError={(e) => {
     const el = e.target as HTMLImageElement;
-    el.onerror = null; 
-    el.src = '/placeholder.jpg'; 
+    el.onerror = null;
+    el.src = '/placeholder.jpg';
   }}
 />
                       <div>
@@ -202,9 +201,8 @@ export const AdminProducts = () => {
                     )}
                   </td>
                   <td className="px-6 py-4">
-                    {/* Cảnh báo tồn kho 3 màu từ bản Tuấn Anh */}
                     <span className={`text-xs font-black ${
-                      product.stockQuantity > 10 ? 'text-green-600' : 
+                      product.stockQuantity > 10 ? 'text-green-600' :
                       product.stockQuantity > 0 ? 'text-orange-500' : 'text-red-600'
                     }`}>
                       {product.stockQuantity} SP
@@ -232,8 +230,8 @@ export const AdminProducts = () => {
                         className="p-2.5 text-red-600 hover:bg-red-50 rounded-xl transition-all disabled:opacity-30"
                         title="Xóa sản phẩm"
                       >
-                        {actionLoading === product.productId ? 
-                          <RefreshCw size={16} className="animate-spin" /> : 
+                        {actionLoading === product.productId ?
+                          <RefreshCw size={16} className="animate-spin" /> :
                           <Trash2 size={16} />
                         }
                       </button>

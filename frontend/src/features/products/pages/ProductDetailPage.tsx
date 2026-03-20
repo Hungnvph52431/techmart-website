@@ -78,7 +78,6 @@ export const ProductDetailPage = () => {
   const selectedVariant = variants.find((v: any) => v.variantId === selectedVariantId);
 
   // Tính giá hiển thị: giá gốc + chênh lệch variant
-  // API có thể trả về priceAdjustment (chênh lệch) hoặc price (giá đầy đủ variant)
   const basePrice = Number(product?.salePrice || product?.price || 0);
   const displayPrice = selectedVariant
     ? (selectedVariant.priceAdjustment != null && !isNaN(Number(selectedVariant.priceAdjustment))
