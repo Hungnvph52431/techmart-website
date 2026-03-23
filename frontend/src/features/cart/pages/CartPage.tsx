@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { useCartStore } from '@/store/cartStore';
+import { productService } from '@/services/product.service';
 import toast from 'react-hot-toast';
 import { Trash2, Plus, Minus, ShoppingCart } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -25,6 +27,33 @@ export const CartPage = () => {
     clearSelection,
     getSelectedTotalPrice,
   } = useCartStore();
+  const [unavailableIds, setUnavailableIds] = useState<Set<number>>(new Set());
+
+  // Validate giỏ hàng khi vào trang — xóa SP đã bị xóa, đánh dấu SP ngừng bán
+  useEffect(() => {
+    if (items.length === 0) return;
+    const validate = async () => {
+      try {
+        const results = await productService.validateCart(items.map(i => i.product.productId));
+        const bad = new Set<number>();
+        let removed = 0;
+        for (const r of results) {
+          if (!r.available) {
+            if (r.reason === 'not_found') {
+              removeItem(r.productId);
+              removed++;
+            } else {
+              bad.add(r.productId);
+            }
+          }
+        }
+        setUnavailableIds(bad);
+        if (removed > 0) toast.error(`Đã xóa ${removed} sản phẩm không còn tồn tại khỏi giỏ hàng`);
+        if (bad.size > 0) toast.error(`${bad.size} sản phẩm đã ngừng bán hoặc hết hàng, không thể thanh toán`);
+      } catch { /* ignore */ }
+    };
+    validate();
+  }, []);
 
   const handleUpdateQuantity = (productId: number, newQuantity: number, stockQuantity: number) => {
     if (newQuantity === 0) {
@@ -94,7 +123,9 @@ export const CartPage = () => {
                 </div>
               </div>
               <AnimatePresence>
-                {items.map((item) => (
+                {items.map((item) => {
+                  const isUnavailable = unavailableIds.has(item.product.productId);
+                  return (
                   <motion.div
                     key={item.product.productId}
                     layout
@@ -102,8 +133,11 @@ export const CartPage = () => {
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0, padding: 0, border: 0, overflow: 'hidden' }}
                     transition={{ duration: 0.3 }}
-                    className="flex items-center gap-4 p-4 border-b last:border-b-0 origin-top bg-white"
+                    className={`flex items-center gap-4 p-4 border-b last:border-b-0 origin-top ${isUnavailable ? 'bg-red-50 opacity-60' : 'bg-white'}`}
                   >
+                    {isUnavailable && (
+                      <span className="absolute right-16 top-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">Ngừng bán</span>
+                    )}
                     <input
                       type="checkbox"
                       checked={
@@ -169,7 +203,8 @@ export const CartPage = () => {
                       <Trash2 className="h-5 w-5" />
                     </button>
                   </motion.div>
-                ))}
+                  );
+                })}
               </AnimatePresence>
             </div>
           </div>
@@ -202,12 +237,19 @@ export const CartPage = () => {
                 </div>
               </div>
 
-                              <Link
+              {unavailableIds.size > 0 ? (
+                <button disabled
+                  className="block w-full bg-gray-300 text-gray-500 text-center py-3 rounded-lg cursor-not-allowed">
+                  Có sản phẩm ngừng bán — vui lòng xóa trước
+                </button>
+              ) : (
+                <Link
                   to="/checkout"
                   className="block w-full bg-primary-600 text-white text-center py-3 rounded-lg hover:bg-primary-700 transition-colors"
                 >
                   Tiến hành thanh toán
                 </Link>
+              )}
               <Link
                 to="/products"
                 className="block w-full text-center text-primary-600 mt-3 hover:text-primary-700"

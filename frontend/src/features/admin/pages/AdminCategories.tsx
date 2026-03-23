@@ -37,7 +37,7 @@ const CategoryRow = ({ item, level, onEdit, onDelete, deleteLoading }: {
       <td className="px-5 py-3.5">
         <div className="flex items-center gap-2" style={{ paddingLeft: `${level * 20}px` }}>
           {level > 0 && <ChevronRight size={12} className="text-slate-300" />}
-          {(item.children || []).length > 0
+          {level === 0
             ? <FolderOpen size={15} className="text-amber-400 shrink-0" />
             : <Folder size={15} className="text-slate-300 shrink-0" />}
           <span className={`font-semibold text-sm ${level === 0 ? 'text-slate-800' : 'text-slate-600'}`}>
@@ -47,9 +47,6 @@ const CategoryRow = ({ item, level, onEdit, onDelete, deleteLoading }: {
       </td>
       <td className="px-5 py-3.5">
         <span className="text-xs font-mono bg-slate-100 text-slate-500 px-2 py-1 rounded-md">/{item.slug}</span>
-      </td>
-      <td className="px-5 py-3.5 text-center">
-        <span className="text-xs font-bold text-slate-400">{item.displayOrder}</span>
       </td>
       <td className="px-5 py-3.5">
         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
@@ -223,9 +220,9 @@ export const AdminCategories = () => {
                 <select value={form.parentId} onChange={(e) => setForm(p => ({ ...p, parentId: e.target.value }))}
                   className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:border-blue-400 focus:outline-none bg-white">
                   <option value="">📁 Danh mục gốc (không có cha)</option>
-                  {flatCategories.filter((c) => c.categoryId !== editingId).map((c) => (
+                  {flatCategories.filter((c) => c.categoryId !== editingId && c.level === 0).map((c) => (
                     <option key={c.categoryId} value={c.categoryId}>
-                      {'　'.repeat(c.level)}{c.level > 0 ? '└ ' : ''}{c.name}
+                      {c.name}
                     </option>
                   ))}
                 </select>
@@ -236,13 +233,6 @@ export const AdminCategories = () => {
                 )}
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Thứ tự hiển thị</label>
-                <input type="number" min={0} value={form.displayOrder}
-                  onChange={(e) => setForm(p => ({ ...p, displayOrder: Number(e.target.value) }))}
-                  className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:border-blue-400 focus:outline-none" />
-                <p className="text-xs text-slate-400">Số nhỏ hơn hiển thị trước</p>
-              </div>
             </div>
 
             {/* Toggle kích hoạt */}
@@ -297,7 +287,6 @@ export const AdminCategories = () => {
               <tr className="bg-slate-50 border-b border-slate-200">
                 <th className="px-5 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wide">Tên danh mục</th>
                 <th className="px-5 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wide">Slug</th>
-                <th className="px-5 py-3 text-center text-xs font-bold text-slate-400 uppercase tracking-wide">Thứ tự</th>
                 <th className="px-5 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wide">Trạng thái</th>
                 <th className="px-5 py-3 text-right text-xs font-bold text-slate-400 uppercase tracking-wide">Thao tác</th>
               </tr>

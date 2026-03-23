@@ -23,8 +23,9 @@ export const ProductCard = ({ product }: ProductCardProps) => {
   const currentCartItem = items.find(item => item.product.productId === product.productId);
   const cartQuantity = currentCartItem ? currentCartItem.quantity : 0;
   const isOutOfStock = product.stockQuantity <= 0;
-  const isMaxReached = !isOutOfStock && cartQuantity >= product.stockQuantity;
-  const isDisabled = isOutOfStock || isMaxReached;
+  const isInactive = product.status === 'inactive';
+  const isMaxReached = !isOutOfStock && !isInactive && cartQuantity >= product.stockQuantity;
+  const isDisabled = isOutOfStock || isInactive || isMaxReached;
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -71,7 +72,7 @@ export const ProductCard = ({ product }: ProductCardProps) => {
         {isDisabled && (
           <div className="absolute inset-0 bg-white/60 flex items-center justify-center backdrop-blur-[2px]">
             <span className="bg-gray-800 text-white px-4 py-2 rounded-xl font-black text-[10px] tracking-widest uppercase shadow-lg italic">
-              Tạm hết hàng
+              {isInactive ? 'Ngừng bán' : 'Tạm hết hàng'}
             </span>
           </div>
         )}

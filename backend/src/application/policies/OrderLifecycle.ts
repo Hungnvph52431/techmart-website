@@ -5,13 +5,25 @@ import {
 } from '../../domain/entities/Order';
 
 // ─── Luồng trạng thái ─────────────────────────────────────────────────────────
-// Bỏ bước "processing" (Chuẩn bị đơn hàng)
 // pending → confirmed → shipping → delivered → completed
+// Admin chỉ được chuyển tối đa đến delivered
+// Chỉ customer (hoặc system sau 3 ngày) mới được chuyển delivered → completed
 export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   pending:   ['confirmed', 'cancelled'],
-  confirmed: ['shipping', 'cancelled'],  // ✅ Bỏ processing, confirmed → shipping thẳng
-  shipping:  ['delivered'],              // ❌ Không thể hủy khi đang giao
+  confirmed: ['shipping', 'cancelled'],
+  shipping:  ['delivered'],
   delivered: ['completed'],
+  completed: [],
+  cancelled: [],
+  returned:  [],
+};
+
+// Admin KHÔNG được chuyển sang completed — chỉ customer/system mới được
+const ADMIN_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  pending:   ['confirmed', 'cancelled'],
+  confirmed: ['shipping', 'cancelled'],
+  shipping:  ['delivered'],
+  delivered: [],              // ❌ Admin không được chuyển delivered → completed
   completed: [],
   cancelled: [],
   returned:  [],
@@ -36,8 +48,13 @@ const RETURN_REQUESTABLE_STATUSES: OrderStatus[] = ['delivered', 'completed'];
 // Thời hạn cho phép yêu cầu hoàn trả (tính từ ngày giao hàng)
 export const RETURN_DEADLINE_DAYS = 7;
 
-export const getAllowedNextOrderStatuses = (status: OrderStatus) =>
-  ORDER_STATUS_TRANSITIONS[status] || [];
+export const getAllowedNextOrderStatuses = (status: OrderStatus, actorRole?: OrderActorRole) => {
+  // Admin bị chặn chuyển delivered → completed
+  if (actorRole === 'admin') {
+    return ADMIN_STATUS_TRANSITIONS[status] || [];
+  }
+  return ORDER_STATUS_TRANSITIONS[status] || [];
+};
 
 export const getAllowedNextPaymentStatuses = (status: PaymentStatus) =>
   PAYMENT_STATUS_TRANSITIONS[status] || [];

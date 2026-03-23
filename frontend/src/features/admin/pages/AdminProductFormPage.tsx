@@ -531,10 +531,33 @@ export const AdminProductFormPage = () => {
                   <select value={field.value || ''} onChange={(e) => field.onChange(Number(e.target.value))}
                     className={`w-full border-2 rounded-xl px-4 py-2.5 text-sm font-medium bg-white focus:outline-none transition-colors ${errors.categoryId ? 'border-red-300' : 'border-slate-200 focus:border-blue-400'}`}>
                     <option value="">Chọn danh mục</option>
-                    {categories.map((c: AdminCategory & { category_id?: number }) => {
-                      const cid = c.category_id ?? c.categoryId;
-                      return <option key={cid} value={cid}>{c.name}</option>;
-                    })}
+                    {(() => {
+                      const getId = (c: any) => c.category_id ?? c.categoryId;
+                      const getParentId = (c: any) => c.parentId ?? c.parent_id ?? null;
+                      const parentCats = categories.filter(c => !getParentId(c));
+                      const childCats = categories.filter(c => getParentId(c));
+                      return parentCats.map(parent => {
+                        const pid = getId(parent);
+                        const children = childCats.filter(c => getParentId(c) === pid);
+                        if (children.length === 0) {
+                          return (
+                            <optgroup key={pid} label={`📁 ${parent.name}`}>
+                              <option disabled style={{ color: '#999', fontStyle: 'italic' }}>
+                                -- Chưa có danh mục con --
+                              </option>
+                            </optgroup>
+                          );
+                        }
+                        return (
+                          <optgroup key={pid} label={`📁 ${parent.name}`}>
+                            {children.map(child => {
+                              const cid = getId(child);
+                              return <option key={cid} value={cid}>{child.name}</option>;
+                            })}
+                          </optgroup>
+                        );
+                      });
+                    })()}
                   </select>
                 )} />
               <FieldError message={errors.categoryId?.message} />

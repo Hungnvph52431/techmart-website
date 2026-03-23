@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Package, Truck, RotateCcw, ShoppingBag, CheckCircle2, Star } from 'lucide-react';
@@ -53,11 +53,13 @@ export const OrdersPage = () => {
   // ✅ confirmingId: track đơn nào đang xác nhận nhận hàng
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
 
-  const fetchOrders = async () => {
+  const [summary, setSummary] = useState({ total: 0, pending: 0, shipping: 0, delivered: 0 });
+
+  const fetchOrders = async (status: FilterStatus = filter) => {
     try {
       setLoading(true);
-      const data = await orderService.getMyOrders('all');
-      setOrders(data as any[]);
+      const data = await orderService.getMyOrders(status) as any[];
+      setOrders(data);
     } catch {
       toast.error('Không thể tải danh sách đơn hàng');
     } finally {
@@ -65,17 +67,32 @@ export const OrdersPage = () => {
     }
   };
 
-  useEffect(() => { void fetchOrders(); }, []);
+  // Lấy summary 1 lần (all) để hiển thị số đếm
+  const fetchSummary = async () => {
+    try {
+      const all = await orderService.getMyOrders('all') as any[];
+      setSummary({
+        total:     all.length,
+        pending:   all.filter(o => o.status === 'pending').length,
+        shipping:  all.filter(o => o.status === 'shipping').length,
+        delivered: all.filter(o => o.status === 'delivered').length,
+      });
+    } catch { /* ignore */ }
+  };
 
-  // ✅ Xác nhận đã nhận hàng ngay từ danh sách
+  useEffect(() => { void fetchSummary(); }, []);
+  useEffect(() => { void fetchOrders(filter); }, [filter]);
+
+  // Xác nhận đã nhận hàng ngay từ danh sách
   const handleConfirmDelivered = async (e: React.MouseEvent, orderId: number) => {
-    e.preventDefault(); // Ngăn Link navigate khi bấm nút
+    e.preventDefault();
     e.stopPropagation();
     try {
       setConfirmingId(orderId);
       await orderService.confirmDelivered(orderId);
-      toast.success('🎉 Xác nhận nhận hàng thành công!');
-      await fetchOrders();
+      toast.success('Xác nhận nhận hàng thành công!');
+      await fetchOrders(filter);
+      await fetchSummary();
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Không thể xác nhận');
     } finally {
@@ -83,17 +100,7 @@ export const OrdersPage = () => {
     }
   };
 
-  const filteredOrders = useMemo(() =>
-    filter === 'all' ? orders : orders.filter(o => o.status === filter),
-    [filter, orders]
-  );
-
-  const summary = useMemo(() => ({
-    total:     orders.length,
-    pending:   orders.filter(o => o.status === 'pending').length,
-    shipping:  orders.filter(o => o.status === 'shipping').length,
-    delivered: orders.filter(o => o.status === 'delivered').length,
-  }), [orders]);
+  const filteredOrders = orders;
 
   if (loading && orders.length === 0) {
     return (
@@ -137,9 +144,9 @@ export const OrdersPage = () => {
                 : 'bg-white text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50'
             }`}>
             {opt.label}
-            {opt.value !== 'all' && (
+            {opt.value !== 'all' && (summary as any)[opt.value] > 0 && (
               <span className="ml-1.5 text-xs opacity-60">
-                {orders.filter(o => o.status === opt.value).length}
+                {(summary as any)[opt.value]}
               </span>
             )}
           </button>
@@ -178,6 +185,11 @@ export const OrdersPage = () => {
                     <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold border ${ORDER_STATUS_STYLES[status] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
                       {ORDER_STATUS_LABELS[status] ?? status}
                     </span>
+                    {order.openReturnCount > 0 && (
+                      <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold bg-orange-100 text-orange-600 border border-orange-200">
+                        Đang hoàn trả
+                      </span>
+                    )}
                   </div>
                   <span className="text-xs text-gray-400">{date ? formatDate(date) : '—'}</span>
                 </div>

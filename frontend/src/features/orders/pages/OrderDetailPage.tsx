@@ -57,6 +57,7 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   bank_transfer: 'Chuyển khoản',
   momo:          'MoMo',
   wallet:        'Ví TechMart',
+  deposit:       'Đặt cọc (Ví + COD)',
 };
 
 const PAYMENT_STATUS_LABELS: Record<string, string> = {
@@ -252,8 +253,11 @@ const ReturnModal = ({
   const setQty = (id: number, qty: number) =>
     setSelected(p => ({ ...p, [id]: { ...p[id], quantity: qty } }));
 
+  const canSubmit = finalReason.trim().length > 0 && evidenceFiles.length > 0 && !submitting;
+
   const handleSubmit = async () => {
     if (!finalReason.trim()) { toast.error('Vui lòng chọn lý do hoàn hàng'); return; }
+    if (evidenceFiles.length === 0) { toast.error('Vui lòng upload ít nhất 1 ảnh/video bằng chứng sản phẩm lỗi'); return; }
     const returnItems = items
       .filter(it => selected[it.orderDetailId]?.checked)
       .map(it => ({ orderDetailId: it.orderDetailId, quantity: selected[it.orderDetailId].quantity }));
@@ -363,13 +367,19 @@ const ReturnModal = ({
           <div>
             <p className="text-sm font-bold text-slate-700 mb-2">
               <Camera size={14} className="inline mr-1 text-orange-500" />
-              Ảnh bằng chứng <span className="text-slate-400 font-normal">(tối đa 5 ảnh, không bắt buộc)</span>
+              Ảnh/Video bằng chứng <span className="text-rose-500">*</span> <span className="text-slate-400 font-normal">(tối đa 5 file)</span>
             </p>
+            {evidenceFiles.length === 0 && (
+              <p className="text-xs text-rose-500 mb-2 font-medium">Bạn cần upload ít nhất 1 ảnh/video chụp sản phẩm lỗi để gửi yêu cầu hoàn trả.</p>
+            )}
             <div className="flex flex-wrap gap-2">
               {evidenceFiles.map((file, idx) => (
                 <div key={idx} className="relative group w-20 h-20 rounded-xl overflow-hidden border-2 border-slate-200">
-                  <img src={URL.createObjectURL(file)} alt={`evidence-${idx}`}
-                    className="w-full h-full object-cover" />
+                  {file.type.startsWith('video/') ? (
+                    <video src={URL.createObjectURL(file)} className="w-full h-full object-cover" muted />
+                  ) : (
+                    <img src={URL.createObjectURL(file)} alt={`evidence-${idx}`} className="w-full h-full object-cover" />
+                  )}
                   <button type="button" onClick={() => removeImage(idx)}
                     className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <Trash2 size={16} className="text-white" />
@@ -380,7 +390,7 @@ const ReturnModal = ({
                 <label className="w-20 h-20 rounded-xl border-2 border-dashed border-slate-300 hover:border-orange-400 flex flex-col items-center justify-center cursor-pointer transition-colors">
                   <ImageIcon size={20} className="text-slate-400" />
                   <span className="text-[10px] text-slate-400 font-bold mt-0.5">Thêm ảnh</span>
-                  <input type="file" accept="image/*" multiple onChange={handleAddImages} className="hidden" />
+                  <input type="file" accept="image/*,video/*" multiple onChange={handleAddImages} className="hidden" />
                 </label>
               )}
             </div>
@@ -393,10 +403,10 @@ const ReturnModal = ({
             className="flex-1 py-3 rounded-2xl border-2 border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-all">
             Hủy
           </button>
-          <button onClick={handleSubmit} disabled={submitting}
-            className="flex-1 py-3 rounded-2xl bg-orange-500 text-white font-bold text-sm hover:bg-orange-600 disabled:opacity-50 transition-all flex items-center justify-center gap-2">
+          <button onClick={handleSubmit} disabled={!canSubmit}
+            className="flex-1 py-3 rounded-2xl bg-orange-500 text-white font-bold text-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
             <RotateCcw size={15} />
-            {submitting ? 'Đang gửi...' : 'Gửi yêu cầu'}
+            {submitting ? 'Đang gửi...' : evidenceFiles.length === 0 ? 'Cần upload ảnh bằng chứng' : 'Gửi yêu cầu'}
           </button>
         </div>
       </div>
@@ -514,8 +524,8 @@ export const OrderDetailPage = () => {
 
   // ✅ Chỉ hủy được khi pending/confirmed — khóa từ shipping trở đi
   const canCancel          = ['pending', 'confirmed'].includes(status);
-  // ✅ User tự bấm "Đã nhận hàng" khi đơn ở trạng thái delivered (admin đã giao)
-  const canConfirmReceived = status === 'delivered';
+  // ✅ User tự bấm "Đã nhận hàng" khi đơn đang giao (shipping) hoặc đã giao (delivered)
+  const canConfirmReceived = ['shipping', 'delivered'].includes(status);
   // ✅ Chỉ hiện badge "Đã nhận hàng" khi user đã xác nhận (completed)
   const alreadyReceived    = status === 'completed';
   // ✅ Chỉ cho đánh giá khi đã xác nhận nhận hàng (completed)
@@ -556,6 +566,16 @@ export const OrderDetailPage = () => {
               <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase ${ORDER_STATUS_STYLES[status] ?? 'bg-gray-100 text-gray-700'}`}>
                 {ORDER_STATUS_LABELS[status] ?? status}
               </span>
+              {returns.length > 0 && returns.some(r => r.status === 'requested') && (
+                <span className="inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase bg-orange-100 text-orange-700 animate-pulse">
+                  Đang chờ xét duyệt trả hàng
+                </span>
+              )}
+              {returns.length > 0 && returns.some(r => ['approved', 'received'].includes(r.status)) && (
+                <span className="inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase bg-violet-100 text-violet-700">
+                  Đang xử lý hoàn trả
+                </span>
+              )}
             </div>
             <p className="mt-1 text-sm text-gray-500">
               Đặt lúc {orderDate ? formatDateTime(orderDate) : '—'} ·{' '}
@@ -585,7 +605,7 @@ export const OrderDetailPage = () => {
               </div>
             )}
 
-            {/* Nút "Đã nhận hàng" — chỉ khi shipping */}
+            {/* Nút "Đã nhận hàng" — khi đang giao (shipping) hoặc đã giao (delivered) */}
             {canConfirmReceived && (
               <button onClick={handleConfirmDelivered}
                 disabled={submitting === 'confirm-delivered'}
@@ -749,9 +769,9 @@ export const OrderDetailPage = () => {
                             <p className="text-xs font-bold text-gray-500 mb-1.5">Ảnh bằng chứng:</p>
                             <div className="flex flex-wrap gap-2">
                               {ret.evidenceImages.map((img, idx) => (
-                                <a key={idx} href={img} target="_blank" rel="noopener noreferrer"
+                                <a key={idx} href={getImageUrl(img)} target="_blank" rel="noopener noreferrer"
                                   className="block w-16 h-16 rounded-lg overflow-hidden border border-gray-200 hover:border-orange-400 transition-colors">
-                                  <img src={img} alt={`evidence-${idx}`} className="w-full h-full object-cover" />
+                                  <img src={getImageUrl(img)} alt={`evidence-${idx}`} className="w-full h-full object-cover" />
                                 </a>
                               ))}
                             </div>

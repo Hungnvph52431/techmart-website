@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   RefreshCw,
   ChevronRight,
-  Zap,
   Package,
   Clock,
   CreditCard,
@@ -26,21 +25,22 @@ const getImageUrl = (url?: string | null) => {
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
+// Admin KHÔNG được chuyển sang completed — chỉ khách hàng xác nhận nhận hàng mới được
 const ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
   pending: ['confirmed', 'cancelled'],
   confirmed: ['shipping', 'cancelled'],
   shipping: ['delivered'],
-  delivered: ['completed'],
+  delivered: [],       // ❌ Admin không được chuyển → completed (khách tự xác nhận)
   completed: [],
   cancelled: [],
   returned: [],
 };
 
-// Chuỗi auto-process: bấm 1 nút đi thẳng đến completed
+// Chuỗi auto-process: admin chỉ đi tối đa đến delivered
 const AUTO_PROCESS_CHAIN: Record<string, string[]> = {
-  pending: ['confirmed', 'shipping', 'delivered', 'completed'],
-  confirmed: ['shipping', 'delivered', 'completed'],
-  shipping: ['delivered', 'completed'],
+  pending: ['confirmed', 'shipping', 'delivered'],
+  confirmed: ['shipping', 'delivered'],
+  shipping: ['delivered'],
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -80,6 +80,11 @@ const PAYMENT_STATUS_TRANSITIONS: Record<string, string[]> = {
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   cod: 'Ship COD',
   online: 'Chuyển khoản / QR',
+  vnpay: 'VNPay',
+  bank_transfer: 'Chuyển khoản',
+  momo: 'MoMo',
+  wallet: 'Ví TechMart',
+  deposit: 'Đặt cọc (Ví + COD)',
 };
 
 const RETURN_STATUS_LABELS: Record<string, string> = {
@@ -286,9 +291,21 @@ export const AdminOrderDetail = () => {
   const returns: any[] = detail.returns || [];
 
   const allowedStatuses = ORDER_STATUS_TRANSITIONS[order.status] || [];
-  const allowedPayments = PAYMENT_STATUS_TRANSITIONS[order.paymentStatus] || [];
-  const canAutoProcess = !!AUTO_PROCESS_CHAIN[order.status];
+  // Ẩn button cập nhật thanh toán khi đã hủy, hoặc khi đã hoàn trả + đã refunded
+  const hasActiveReturn = returns.some((r: any) =>
+  ['requested', 'approved', 'received'].includes(r.status)
+);
 
+const isCodUnpaid = order.paymentMethod === 'cod' && order.paymentStatus === 'pending';
+
+const allowedPayments = (() => {
+  if (order.status === 'cancelled') return [];
+  if (order.status === 'returned' && order.paymentStatus === 'refunded') return [];
+  // COD chưa thanh toán + đơn đã hoàn/trả → ẩn 2 nút (không có tiền để xử lý)
+  if (order.status === 'returned' && isCodUnpaid) return [];
+  if (hasActiveReturn) return [];
+  return PAYMENT_STATUS_TRANSITIONS[order.paymentStatus] || [];
+})();
   return (
     <div className="space-y-6">
       {/* HEADER */}
@@ -307,6 +324,26 @@ export const AdminOrderDetail = () => {
             <span className={`px-3 py-1 rounded-full text-xs font-black uppercase border ${STATUS_STYLES[order.status]}`}>
               {STATUS_LABELS[order.status]}
             </span>
+            {returns.some((r: any) => r.status === 'requested') && (
+              <span className="px-3 py-1 rounded-full text-xs font-black uppercase bg-orange-100 text-orange-700 border border-orange-200 animate-pulse">
+                Chờ duyệt hoàn trả
+              </span>
+            )}
+            {returns.some((r: any) => r.status === 'approved') && (
+              <span className="px-3 py-1 rounded-full text-xs font-black uppercase bg-sky-100 text-sky-700 border border-sky-200">
+                Đã duyệt — chờ nhận hàng
+              </span>
+            )}
+            {returns.some((r: any) => r.status === 'received') && (
+              <span className="px-3 py-1 rounded-full text-xs font-black uppercase bg-violet-100 text-violet-700 border border-violet-200">
+                Đã nhận — chờ hoàn tiền
+              </span>
+            )}
+            {returns.some((r: any) => r.status === 'refunded') && !returns.some((r: any) => ['requested', 'approved', 'received'].includes(r.status)) && (
+              <span className="px-3 py-1 rounded-full text-xs font-black uppercase bg-emerald-100 text-emerald-700 border border-emerald-200">
+                Đã hoàn tiền
+              </span>
+            )}
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600 border border-gray-200">
               {PAYMENT_METHOD_LABELS[order.paymentMethod] || order.paymentMethod}
             </span>
@@ -326,17 +363,6 @@ export const AdminOrderDetail = () => {
             Làm mới
           </button>
 
-          {/* NÚT AUTO PROCESS */}
-          {canAutoProcess && (
-            <button
-              onClick={() => setConfirmDialog({ show: true, type: 'auto', nextValue: 'auto', label: 'Xử lý nhanh → Hoàn thành' })}
-              disabled={!!submitting}
-              className="inline-flex items-center gap-2 px-5 py-2 bg-blue-600 rounded-xl text-sm font-black text-white uppercase hover:bg-blue-700 disabled:opacity-60 shadow-lg shadow-blue-200"
-            >
-              <Zap size={15} />
-              {submitting === 'auto' ? 'Đang xử lý...' : 'Xử lý nhanh → Hoàn thành'}
-            </button>
-          )}
         </div>
       </div>
 
@@ -470,9 +496,9 @@ export const AdminOrderDetail = () => {
                         <p className="text-xs font-bold text-gray-500 mb-1.5">Ảnh bằng chứng ({ret.evidenceImages.length}):</p>
                         <div className="flex flex-wrap gap-2">
                           {ret.evidenceImages.map((img: string, idx: number) => (
-                            <a key={idx} href={img} target="_blank" rel="noopener noreferrer"
+                            <a key={idx} href={getImageUrl(img)} target="_blank" rel="noopener noreferrer"
                               className="block w-20 h-20 rounded-xl overflow-hidden border-2 border-gray-100 hover:border-blue-400 transition-colors">
-                              <img src={img} alt={`evidence-${idx}`} className="w-full h-full object-cover" />
+                              <img src={getImageUrl(img)} alt={`evidence-${idx}`} className="w-full h-full object-cover" />
                             </a>
                           ))}
                         </div>
@@ -508,13 +534,23 @@ export const AdminOrderDetail = () => {
                           <Truck size={13} /> Xác nhận nhận hàng
                         </button>
                       )}
-                      {ret.status === 'received' && (
+                      {ret.status === 'received' && !isCodUnpaid && (
                         <button
                           onClick={() => setReturnModal({ type: 'refund', returnId: ret.orderReturnId, adminNote: '' })}
                           disabled={!!submitting}
                           className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-black uppercase hover:bg-blue-700 disabled:opacity-60"
                         >
                           <CreditCard size={13} /> Hoàn tiền
+                        </button>
+                      )}
+                      {/* COD chưa thanh toán + đã nhận hàng → đóng luôn, không cần hoàn tiền */}
+                      {ret.status === 'received' && isCodUnpaid && (
+                        <button
+                          onClick={() => setReturnModal({ type: 'close', returnId: ret.orderReturnId, adminNote: '' })}
+                          disabled={!!submitting}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-600 text-white rounded-xl text-xs font-black uppercase hover:bg-slate-700 disabled:opacity-60"
+                        >
+                          <AlertCircle size={13} /> Đóng yêu cầu
                         </button>
                       )}
                       {(ret.status === 'refunded' || ret.status === 'rejected') && ret.status !== 'closed' && (

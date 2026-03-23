@@ -6,8 +6,10 @@ import { adminOrderService } from '@/services/admin/order.service';
 import { 
   Search, 
   RefreshCw, 
-  Package 
-} from 'lucide-react'; // Chỉ giữ lại các Icon thực sự hiển thị
+  Package,
+  Phone,
+  CreditCard,
+} from 'lucide-react';
 interface OrderResponse {
   items: any[];    // Danh sách đơn hàng
   total: number;   // Tổng số lượng đơn
@@ -38,27 +40,57 @@ const STATUS_BADGES: Record<string, string> = {
   returned: 'bg-slate-200 text-slate-800',
 };
 
+const PAYMENT_LABELS: Record<string, string> = {
+  cod: 'Ship COD',
+  online: 'Chuyển khoản',
+  vnpay: 'VNPay',
+  bank_transfer: 'Chuyển khoản',
+  momo: 'MoMo',
+  wallet: 'Ví TechMart',
+  deposit: 'Đặt cọc',
+};
+
+const PAYMENT_STATUS_BADGES: Record<string, string> = {
+  pending: 'bg-amber-100 text-amber-700',
+  paid: 'bg-emerald-100 text-emerald-700',
+  failed: 'bg-rose-100 text-rose-700',
+  refunded: 'bg-blue-100 text-blue-700',
+};
+
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  pending: 'Chưa TT',
+  paid: 'Đã TT',
+  failed: 'Thất bại',
+  refunded: 'Đã hoàn',
+};
+
 export const AdminOrders = () => {
   const navigate = useNavigate();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
   const [searchText, setSearchText] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [totalOrders, setTotalOrders] = useState(0);
 
   useEffect(() => {
     loadOrders();
-  }, [filter]);
+  }, [filter, searchQuery]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchQuery(searchText), 400);
+    return () => clearTimeout(timer);
+  }, [searchText]);
 
   const loadOrders = async () => {
   try {
     setLoading(true);
-    
-    // Ép kiểu dữ liệu trả về thành OrderResponse để dập lỗi TS2339
-    const response = await adminOrderService.getAll() as unknown as OrderResponse;
-    
-    // Bây giờ bạn có thể truy cập thoải mái mà không bị báo lỗi
-    const orderList = response.items || []; 
+    const response = await adminOrderService.getAll({
+      search: searchQuery || undefined,
+      status: filter !== 'all' ? filter : undefined,
+    }) as unknown as OrderResponse;
+
+    const orderList = response.items || [];
     const total = response.total || 0;
 
     setOrders(orderList);
@@ -70,12 +102,7 @@ export const AdminOrders = () => {
   }
 };
 
-  const filteredOrders = orders.filter(order => {
-    const matchesFilter = filter === 'all' || order.status === filter;
-    const matchesSearch = order.orderCode?.toLowerCase().includes(searchText.toLowerCase()) || 
-                          order.shippingName?.toLowerCase().includes(searchText.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
+  const filteredOrders = orders;
 
   if (loading && orders.length === 0) {
     return (
@@ -97,7 +124,7 @@ export const AdminOrders = () => {
           <div className="relative">
             <input
               type="text"
-              placeholder="Tìm mã đơn, tên khách..."
+              placeholder="Tìm mã đơn, tên khách, SĐT, tên sản phẩm..."
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               className="pl-10 pr-4 py-2.5 bg-white border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none w-64 shadow-sm"
@@ -135,6 +162,7 @@ export const AdminOrders = () => {
               <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                 <th className="px-6 py-4 text-left">Đơn hàng</th>
                 <th className="px-6 py-4 text-left">Khách hàng</th>
+                <th className="px-6 py-4 text-left">Thanh toán</th>
                 <th className="px-6 py-4 text-left">Tổng tiền</th>
                 <th className="px-6 py-4 text-left">Trạng thái</th>
               </tr>
@@ -156,27 +184,44 @@ export const AdminOrders = () => {
               ? new Date(order.createdAt).toLocaleDateString('vi-VN')
               : 'Không rõ ngày'}
           </div>
-        </td>
+              </td>
+              <div className="text-sm font-bold text-gray-800">
+        {order.customer?.name || order.shipping?.name || 'Khách lẻ'}
+      </div>
+      <div className="flex items-center gap-1 text-[11px] text-gray-400 mt-0.5">
+        <Phone size={10} />
+        <span>{order.customer?.phone || order.shipping?.phone || '—'}</span>
+      </div>
         <td className="px-6 py-4">
-          <div className="text-sm font-bold text-gray-800">{order.shippingName || 'Khách lẻ'}</div>
-          <div className="text-[11px] text-gray-400">
-            {order.paymentMethod === 'cod' ? 'Ship COD' : 'Chuyển khoản'}
+          <div className="flex items-center gap-1 text-[11px] font-bold text-gray-600 mb-1">
+            <CreditCard size={10} className="text-gray-400" />
+            {PAYMENT_LABELS[order.paymentMethod] || order.paymentMethod}
           </div>
+          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${PAYMENT_STATUS_BADGES[order.paymentStatus] || 'bg-gray-100 text-gray-500'}`}>
+            {PAYMENT_STATUS_LABELS[order.paymentStatus] || order.paymentStatus}
+          </span>
         </td>
         <td className="px-6 py-4 text-sm font-black text-red-500">
           {Number(order.totalAmount || order.total).toLocaleString('vi-VN')}₫
         </td>
         <td className="px-6 py-4">
-          <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${STATUS_BADGES[order.status]}`}>
-            {STATUS_LABELS[order.status]}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${STATUS_BADGES[order.status]}`}>
+              {STATUS_LABELS[order.status]}
+            </span>
+            {order.openReturnCount > 0 && (
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-orange-100 text-orange-600 border border-orange-200">
+                🔄 Đang hoàn trả
+              </span>
+            )}
+          </div>
         </td>
       </tr>
     ))
   ) : (
     // PHẦN 2: Nếu không có đơn hàng nào khớp, hiển thị thông báo trống
     <tr>
-      <td colSpan={4} className="px-6 py-12 text-center">
+      <td colSpan={5} className="px-6 py-12 text-center">
         <div className="flex flex-col items-center justify-center space-y-2">
           <Package className="text-gray-200" size={40} />
           <p className="text-gray-400 italic text-sm font-medium">

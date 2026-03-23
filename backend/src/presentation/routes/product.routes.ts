@@ -11,6 +11,9 @@ export const createProductRoutes = (productController: ProductController) => {
     productController.getStats
   );
 
+  // Validate giỏ hàng — kiểm tra trạng thái & tồn kho SP
+  router.post('/validate-cart', productController.validateCart);
+
   // --- 1. ROUTES CÔNG KHAI (STOREFRONT) ---
   router.get('/', productController.getAll);
   router.get('/slug/:slug', productController.getBySlug);

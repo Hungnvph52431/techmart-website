@@ -650,6 +650,7 @@ export const CheckoutPage = () => {
                   </p>
                 </div>
               )}
+
             </div>
           </div>
 
