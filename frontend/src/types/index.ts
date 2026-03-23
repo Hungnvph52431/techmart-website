@@ -161,17 +161,26 @@ export interface ProductStats {
   inactiveProducts: number;
   outOfStockCount: number;
   lowStockCount: number;
+  totalStockUnits: number;
+  totalInventoryValue: number;
+  totalSoldUnits: number;
   topSellingProducts: Array<{
     productId: number;
     name: string;
     soldQuantity: number;
     stockQuantity: number;
     mainImage: string | null;
+    price: number;
   }>;
   lowStockProducts: Array<{
     productId: number;
     name: string;
     stockQuantity: number;
+  }>;
+  categoryBreakdown: Array<{
+    categoryName: string;
+    productCount: number;
+    totalSold: number;
   }>;
 }
 
@@ -186,9 +195,31 @@ export interface OrderStats {
   totalOrders: number;
   totalRevenue: number;
   revenueThisMonth: number;
+  revenueLastMonth: number;
+  revenueToday: number;
+  revenueYesterday: number;
+  ordersToday: number;
+  ordersThisMonth: number;
+  ordersLastMonth: number;
   avgOrderValue: number;
+  completionRate: number;
+  cancellationRate: number;
   ordersByStatus: Record<string, number>;
-  recentOrders: Array<Partial<Order>>;
+  paymentMethodStats: Record<string, number>;
+  paymentMethodRevenue: Record<string, number>;
+  recentOrders: Array<any>;
+  revenueByDay: Array<{ date: string; revenue: number; orderCount: number }>;
+  returnStats: {
+    total: number;
+    pending: number;
+    refunded: number;
+  };
+  topCustomers: Array<{
+    name: string;
+    email: string;
+    orderCount: number;
+    totalSpent: number;
+  }>;
 }
 
 export interface ProductFilter {

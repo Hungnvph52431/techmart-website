@@ -79,6 +79,7 @@ export interface IProductRepository {
   create(product: CreateProductDTO): Promise<Product>;
   update(product: UpdateProductDTO): Promise<Product | null>;
   delete(productId: number): Promise<boolean>;
+  hardDelete(productId: number): Promise<boolean>;
   updateStock(productId: number, quantity: number): Promise<boolean>;
 
   // --- 3. QUẢN LÝ ẢNH (BÍ QUYẾT HIỂN THỊ ẢNH CỦA TUẤN ANH) ---
@@ -105,6 +106,9 @@ export interface IProductRepository {
   findAdminById(productId: number): Promise<Product | null>;
   save(payload: SaveProductPayload, productId?: number): Promise<Product>;
   archive(productId: number): Promise<boolean>;
+
+  // Kiểm tra sản phẩm đang được sử dụng (giỏ hàng, đơn hàng chờ)
+  checkProductInUse(productId: number): Promise<{ inCart: number; inPendingOrders: number }>;
 
   // Kiểm tra mã SKU
   isSkuTaken(sku: string, options?: {

@@ -42,8 +42,23 @@ export const productService = {
     return response.data;
   },
 
-  deleteProduct: async (id: number): Promise<void> => {
-    await api.delete(`/products/${id}`);
+  deleteProduct: async (id: number) => {
+    const response = await api.delete(`/products/${id}`);
+    return response.data;
+  },
+
+  // Validate giỏ hàng — kiểm tra SP còn bán không
+  validateCart: async (productIds: number[]) => {
+    const response = await api.post('/products/validate-cart', { productIds });
+    return response.data as Array<{
+      productId: number;
+      available: boolean;
+      reason?: string;
+      name?: string;
+      stockQuantity?: number;
+      price?: number;
+      salePrice?: number;
+    }>;
   },
 
   // 4. THỐNG KÊ (Dành cho Dashboard Admin)

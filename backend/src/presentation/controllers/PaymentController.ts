@@ -152,6 +152,23 @@ export class PaymentController {
       }
 
       const orderCode = (req.query as any)['vnp_TxnRef'] as string;
+      const vnpTransactionNo = (req.query as any)['vnp_TransactionNo'] as string;
+
+      // Xử lý wallet topup qua IPN (fallback nếu browser redirect fail)
+      if (orderCode && orderCode.startsWith('WLT-')) {
+        try {
+          if (verify.isSuccess && this.walletUseCase) {
+            await this.walletUseCase.completeVNPayTopup(orderCode, vnpTransactionNo);
+          } else if (this.walletUseCase) {
+            await this.walletUseCase.failVNPayTopup(orderCode);
+          }
+          return res.json({ RspCode: '00', Message: 'Confirm Success' });
+        } catch (err) {
+          console.error('[Payment] wallet IPN error:', err);
+          return res.json({ RspCode: '00', Message: 'Confirm Success' });
+        }
+      }
+
       const order = await this.orderUseCase.getOrderByCode(orderCode);
 
       if (!order) {
@@ -168,7 +185,8 @@ export class PaymentController {
 
       if (verify.isSuccess) {
         await this.orderUseCase.updateOrderPaymentStatus(
-  order.orderId, 'paid', null, 'system' as any
+          order.orderId, 'paid', null, 'system' as any,
+          `VNPay IPN TxnNo: ${vnpTransactionNo}`
         );
       }
 

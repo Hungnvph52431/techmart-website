@@ -1,11 +1,18 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { RotateCcw, ChevronDown, CheckCircle2, XCircle, PackageCheck, Wallet, X } from 'lucide-react';
+import { RotateCcw, ChevronDown, ChevronUp, CheckCircle2, XCircle, PackageCheck, Wallet, X, ImageIcon } from 'lucide-react';
 import { orderService } from '@/services/order.service';
 import type { OrderReturnView, ReturnStatus } from '@/types/order';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+const BACKEND_URL = (import.meta.env.VITE_API_URL as string)?.replace('/api', '') || 'http://localhost:5001';
+const getImageUrl = (url?: string): string => {
+  if (!url) return '';
+  if (url.startsWith('http') || url.startsWith('data:')) return url;
+  return `${BACKEND_URL}${url}`;
+};
+
 const formatDate = (d?: string) =>
   d ? new Date(d).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
 
@@ -104,6 +111,7 @@ export const AdminReturns = () => {
   const [returns, setReturns]     = useState<OrderReturnView[]>([]);
   const [loading, setLoading]     = useState(true);
   const [filter, setFilter]       = useState('all');
+  const [expandedId, setExpandedId] = useState<number | null>(null);
   const [modal, setModal]         = useState<{
     type: 'approve' | 'reject' | 'receive' | 'refund';
     item: OrderReturnView;
@@ -210,36 +218,82 @@ export const AdminReturns = () => {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                {['Mã yêu cầu', 'Đơn hàng', 'Lý do', 'Ngày gửi', 'Trạng thái', 'Thao tác'].map(h => (
-                  <th key={h} className="px-5 py-3.5 text-left text-[11px] font-black uppercase tracking-widest text-gray-400">{h}</th>
+                {['Mã yêu cầu', 'Đơn hàng', 'Khách hàng', 'Lý do', 'Thanh toán', 'Ngày gửi', 'Trạng thái', 'Thao tác'].map(h => (
+                  <th key={h} className="px-4 py-3.5 text-left text-[11px] font-black uppercase tracking-widest text-gray-400">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {returns.map(item => (
-                <tr key={item.orderReturnId} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-5 py-4">
-                    <span className="font-mono font-bold text-gray-800 text-xs">{item.requestCode}</span>
-                  </td>
-                  <td className="px-5 py-4">
-                    <Link to={`/admin/orders/${item.orderId}`}
-                      className="font-bold text-blue-600 hover:underline text-xs">
-                      #{item.orderId}
-                    </Link>
-                  </td>
-                  <td className="px-5 py-4 max-w-[220px]">
-                    <p className="text-gray-700 truncate">{item.reason}</p>
-                    {item.customerNote && (
-                      <p className="text-xs text-gray-400 mt-0.5 truncate">{item.customerNote}</p>
+              {returns.map(item => {
+                const ext = item as any;
+                const isExpanded = expandedId === item.orderReturnId;
+                const images = item.evidenceImages || [];
+
+                // Flow steps cho trạng thái hoàn trả
+                const FLOW_STEPS = [
+                  { key: 'requested', label: 'Yêu cầu', date: item.requestedAt, icon: <RotateCcw size={12} /> },
+                  { key: 'approved',  label: 'Duyệt',   date: item.approvedAt,  icon: <CheckCircle2 size={12} /> },
+                  { key: 'received',  label: 'Nhận hàng', date: item.receivedAt, icon: <PackageCheck size={12} /> },
+                  { key: 'refunded',  label: 'Hoàn tiền', date: item.refundedAt, icon: <Wallet size={12} /> },
+                ];
+                const statusOrder = ['requested', 'approved', 'received', 'refunded', 'closed'];
+                const currentIdx = statusOrder.indexOf(item.status);
+
+                return (
+                <React.Fragment key={item.orderReturnId}>
+                <tr className={`hover:bg-gray-50/50 transition-colors cursor-pointer ${isExpanded ? 'bg-blue-50/30' : ''}`}
+                    onClick={() => setExpandedId(isExpanded ? null : item.orderReturnId)}>
+                  <td className="px-4 py-4">
+                    <div className="flex items-center gap-1.5">
+                      {isExpanded ? <ChevronUp size={14} className="text-blue-500" /> : <ChevronDown size={14} className="text-gray-400" />}
+                      <span className="font-mono font-bold text-gray-800 text-xs">{item.requestCode}</span>
+                    </div>
+                    {images.length > 0 && (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] text-blue-500 font-bold mt-0.5">
+                        <ImageIcon size={10} /> {images.length} ảnh
+                      </span>
                     )}
                   </td>
-                  <td className="px-5 py-4 text-gray-500 whitespace-nowrap">{formatDate(item.requestedAt)}</td>
-                  <td className="px-5 py-4">
+                  <td className="px-4 py-4">
+                    <Link to={`/admin/orders/${item.orderId}`} onClick={e => e.stopPropagation()}
+                      className="font-bold text-blue-600 hover:underline text-xs">
+                      {ext.orderCode || `#${item.orderId}`}
+                    </Link>
+                    {ext.orderTotal > 0 && (
+                      <p className="text-[10px] text-gray-400 font-bold mt-0.5">
+                        {Number(ext.orderTotal).toLocaleString('vi-VN')}₫
+                      </p>
+                    )}
+                  </td>
+                  <td className="px-4 py-4">
+                    <p className="text-xs font-bold text-gray-800">{ext.customerName || '—'}</p>
+                    {ext.customerPhone && (
+                      <p className="text-[10px] text-gray-400">{ext.customerPhone}</p>
+                    )}
+                  </td>
+                  <td className="px-4 py-4 max-w-[180px]">
+                    <p className="text-gray-700 truncate text-xs">{item.reason}</p>
+                    {item.customerNote && (
+                      <p className="text-[10px] text-gray-400 mt-0.5 truncate">{item.customerNote}</p>
+                    )}
+                  </td>
+                  <td className="px-4 py-4">
+                    <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                      ext.paymentStatus === 'paid' ? 'bg-emerald-100 text-emerald-700' :
+                      ext.paymentStatus === 'refunded' ? 'bg-violet-100 text-violet-700' :
+                      'bg-gray-100 text-gray-600'
+                    }`}>
+                      {ext.paymentStatus === 'paid' ? 'Đã TT' : ext.paymentStatus === 'refunded' ? 'Đã hoàn' : ext.paymentStatus || '—'}
+                    </span>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{ext.paymentMethod?.toUpperCase() || ''}</p>
+                  </td>
+                  <td className="px-4 py-4 text-gray-500 whitespace-nowrap text-xs">{formatDate(item.requestedAt)}</td>
+                  <td className="px-4 py-4">
                     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${STATUS_STYLE[item.status]}`}>
                       {STATUS_LABEL[item.status]}
                     </span>
                   </td>
-                  <td className="px-5 py-4">
+                  <td className="px-4 py-4" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center gap-2 flex-wrap">
                       {item.status === 'requested' && (
                         <>
@@ -265,13 +319,110 @@ export const AdminReturns = () => {
                           <Wallet size={13} /> Hoàn tiền
                         </button>
                       )}
-                      {(item.status === 'refunded' || item.status === 'rejected') && (
-                        <span className="text-xs text-gray-400 italic">—</span>
+                      {(item.status === 'refunded' || item.status === 'rejected' || item.status === 'closed') && (
+                        <span className="text-xs text-gray-400 italic">Hoàn tất</span>
                       )}
                     </div>
                   </td>
                 </tr>
-              ))}
+
+                {/* Expanded Detail Row */}
+                {isExpanded && (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-0">
+                      <div className="bg-slate-50 rounded-xl border border-slate-200 p-5 mb-4 space-y-4">
+                        {/* Trạng thái hoàn trả vật lý - Flow Steps */}
+                        {item.status !== 'rejected' && (
+                        <div>
+                          <p className="text-xs font-black text-gray-600 uppercase tracking-wider mb-3">Tiến trình hoàn trả</p>
+                          <div className="flex items-center gap-1">
+                            {FLOW_STEPS.map((step, idx) => {
+                              const stepIdx = statusOrder.indexOf(step.key);
+                              const isCompleted = stepIdx <= currentIdx;
+                              const isCurrent = step.key === item.status;
+                              return (
+                                <React.Fragment key={step.key}>
+                                  <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${
+                                    isCurrent ? 'bg-blue-600 text-white' :
+                                    isCompleted ? 'bg-emerald-100 text-emerald-700' :
+                                    'bg-gray-100 text-gray-400'
+                                  }`}>
+                                    {step.icon}
+                                    <span>{step.label}</span>
+                                    {step.date && <span className="text-[10px] opacity-70 ml-1">{formatDate(step.date)}</span>}
+                                  </div>
+                                  {idx < FLOW_STEPS.length - 1 && (
+                                    <div className={`w-6 h-0.5 ${stepIdx < currentIdx ? 'bg-emerald-400' : 'bg-gray-200'}`} />
+                                  )}
+                                </React.Fragment>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        )}
+                        {item.status === 'rejected' && (
+                          <div className="bg-rose-50 border border-rose-200 rounded-xl p-3">
+                            <p className="text-xs font-bold text-rose-700">Yêu cầu bị từ chối</p>
+                            {item.adminNote && <p className="text-xs text-rose-600 mt-1">Lý do: {item.adminNote}</p>}
+                          </div>
+                        )}
+
+                        {/* Bằng chứng hình ảnh */}
+                        <div>
+                          <p className="text-xs font-black text-gray-600 uppercase tracking-wider mb-2">
+                            <ImageIcon size={12} className="inline mr-1" />
+                            Bằng chứng từ khách hàng ({images.length} file)
+                          </p>
+                          {images.length > 0 ? (
+                            <div className="flex flex-wrap gap-3">
+                              {images.map((img, idx) => {
+                                const url = getImageUrl(img);
+                                const isVideo = img.match(/\.(mp4|mov|avi|webm)$/i);
+                                return (
+                                  <a key={idx} href={url} target="_blank" rel="noopener noreferrer"
+                                    className="block w-28 h-28 rounded-xl overflow-hidden border-2 border-slate-200 hover:border-blue-400 transition-colors shadow-sm">
+                                    {isVideo ? (
+                                      <video src={url} className="w-full h-full object-cover" muted />
+                                    ) : (
+                                      <img src={url} alt={`Bằng chứng ${idx + 1}`}
+                                        className="w-full h-full object-cover"
+                                        onError={e => { (e.target as HTMLImageElement).src = '/placeholder.jpg'; }} />
+                                    )}
+                                  </a>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-gray-400 italic">Không có ảnh bằng chứng</p>
+                          )}
+                        </div>
+
+                        {/* Lý do + ghi chú */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-[11px] font-bold text-gray-500 uppercase mb-1">Lý do hoàn trả</p>
+                            <p className="text-sm text-gray-800">{item.reason}</p>
+                          </div>
+                          {item.customerNote && (
+                            <div>
+                              <p className="text-[11px] font-bold text-gray-500 uppercase mb-1">Ghi chú khách hàng</p>
+                              <p className="text-sm text-gray-700">{item.customerNote}</p>
+                            </div>
+                          )}
+                          {item.adminNote && (
+                            <div>
+                              <p className="text-[11px] font-bold text-gray-500 uppercase mb-1">Ghi chú admin</p>
+                              <p className="text-sm text-gray-700">{item.adminNote}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </React.Fragment>
+                );
+              })}
             </tbody>
           </table>
         )}

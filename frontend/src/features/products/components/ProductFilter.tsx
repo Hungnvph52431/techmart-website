@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { brandService, type Brand } from "@/services/brand.service";
+import { categoryService, type Category } from "@/services/category.service";
 
 // ─── Filter config ───
 const FILTER_GROUPS: {
@@ -71,11 +72,15 @@ export const ProductsFilter = () => {
   const [searchInput, setSearchInput] = useState(searchParams.get("search") || "");
   const [showPanel, setShowPanel] = useState(false);
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [childCategories, setChildCategories] = useState<Category[]>([]);
   const [tempFilters, setTempFilters] = useState<Record<string, string>>({});
 
   useEffect(() => {
     brandService.getAll()
       .then(data => setBrands((data || []).filter((b: Brand) => b.isActive)))
+      .catch(() => {});
+    categoryService.getAll()
+      .then(data => setChildCategories((data || []).filter((c: Category) => c.parentId && c.isActive !== false)))
       .catch(() => {});
   }, []);
 
@@ -96,6 +101,7 @@ export const ProductsFilter = () => {
   }, [searchParams]);
 
   const brand = searchParams.get("brand") || "";
+  const category = searchParams.get("category") || "";
 
   const realActiveCount = FILTER_GROUPS.filter(g => {
     if (g.key === "price") return searchParams.get("minPrice") || searchParams.get("maxPrice");
@@ -162,7 +168,7 @@ export const ProductsFilter = () => {
     setShowPanel(false);
   };
 
-  const hasAnyFilter = brand || realActiveCount > 0 || searchParams.get("search");
+  const hasAnyFilter = brand || category || realActiveCount > 0 || searchParams.get("search");
 
   return (
     <div className="space-y-3">
@@ -189,7 +195,8 @@ export const ProductsFilter = () => {
         </form>
 
         {/* Brand pills */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-bold text-gray-400 uppercase tracking-wide mr-1">Thương hiệu:</span>
           <button onClick={() => updateParams({ brand: "" })}
             className={`px-3.5 py-1.5 rounded-xl text-sm font-semibold border transition-all ${
               !brand ? "border-blue-600 bg-blue-600 text-white" : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
@@ -206,6 +213,27 @@ export const ProductsFilter = () => {
             </button>
           ))}
         </div>
+
+        {/* Category pills */}
+        {childCategories.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-gray-100">
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wide mr-1">Danh mục:</span>
+            <button onClick={() => updateParams({ category: "" })}
+              className={`px-3.5 py-1.5 rounded-xl text-sm font-semibold border transition-all ${
+                !category ? "border-blue-600 bg-blue-600 text-white" : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
+              }`}>
+              Tất cả
+            </button>
+            {childCategories.map(c => (
+              <button key={c.categoryId} onClick={() => updateParams({ category: category === c.slug ? "" : c.slug })}
+                className={`px-3.5 py-1.5 rounded-xl text-sm font-semibold border transition-all ${
+                  category === c.slug ? "border-blue-600 bg-blue-600 text-white" : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
+                }`}>
+                {c.name}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Filter bar ── */}

@@ -96,8 +96,9 @@ export const ProductDetailPage = () => {
 
   const availableStock = stockToUse - cartQuantity;
   const isOutOfStock = stockToUse <= 0;
-  const isMaxReached = !isOutOfStock && availableStock <= 0;
-  const isDisabled = isOutOfStock || isMaxReached;
+  const isInactive = product?.status === 'inactive';
+  const isMaxReached = !isOutOfStock && !isInactive && availableStock <= 0;
+  const isDisabled = isOutOfStock || isInactive || isMaxReached;
 
   useEffect(() => {
     if (availableStock > 0 && quantity < 1) setQuantity(1);
@@ -395,7 +396,7 @@ export const ProductDetailPage = () => {
                     : "bg-white text-blue-600 border-2 border-blue-600 hover:bg-blue-50 shadow-blue-100"
                 }`}>
                 <ShoppingCart className="h-5 w-5" />
-                {isOutOfStock ? "Hết hàng" : isMaxReached ? "Đã có trong giỏ" : "Thêm vào giỏ"}
+                {isInactive ? "Ngừng bán" : isOutOfStock ? "Hết hàng" : isMaxReached ? "Đã có trong giỏ" : "Thêm vào giỏ"}
               </button>
 
               <button onClick={handleBuyNow} disabled={isDisabled || quantity <= 0}
@@ -405,7 +406,7 @@ export const ProductDetailPage = () => {
                     : "bg-gradient-to-r from-red-600 to-orange-500 text-white hover:opacity-90 shadow-red-200"
                 }`}>
                 <Zap className="h-5 w-5" />
-                {isOutOfStock ? "Tạm hết hàng" : "Mua ngay"}
+                {isInactive ? "Ngừng bán" : isOutOfStock ? "Tạm hết hàng" : "Mua ngay"}
               </button>
             </div>
 

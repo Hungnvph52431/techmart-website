@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { PlusCircle, Search, RefreshCw, Edit, Trash2 } from 'lucide-react';
-import { productService } from '@/services/product.service'; 
+import { productService } from '@/services/product.service';
+import { adminProductService } from '@/services/admin/product.service';
 import { adminCategoryService } from '@/services/admin/category.service'; 
-import { Product, Category } from '@/types'; 
+import { Category } from '@/types';
+import { AdminProduct } from '@/features/admin/types/catalog'; 
 
 // ✅ Helper: chuyển path ảnh local thành URL đầy đủ
 const BACKEND_URL = (import.meta.env.VITE_API_URL as string)?.replace('/api', '') || 'http://localhost:5001';
@@ -18,13 +20,13 @@ const getImageUrl = (url?: string): string => {
 const STATUS_OPTIONS = [
   { label: 'Tất cả trạng thái', value: 'all' },
   { label: 'Đang bán', value: 'active' },
-  { label: 'Tạm ẩn', value: 'inactive' },
+  { label: 'Ngừng bán', value: 'inactive' },
   { label: 'Hết hàng', value: 'out_of_stock' },
   { label: 'Đặt trước', value: 'pre_order' },
 ];
 
 export const AdminProducts = () => {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<AdminProduct[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
@@ -56,19 +58,12 @@ export const AdminProducts = () => {
   const fetchProducts = async () => {
   try {
     setLoading(true);
-    console.log("🚀 Đang gọi API lấy sản phẩm...");
-    const response = await productService.getAll({
+    const response = await adminProductService.getAll({
       search: filters.search || undefined,
       categoryId: filters.categoryId ? Number(filters.categoryId) : undefined,
       status: filters.status !== 'all' ? filters.status : undefined,
-    }) as any;
-
-    // PHẢI TRUY XUẤT VÀO .data ĐỂ LẤY MẢNG SẢN PHẨM
-    if (response && response.data) {
-      setProducts(response.data); // Chỉ gán mảng sản phẩm thực tế
-    } else {
-      setProducts(Array.isArray(response) ? response : []);
-    }
+    });
+    setProducts(Array.isArray(response) ? response : []);
   } catch (error) {
     console.error("Lỗi fetch:", error);
     toast.error('Không thể tải danh sách sản phẩm');
@@ -78,18 +73,44 @@ export const AdminProducts = () => {
   }
 };
 
-  const handleDelete = async (productId: number, name: string) => {
-    if (!confirm(`Bạn có chắc muốn xóa sản phẩm "${name}"? Thao tác này không thể hoàn tác.`)) {
-      return;
+  const handleDelete = async (product: AdminProduct) => {
+    const isInactive = product.status === 'inactive';
+
+    if (isInactive) {
+      // Đã ngừng bán → xóa hẳn khỏi hệ thống
+      if (!confirm(`Sản phẩm "${product.name}" đã ngừng bán.\n\nBấm OK để XÓA VĨNH VIỄN khỏi hệ thống. Thao tác này không thể hoàn tác!`)) {
+        return;
+      }
     }
 
     try {
-      setActionLoading(productId);
-      await productService.deleteProduct(productId); 
-      toast.success('Đã xóa sản phẩm thành công');
+      setActionLoading(product.productId);
+      const resp = await productService.deleteProduct(product.productId) as any;
+
+      if (resp?.action === 'deactivated') {
+        toast.success(`"${product.name}" đã chuyển sang Ngừng bán`);
+      } else {
+        toast.success(`Đã xóa vĩnh viễn "${product.name}"`);
+      }
       fetchProducts();
-    } catch (error) {
-      toast.error('Không thể xóa sản phẩm này');
+    } catch (error: any) {
+      const resp = error?.response;
+      if (resp?.status === 409 && resp?.data?.code === 'PRODUCT_IN_USE') {
+        const doArchive = confirm(
+          `${resp.data.message}\n\nBạn có muốn chuyển sang "Ngừng bán" thay vì xóa?`
+        );
+        if (doArchive) {
+          try {
+            await adminProductService.archive(product.productId);
+            toast.success('Đã chuyển sản phẩm sang Ngừng bán');
+            fetchProducts();
+          } catch {
+            toast.error('Không thể chuyển trạng thái sản phẩm');
+          }
+        }
+      } else {
+        toast.error('Không thể xóa sản phẩm này');
+      }
     } finally {
       setActionLoading(null);
     }
@@ -129,9 +150,29 @@ export const AdminProducts = () => {
           className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none"
         >
           <option value="">Tất cả danh mục</option>
-          {categories.map((cat) => (
-            <option key={cat.categoryId} value={cat.categoryId}>{cat.name}</option>
-          ))}
+          {(() => {
+            const parentCats = categories.filter(c => !c.parentId);
+            const childCats = categories.filter(c => c.parentId);
+            return parentCats.map(parent => {
+              const children = childCats.filter(c => c.parentId === parent.categoryId);
+              if (children.length === 0) {
+                return (
+                  <optgroup key={parent.categoryId} label={`📁 ${parent.name}`}>
+                    <option disabled style={{ color: '#999', fontStyle: 'italic' }}>
+                      -- Chưa có danh mục con --
+                    </option>
+                  </optgroup>
+                );
+              }
+              return (
+                <optgroup key={parent.categoryId} label={`📁 ${parent.name}`}>
+                  {children.map(child => (
+                    <option key={child.categoryId} value={child.categoryId}>{child.name}</option>
+                  ))}
+                </optgroup>
+              );
+            });
+          })()}
         </select>
 
         <select
@@ -167,14 +208,16 @@ export const AdminProducts = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {products.map((product) => (
-                <tr key={product.productId} className="hover:bg-blue-50/20 transition-colors">
+              {products.map((product) => {
+                const isInactive = product.status === 'inactive';
+                return (
+                <tr key={product.productId} className={`transition-colors ${isInactive ? 'bg-gray-50/80 opacity-60' : 'hover:bg-blue-50/20'}`}>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-4">
                      <img
   src={getImageUrl(product.mainImage)}
   alt={product.name}
-  className="w-14 h-14 object-contain bg-gray-100 rounded-2xl border border-gray-100 shadow-sm"
+  className={`w-14 h-14 object-contain rounded-2xl border shadow-sm ${isInactive ? 'bg-gray-200 border-gray-200 grayscale' : 'bg-gray-100 border-gray-100'}`}
   onError={(e) => {
     const el = e.target as HTMLImageElement;
     el.onerror = null;
@@ -182,8 +225,8 @@ export const AdminProducts = () => {
   }}
 />
                       <div>
-                        <div className="text-sm font-black text-gray-800 uppercase italic leading-tight">{product.name}</div>
-                        <div className="text-[10px] font-black text-blue-600 font-mono mt-0.5">SKU: {product.sku || 'N/A'}</div>
+                        <div className={`text-sm font-black uppercase italic leading-tight ${isInactive ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{product.name}</div>
+                        <div className={`text-[10px] font-black font-mono mt-0.5 ${isInactive ? 'text-gray-400' : 'text-blue-600'}`}>SKU: {product.sku || 'N/A'}</div>
                       </div>
                     </div>
                   </td>
@@ -193,15 +236,16 @@ export const AdminProducts = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-sm font-black text-gray-800 tracking-tighter">{(Number(product.price) || 0).toLocaleString('vi-VN')}₫</div>
+                    <div className={`text-sm font-black tracking-tighter ${isInactive ? 'text-gray-400' : 'text-gray-800'}`}>{(Number(product.price) || 0).toLocaleString('vi-VN')}₫</div>
                     {product.salePrice && Number(product.salePrice) < Number(product.price) && (
-                      <div className="text-[9px] text-red-500 font-black uppercase italic tracking-tighter mt-0.5">
+                      <div className={`text-[9px] font-black uppercase italic tracking-tighter mt-0.5 ${isInactive ? 'text-gray-400' : 'text-red-500'}`}>
                         Sale: {Number(product.salePrice).toLocaleString('vi-VN')}₫
                       </div>
                     )}
                   </td>
                   <td className="px-6 py-4">
                     <span className={`text-xs font-black ${
+                      isInactive ? 'text-gray-400' :
                       product.stockQuantity > 10 ? 'text-green-600' :
                       product.stockQuantity > 0 ? 'text-orange-500' : 'text-red-600'
                     }`}>
@@ -210,9 +254,16 @@ export const AdminProducts = () => {
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${
-                      product.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'
+                      product.status === 'active' ? 'bg-green-100 text-green-700' :
+                      isInactive ? 'bg-red-100 text-red-600 border border-red-200' :
+                      product.status === 'out_of_stock' ? 'bg-orange-100 text-orange-700' :
+                      'bg-slate-100 text-slate-500'
                     }`}>
-                      {product.status === 'active' ? '✓ Đang bán' : '✗ ' + product.status}
+                      {product.status === 'active' ? '✓ Đang bán' :
+                       isInactive ? '⛔ Ngừng bán' :
+                       product.status === 'out_of_stock' ? '✗ Hết hàng' :
+                       product.status === 'pre_order' ? '⏳ Đặt trước' :
+                       product.status}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
@@ -220,15 +271,19 @@ export const AdminProducts = () => {
                       <Link
                         to={`/admin/products/edit/${product.productId}`}
                         className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                        title="Sửa sản phẩm"
+                        title={isInactive ? 'Sửa để mở bán lại' : 'Sửa sản phẩm'}
                       >
                         <Edit size={16} />
                       </Link>
                       <button
-                        onClick={() => handleDelete(product.productId, product.name)}
+                        onClick={() => handleDelete(product)}
                         disabled={actionLoading === product.productId}
-                        className="p-2.5 text-red-600 hover:bg-red-50 rounded-xl transition-all disabled:opacity-30"
-                        title="Xóa sản phẩm"
+                        className={`p-2.5 rounded-xl transition-all disabled:opacity-30 ${
+                          isInactive
+                            ? 'text-red-700 hover:bg-red-100 bg-red-50'
+                            : 'text-red-600 hover:bg-red-50'
+                        }`}
+                        title={isInactive ? 'Xóa vĩnh viễn' : 'Ngừng bán'}
                       >
                         {actionLoading === product.productId ?
                           <RefreshCw size={16} className="animate-spin" /> :
@@ -238,7 +293,8 @@ export const AdminProducts = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

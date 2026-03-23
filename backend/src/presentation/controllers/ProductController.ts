@@ -149,9 +149,39 @@ getAll = async (req: Request, res: Response) => {
 
   delete = async (req: Request, res: Response) => {
     try {
-      const success = await this.productUseCase.deleteProduct(Number(req.params.id));
-      if (!success) return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
-      res.json({ message: 'Xóa thành công' });
+      const result = await this.productUseCase.deleteProduct(Number(req.params.id));
+      if (result.action === 'deactivated') {
+        return res.json({ message: 'Sản phẩm đã chuyển sang Ngừng bán', action: 'deactivated' });
+      }
+      res.json({ message: 'Đã xóa sản phẩm vĩnh viễn', action: 'deleted' });
+    } catch (error: any) {
+      if (error.message.includes('Không tìm thấy')) {
+        return res.status(404).json({ message: error.message });
+      }
+      if (error.message.includes('Không thể xóa sản phẩm')) {
+        return res.status(409).json({ message: error.message, code: 'PRODUCT_IN_USE' });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  };
+
+  // Validate giỏ hàng: nhận danh sách productIds, trả về status & stock
+  validateCart = async (req: Request, res: Response) => {
+    try {
+      const { productIds } = req.body;
+      if (!Array.isArray(productIds) || productIds.length === 0) {
+        return res.json([]);
+      }
+      const results = await Promise.all(
+        productIds.map(async (id: number) => {
+          const product = await this.productUseCase.getProductById(id);
+          if (!product) return { productId: id, available: false, reason: 'not_found' };
+          if (product.status === 'inactive') return { productId: id, available: false, reason: 'inactive', name: product.name };
+          if (product.stockQuantity <= 0) return { productId: id, available: false, reason: 'out_of_stock', name: product.name };
+          return { productId: id, available: true, status: product.status, stockQuantity: product.stockQuantity, price: product.price, salePrice: product.salePrice };
+        })
+      );
+      res.json(results);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

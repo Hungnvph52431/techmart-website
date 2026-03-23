@@ -50,7 +50,8 @@ export class ProductRepository implements IProductRepository {
 
   async findAdminList(filters?: any): Promise<Product[]> {
     const { query, params } = this.buildBaseListQuery(false, filters);
-    const [rows] = await pool.execute<RowDataPacket[]>(query, params);
+    const fullSql = `SELECT p.*, c.name as categoryName, b.name as brandName ${query} ORDER BY p.created_at DESC`;
+    const [rows] = await pool.execute<RowDataPacket[]>(fullSql, params);
     const products = rows.map((row) => this.mapRowToProduct(row));
     return this.attachRelations(products, { includeVariants: true });
   }
@@ -411,24 +412,38 @@ async update(data: any): Promise<Product | null> {
 
 async delete(id: number): Promise<boolean> {
     const [result] = await this.pool.execute<ResultSetHeader>(
-      'UPDATE products SET deleted_at = NOW(), status = ? WHERE product_id = ? AND deleted_at IS NULL',
-      ['archived', id]
+      'UPDATE products SET status = ? WHERE product_id = ? AND deleted_at IS NULL',
+      ['inactive', id]
+    );
+    return result.affectedRows > 0;
+  }
+
+  async hardDelete(id: number): Promise<boolean> {
+    // Xóa hẳn: set deleted_at để soft-delete khỏi DB
+    const [result] = await this.pool.execute<ResultSetHeader>(
+      'UPDATE products SET deleted_at = NOW() WHERE product_id = ? AND deleted_at IS NULL',
+      [id]
     );
     return result.affectedRows > 0;
   }
   async getStats(): Promise<ProductStats> {
-    // 1. Tổng quan
+    // 1. Tổng quan + Giá trị tồn kho
     const [summary]: any = await this.pool.execute(`
       SELECT
         COUNT(*) as totalProducts,
         SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as activeProducts,
-        SUM(CASE WHEN stock_quantity = 0 THEN 1 ELSE 0 END) as outOfStockCount
+        SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END) as inactiveProducts,
+        SUM(CASE WHEN stock_quantity = 0 THEN 1 ELSE 0 END) as outOfStockCount,
+        SUM(CASE WHEN stock_quantity > 0 AND stock_quantity <= 5 THEN 1 ELSE 0 END) as lowStockCount,
+        COALESCE(SUM(stock_quantity), 0) as totalStockUnits,
+        COALESCE(SUM(stock_quantity * price), 0) as totalInventoryValue,
+        COALESCE(SUM(sold_quantity), 0) as totalSoldUnits
       FROM products WHERE deleted_at IS NULL
     `);
 
     // 2. Top sản phẩm bán chạy
     const [topSelling]: any = await this.pool.execute(`
-      SELECT product_id, name, sold_quantity, stock_quantity, main_image
+      SELECT product_id, name, sold_quantity, stock_quantity, main_image, price
       FROM products
       WHERE deleted_at IS NULL AND sold_quantity > 0
       ORDER BY sold_quantity DESC
@@ -444,14 +459,30 @@ async delete(id: number): Promise<boolean> {
       LIMIT 10
     `);
 
+    // 4. Phân bổ theo danh mục
+    const [categoryBreakdown]: any = await this.pool.execute(`
+      SELECT c.name as categoryName, COUNT(p.product_id) as productCount,
+             COALESCE(SUM(p.sold_quantity), 0) as totalSold
+      FROM products p
+      LEFT JOIN categories c ON c.category_id = p.category_id
+      WHERE p.deleted_at IS NULL AND p.status = 'active'
+      GROUP BY c.category_id, c.name
+      ORDER BY totalSold DESC
+      LIMIT 8
+    `);
+
     return {
       ...summary[0],
+      totalStockUnits: Number(summary[0].totalStockUnits),
+      totalInventoryValue: parseFloat(summary[0].totalInventoryValue),
+      totalSoldUnits: Number(summary[0].totalSoldUnits),
       topSellingProducts: topSelling.map((r: any) => ({
         productId: r.product_id,
         name: r.name,
         soldQuantity: r.sold_quantity,
         stockQuantity: r.stock_quantity,
         mainImage: r.main_image || null,
+        price: parseFloat(r.price),
       })),
       lowStockProducts: lowStock.map((r: any) => ({
         productId: r.product_id,
@@ -459,11 +490,31 @@ async delete(id: number): Promise<boolean> {
         stockQuantity: r.stock_quantity,
         mainImage: r.main_image || null,
       })),
+      categoryBreakdown: categoryBreakdown.map((r: any) => ({
+        categoryName: r.categoryName || 'Chưa phân loại',
+        productCount: Number(r.productCount),
+        totalSold: Number(r.totalSold),
+      })),
     };
   }
+  async checkProductInUse(productId: number): Promise<{ inCart: number; inPendingOrders: number }> {
+    const [cartRows] = await pool.execute<RowDataPacket[]>(
+      `SELECT COUNT(*) AS cnt FROM cart WHERE product_id = ?`, [productId]
+    );
+    const [orderRows] = await pool.execute<RowDataPacket[]>(
+      `SELECT COUNT(DISTINCT o.order_id) AS cnt FROM order_details od
+       JOIN orders o ON o.order_id = od.order_id
+       WHERE od.product_id = ? AND o.status IN ('pending', 'confirmed')`, [productId]
+    );
+    return {
+      inCart: Number(cartRows[0]?.cnt || 0),
+      inPendingOrders: Number(orderRows[0]?.cnt || 0),
+    };
+  }
+
   async archive(productId: number): Promise<boolean> {
     const [result] = await pool.execute<ResultSetHeader>(
-      `UPDATE products SET status = 'archived' WHERE product_id = ?`, [productId]
+      `UPDATE products SET status = 'inactive' WHERE product_id = ? AND deleted_at IS NULL`, [productId]
     );
     return result.affectedRows > 0;
   }
@@ -569,7 +620,15 @@ async delete(id: number): Promise<boolean> {
   `;
   const params: any[] = [];
 
-  if (publicOnly) query += ` AND p.status IN ('active', 'out_of_stock')`;
+  if (publicOnly) {
+    if (filters?.search) {
+      // Khi tìm kiếm: hiển thị cả sản phẩm ngừng bán
+      query += ` AND p.status IN ('active', 'out_of_stock', 'inactive')`;
+    } else {
+      // Trang chủ / danh sách bình thường: ẩn sản phẩm ngừng bán
+      query += ` AND p.status IN ('active', 'out_of_stock')`;
+    }
+  }
 
   // 1. Lọc theo Danh mục (categoryId hoặc categorySlug)
   if (filters?.categoryId) {
@@ -597,6 +656,12 @@ async delete(id: number): Promise<boolean> {
     query += ' AND (p.name LIKE ? OR p.sku LIKE ?)';
     params.push(`%${filters.search}%`, `%${filters.search}%`);
   }
+  // Lọc theo trạng thái (admin filter)
+  if (filters?.status && filters.status !== 'all') {
+    query += ' AND p.status = ?';
+    params.push(filters.status);
+  }
+
   if (filters?.isFeatured === true || filters?.featured === 'true') query += ' AND p.is_featured = 1';
   if (filters?.isNew === true) query += ' AND p.is_new = 1';
   if (filters?.isBestseller === true) query += ' AND p.is_bestseller = 1';
