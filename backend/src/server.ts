@@ -1,6 +1,12 @@
 import express, { Application } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+dotenv.config();
+console.log('=== ENV CHECK ===');
+console.log('VNPAY_RETURN_URL:', process.env.VNPAY_RETURN_URL);
+console.log('VNPAY_TMN_CODE:', process.env.VNPAY_TMN_CODE);
+console.log('VNPAY_HASH_SECRET:', process.env.VNPAY_HASH_SECRET);
+console.log('=================');
 import { testConnection } from './infrastructure/database/connection';
 
 
@@ -72,7 +78,7 @@ import { createBannerRoutes, createAdminBannerRoutes } from './presentation/rout
 import { createReviewRoutes, createAdminReviewRoutes } from './presentation/routes/review.routes';
 import path from 'path';
 
-dotenv.config();
+
 
 const app: Application = express();
 const PORT = process.env.PORT || 5000;
