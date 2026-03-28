@@ -308,6 +308,7 @@ export const CheckoutPage = () => {
       }
 
       if (paymentMethod === 'bank_transfer') {
+        clearCart();
         navigate(`/payment/bank-transfer/${result.orderId}`);
         return;
       }

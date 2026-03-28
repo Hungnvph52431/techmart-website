@@ -23,9 +23,12 @@ export const BankTransferPage = () => {
 
   const fetchOrder = async () => {
     try {
-      const { data } = await api.get(`/orders/${orderId}`);
-      setOrder(data);
-      if (data.status !== 'pending') {
+      const { data } = await api.get(`/orders/my-orders/${orderId}`);
+      console.log('Order status:', data.order.status);
+      console.log('Order data:', data);
+      setOrder(data.order);
+      
+      if (data.order.status !== 'pending') {
         setIsPaid(true);
       }
     } catch {
@@ -41,7 +44,7 @@ export const BankTransferPage = () => {
     return () => clearInterval(interval);
   }, [orderId]);
 
-  const total = order?.totalAmount ?? 0;
+  const total = order?.totalAmount ?? order?.total_amount ?? order?.total ?? 0;
   const description = `TechMart ${orderId}`;
   const qrUrl = `https://img.vietqr.io/image/${BANK_ID}-${ACCOUNT_NO}-compact2.png?amount=${total}&addInfo=${encodeURIComponent(description)}&accountName=${encodeURIComponent(ACCOUNT_NAME)}`;
 
