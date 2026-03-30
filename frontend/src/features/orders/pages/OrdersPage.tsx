@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Package, Truck, RotateCcw, ShoppingBag, CheckCircle2, Star } from 'lucide-react';
+import { Package, Truck, ShoppingBag, CheckCircle2, Star } from 'lucide-react'; // Đã xóa RotateCcw thừa
 import { orderService } from '@/services/order.service';
-import api from '@/services/api';
+// Đã xóa dòng import api thừa
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const formatCurrency = (amount: number) =>
@@ -25,7 +25,7 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
 const ORDER_STATUS_STYLES: Record<string, string> = {
   pending:   'bg-amber-100 text-amber-700 border-amber-200',
   confirmed: 'bg-blue-100 text-blue-700 border-blue-200',
-  shipping:  'bg-sky-100 text-sky-700 border-sky-200',
+  shipping:  'bg-purple-100 text-purple-700 border-purple-200', // ✅ FIX: Đã đổi màu Xanh dương sang Tím giống Admin
   delivered: 'bg-emerald-100 text-emerald-700 border-emerald-200',
   completed: 'bg-lime-100 text-lime-700 border-lime-200',
   cancelled: 'bg-rose-100 text-rose-700 border-rose-200',
@@ -173,7 +173,9 @@ export const OrdersPage = () => {
             const total      = Number(order.total ?? order.totalAmount ?? 0);
             const date       = order.orderDate ?? order.created_at ?? '';
             const itemCount  = order.itemCount ?? order.items?.length ?? 0;
-            const isShipping = status === 'shipping';
+            
+            // ✅ FIX: Sửa lại điều kiện kiểm tra trạng thái
+            const isDelivered = status === 'delivered'; 
             const canReview  = ['delivered', 'completed'].includes(status);
 
             return (
@@ -208,10 +210,12 @@ export const OrdersPage = () => {
                 </Link>
 
                 {/* Actions */}
-                {(isShipping || canReview) && (
+                {/* ✅ FIX: Ẩn luôn thanh Actions nếu không có nút nào cần hiện, nhưng cho hiện nếu là delivered/completed để người ta xem chi tiết/đánh giá */}
+                {(isDelivered || canReview || status === 'shipping') && (
                   <div className="flex gap-2 px-5 pb-4">
-                    {/* ✅ Nút "Đã nhận hàng" ngay trong danh sách */}
-                    {isShipping && (
+                    
+                    {/* ✅ FIX: Chỉ hiện nút "Đã nhận hàng" khi trạng thái là 'delivered' (Đã giao) */}
+                    {isDelivered && (
                       <button
                         onClick={e => handleConfirmDelivered(e, oid)}
                         disabled={confirmingId === oid}

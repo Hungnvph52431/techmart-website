@@ -43,7 +43,7 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
 const ORDER_STATUS_STYLES: Record<string, string> = {
   pending:   'bg-amber-100 text-amber-800',
   confirmed: 'bg-blue-100 text-blue-800',
-  shipping:  'bg-sky-100 text-sky-800',
+  shipping:  'bg-purple-100 text-purple-800',
   delivered: 'bg-emerald-100 text-emerald-800',
   completed: 'bg-lime-100 text-lime-800',
   cancelled: 'bg-rose-100 text-rose-800',
@@ -255,11 +255,13 @@ const RETURN_REASONS = [
 
 const ReturnModal = ({
   items,
+  order, // <-- Thêm prop này
   orderId,
   onClose,
   onSubmitted,
 }: {
   items: any[];
+  order: any; // <-- Thêm prop này
   orderId: number;
   onClose: () => void;
   onSubmitted: () => void;
@@ -273,6 +275,10 @@ const ReturnModal = ({
   );
   const [submitting, setSubmitting] = useState(false);
 
+  // --- LOGIC TÀI CHÍNH ---
+  const subtotal = Number(order?.subtotal ?? 0); // Tổng tiền hàng (trước giảm)
+  const discountAmount = Number(order?.discountAmount ?? order?.discount_amount ?? 0); // Tổng tiền voucher
+
   const finalReason = reason === 'Khác' ? customReason : reason;
 
   const handleAddImages = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -281,15 +287,9 @@ const ReturnModal = ({
     e.target.value = '';
   };
 
-  const removeImage = (idx: number) => {
-    setEvidenceFiles(prev => prev.filter((_, i) => i !== idx));
-  };
-
-  const toggleItem = (id: number) =>
-    setSelected(p => ({ ...p, [id]: { ...p[id], checked: !p[id].checked } }));
-
-  const setQty = (id: number, qty: number) =>
-    setSelected(p => ({ ...p, [id]: { ...p[id], quantity: qty } }));
+  const removeImage = (idx: number) => setEvidenceFiles(prev => prev.filter((_, i) => i !== idx));
+  const toggleItem = (id: number) => setSelected(p => ({ ...p, [id]: { ...p[id], checked: !p[id].checked } }));
+  const setQty = (id: number, qty: number) => setSelected(p => ({ ...p, [id]: { ...p[id], quantity: qty } }));
 
   const canSubmit = finalReason.trim().length > 0 && evidenceFiles.length > 0 && !submitting;
 
@@ -317,6 +317,9 @@ const ReturnModal = ({
     }
   };
 
+  // Tính TỔNG TIỀN HOÀN DỰ KIẾN của cả phiếu trả
+  let totalEstimatedRefund = 0;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto">
@@ -336,36 +339,86 @@ const ReturnModal = ({
         <div className="px-6 py-5 space-y-5">
           {/* Chọn sản phẩm */}
           <div>
-            <p className="text-sm font-bold text-slate-700 mb-2">Sản phẩm cần hoàn trả</p>
-            <div className="space-y-2">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-bold text-slate-700">Sản phẩm cần hoàn trả</p>
+              {discountAmount > 0 && (
+                <span className="text-[10px] bg-orange-100 text-orange-600 px-2 py-0.5 rounded font-bold uppercase tracking-wide">
+                  Đơn hàng có Voucher
+                </span>
+              )}
+            </div>
+            <div className="space-y-3">
               {items.map(item => {
                 const id   = item.orderDetailId;
                 const name = item.productName ?? `Sản phẩm #${id}`;
                 const img  = item.productImage ?? '';
                 const maxQty = item.quantity ?? 1;
+                const price  = Number(item.price ?? 0); // Lấy giá 1 SP
                 const sel  = selected[id];
+
+                // --- TÍNH TOÁN TIỀN HOÀN CHO SẢN PHẨM NÀY ---
+                const selectedQty = sel?.checked ? sel.quantity : 0;
+                const itemBaseTotal = price * selectedQty; // Tổng giá trị gốc của SP đang chọn trả
+                
+                let itemRefund = itemBaseTotal;
+                let itemDiscountShare = 0;
+
+                // Nếu có mã giảm giá -> Bổ đôi giảm giá theo tỷ lệ
+                if (subtotal > 0 && discountAmount > 0 && sel?.checked) {
+                  const ratio = itemBaseTotal / subtotal;
+                  itemDiscountShare = ratio * discountAmount;
+                  itemRefund = itemBaseTotal - itemDiscountShare;
+                }
+
+                totalEstimatedRefund += itemRefund; // Cộng dồn vào tổng
+
                 return (
                   <label key={id}
-                    className={`flex items-center gap-3 p-3 rounded-2xl border-2 cursor-pointer transition-colors ${sel?.checked ? 'border-orange-400 bg-orange-50' : 'border-slate-100 bg-slate-50'}`}>
-                    <input type="checkbox" checked={sel?.checked ?? true}
-                      onChange={() => toggleItem(id)}
-                      className="w-4 h-4 accent-orange-500 flex-shrink-0" />
-                    <img src={img || '/placeholder.jpg'} alt={name}
-                      className="w-12 h-12 rounded-xl object-cover bg-white flex-shrink-0"
-                      onError={e => { const el = e.target as HTMLImageElement; el.onerror = null; el.src = '/placeholder.jpg'; }} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-800 truncate">{name}</p>
-                      {item.variantName && <p className="text-xs text-slate-500">{item.variantName}</p>}
+                    className={`flex items-start gap-3 p-3 rounded-2xl border-2 cursor-pointer transition-colors ${sel?.checked ? 'border-orange-400 bg-orange-50' : 'border-slate-100 bg-slate-50'}`}>
+                    <div className="pt-3">
+                      <input type="checkbox" checked={sel?.checked ?? true}
+                        onChange={() => toggleItem(id)}
+                        className="w-4 h-4 accent-orange-500 flex-shrink-0" />
                     </div>
-                    {sel?.checked && maxQty > 1 && (
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button type="button" onClick={e => { e.preventDefault(); setQty(id, Math.max(1, sel.quantity - 1)); }}
-                          className="w-6 h-6 rounded-lg bg-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-300">−</button>
-                        <span className="w-6 text-center text-sm font-bold text-slate-800">{sel.quantity}</span>
-                        <button type="button" onClick={e => { e.preventDefault(); setQty(id, Math.min(maxQty, sel.quantity + 1)); }}
-                          className="w-6 h-6 rounded-lg bg-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-300">+</button>
+                    
+                    <img src={img || '/placeholder.jpg'} alt={name}
+                      className="w-14 h-14 mt-1 rounded-xl object-cover bg-white flex-shrink-0 border border-slate-100"
+                      onError={e => { const el = e.target as HTMLImageElement; el.onerror = null; el.src = '/placeholder.jpg'; }} />
+                    
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-800 line-clamp-2">{name}</p>
+                      {item.variantName && <p className="text-xs text-slate-500 mt-0.5">{item.variantName}</p>}
+                      
+                      {/* Số lượng & Giá tiền */}
+                      <div className="mt-2 flex items-end justify-between">
+                        {/* Cột Số lượng */}
+                        {sel?.checked && maxQty > 1 ? (
+                          <div className="flex items-center gap-1">
+                            <button type="button" onClick={e => { e.preventDefault(); setQty(id, Math.max(1, sel.quantity - 1)); }}
+                              className="w-6 h-6 rounded border border-slate-300 bg-white text-slate-700 font-bold hover:bg-slate-100">−</button>
+                            <span className="w-6 text-center text-sm font-bold text-slate-800">{sel.quantity}</span>
+                            <button type="button" onClick={e => { e.preventDefault(); setQty(id, Math.min(maxQty, sel.quantity + 1)); }}
+                              className="w-6 h-6 rounded border border-slate-300 bg-white text-slate-700 font-bold hover:bg-slate-100">+</button>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-slate-500">Số lượng: {maxQty}</p>
+                        )}
+
+                        {/* Cột Giá tiền */}
+                        {sel?.checked && (
+                          <div className="text-right">
+                            {itemDiscountShare > 0 && (
+                              <p className="text-xs text-slate-400 line-through mb-0.5">
+                                {formatCurrency(itemBaseTotal)}
+                              </p>
+                            )}
+                            <p className="text-sm font-black text-orange-600">
+                              + {formatCurrency(itemRefund)}
+                            </p>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </label>
                 );
               })}
@@ -436,16 +489,26 @@ const ReturnModal = ({
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-white flex gap-3 px-6 pb-6 pt-3 border-t border-slate-100 rounded-b-3xl">
-          <button onClick={onClose}
-            className="flex-1 py-3 rounded-2xl border-2 border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-all">
-            Hủy
-          </button>
-          <button onClick={handleSubmit} disabled={!canSubmit}
-            className="flex-1 py-3 rounded-2xl bg-orange-500 text-white font-bold text-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
-            <RotateCcw size={15} />
-            {submitting ? 'Đang gửi...' : evidenceFiles.length === 0 ? 'Cần upload ảnh bằng chứng' : 'Gửi yêu cầu'}
-          </button>
+        <div className="sticky bottom-0 bg-white border-t border-slate-100 rounded-b-3xl">
+          {/* Box hiển thị Tổng tiền hoàn */}
+          <div className="px-6 py-3 bg-slate-50 flex items-center justify-between border-b border-slate-100">
+            <span className="text-sm font-semibold text-slate-600">Hoàn tiền dự kiến:</span>
+            <span className="text-lg font-black text-orange-600">
+              {formatCurrency(totalEstimatedRefund)}
+            </span>
+          </div>
+
+          <div className="flex gap-3 px-6 pb-6 pt-4">
+            <button onClick={onClose}
+              className="flex-1 py-3 rounded-2xl border-2 border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-all">
+              Hủy
+            </button>
+            <button onClick={handleSubmit} disabled={!canSubmit}
+              className="flex-1 py-3 rounded-2xl bg-orange-500 text-white font-bold text-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
+              <RotateCcw size={15} />
+              {submitting ? 'Đang gửi...' : evidenceFiles.length === 0 ? 'Cần upload ảnh bằng chứng' : 'Gửi yêu cầu'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -579,8 +642,9 @@ export const OrderDetailPage = () => {
 
   // ✅ Chỉ hủy được khi pending/confirmed — khóa từ shipping trở đi
   const canCancel          = ['pending', 'confirmed'].includes(status);
-  // ✅ User tự bấm "Đã nhận hàng" khi đơn đang giao (shipping) hoặc đã giao (delivered)
-  const canConfirmReceived = ['shipping', 'delivered'].includes(status);
+  // ✅ FIX: Chỉ hiện nút "Đã nhận hàng" khi đơn ở trạng thái 'delivered' (đã giao đến nơi)
+  //         KHÔNG hiện khi 'shipping' (đang trên đường giao)
+  const canConfirmReceived = status === 'delivered';
   // ✅ Chỉ hiện badge "Đã nhận hàng" khi user đã xác nhận (completed)
   const alreadyReceived    = status === 'completed';
   // ✅ Chỉ cho đánh giá khi đã nhận hàng VÀ chưa review hết
@@ -602,6 +666,7 @@ export const OrderDetailPage = () => {
       {showReturnModal && (
         <ReturnModal
           items={items}
+          order={order} 
           orderId={orderId}
           onClose={() => setShowReturnModal(false)}
           onSubmitted={() => { setShowReturnModal(false); void loadData(); }}
@@ -660,7 +725,7 @@ export const OrderDetailPage = () => {
               </div>
             )}
 
-            {/* Nút "Đã nhận hàng" — khi đang giao (shipping) hoặc đã giao (delivered) */}
+            {/* Nút "Đã nhận hàng" — CHỈ khi status = 'delivered' */}
             {canConfirmReceived && (
               <button onClick={handleConfirmDelivered}
                 disabled={submitting === 'confirm-delivered'}
@@ -782,7 +847,7 @@ export const OrderDetailPage = () => {
               </section>
             )}
 
-            {/* ── Fix #7: Trạng thái hoàn trả (cho khách hàng) ── */}
+            {/* ── Trạng thái hoàn trả (cho khách hàng) ── */}
             {returns.length > 0 && (
               <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
                 <h3 className="text-base font-black text-gray-900 uppercase italic flex items-center gap-2 mb-5">
