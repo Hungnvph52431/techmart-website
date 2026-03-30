@@ -211,8 +211,9 @@ export const CheckoutPage = () => {
   }, []);
 
   // Chỉ thanh toán các sản phẩm đang được chọn trong giỏ.
-  // Nếu người dùng chưa chọn gì thì getSelectedItems() sẽ trả về toàn bộ items.
-  const checkoutItems = getSelectedItems();
+  const selectedItems = getSelectedItems();
+  // Fallback: nếu không có sản phẩm nào được chọn (vd: localStorage cũ), dùng tất cả
+  const checkoutItems = selectedItems.length > 0 ? selectedItems : items;
 
   // Nếu vào checkout mà giỏ hàng trống (vd: bấm Back sau khi đã đặt) → redirect
   useEffect(() => {

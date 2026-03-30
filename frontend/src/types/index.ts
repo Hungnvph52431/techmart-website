@@ -229,6 +229,9 @@ export interface ProductFilter {
   brandSlug?: string;
   status?: string;
   isFeatured?: boolean;
+  isNew?: boolean;
+  isBestseller?: boolean;
+  onSale?: boolean;
   sort?: string;
   page?: number;
   limit?: number;

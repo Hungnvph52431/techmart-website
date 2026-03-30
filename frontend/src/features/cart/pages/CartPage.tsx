@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { useCartStore } from '@/store/cartStore';
 import { productService } from '@/services/product.service';
@@ -19,7 +19,6 @@ export const CartPage = () => {
     items,
     removeItem,
     updateQuantity,
-    getTotalPrice,
     getTotalItems,
     selectedProductIds,
     toggleSelect,
@@ -28,10 +27,12 @@ export const CartPage = () => {
     getSelectedTotalPrice,
   } = useCartStore();
   const [unavailableIds, setUnavailableIds] = useState<Set<number>>(new Set());
+  const validatedRef = useRef(false);
 
   // Validate giỏ hàng khi vào trang — xóa SP đã bị xóa, đánh dấu SP ngừng bán
   useEffect(() => {
-    if (items.length === 0) return;
+    if (items.length === 0 || validatedRef.current) return;
+    validatedRef.current = true;
     const validate = async () => {
       try {
         const results = await productService.validateCart(items.map(i => i.product.productId));
@@ -48,8 +49,12 @@ export const CartPage = () => {
           }
         }
         setUnavailableIds(bad);
-        if (removed > 0) toast.error(`Đã xóa ${removed} sản phẩm không còn tồn tại khỏi giỏ hàng`);
-        if (bad.size > 0) toast.error(`${bad.size} sản phẩm đã ngừng bán hoặc hết hàng, không thể thanh toán`);
+        // Tự động bỏ chọn SP ngừng bán
+        if (bad.size > 0) {
+          const { selectedProductIds } = useCartStore.getState();
+          const filtered = selectedProductIds.filter(id => !bad.has(id));
+          useCartStore.setState({ selectedProductIds: filtered });
+        }
       } catch { /* ignore */ }
     };
     validate();
@@ -93,11 +98,8 @@ export const CartPage = () => {
     );
   }
 
-  const allSelected = selectedProductIds.length > 0 && selectedProductIds.length === items.length;
-  const selectedCount =
-    selectedProductIds.length > 0
-      ? items.filter((i) => selectedProductIds.includes(i.product.productId)).length
-      : items.length;
+  const allSelected = selectedProductIds.length === items.length;
+  const selectedCount = items.filter((i) => selectedProductIds.includes(i.product.productId)).length;
   const selectedSubtotal = getSelectedTotalPrice();
   const shippingFee = selectedSubtotal >= 5000000 ? 0 : 30000;
 
@@ -140,12 +142,10 @@ export const CartPage = () => {
                     )}
                     <input
                       type="checkbox"
-                      checked={
-                        selectedProductIds.length === 0 ||
-                        selectedProductIds.includes(item.product.productId)
-                      }
+                      checked={selectedProductIds.includes(item.product.productId)}
+                      disabled={isUnavailable}
                       onChange={() => toggleSelect(item.product.productId)}
-                      className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      className={`h-4 w-4 rounded border-gray-300 focus:ring-primary-500 ${isUnavailable ? 'text-gray-300 cursor-not-allowed' : 'text-primary-600'}`}
                     />
                     <img
                       src={getImageUrl(item.product.mainImage)}
@@ -237,10 +237,15 @@ export const CartPage = () => {
                 </div>
               </div>
 
-              {unavailableIds.size > 0 ? (
+              {selectedCount === 0 ? (
                 <button disabled
                   className="block w-full bg-gray-300 text-gray-500 text-center py-3 rounded-lg cursor-not-allowed">
-                  Có sản phẩm ngừng bán — vui lòng xóa trước
+                  Chọn sản phẩm để thanh toán
+                </button>
+              ) : selectedProductIds.some(id => unavailableIds.has(id)) ? (
+                <button disabled
+                  className="block w-full bg-gray-300 text-gray-500 text-center py-3 rounded-lg cursor-not-allowed">
+                  Bỏ chọn sản phẩm ngừng bán để tiếp tục
                 </button>
               ) : (
                 <Link

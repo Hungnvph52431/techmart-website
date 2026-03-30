@@ -210,10 +210,7 @@ export class OrderUseCase {
       this.sendOrderCreatedEmailNotification(newOrder.orderId).catch(() => {});
     }
 
-    // Wallet payment → đã paid ngay → gửi thêm email thanh toán thành công
-    if (orderData.paymentMethod === 'wallet' && newOrder) {
-      this.sendPaymentEmail(newOrder.orderId).catch(() => {});
-    }
+    // Wallet payment → đã paid ngay → không gửi thêm email thanh toán vì email đặt hàng đã đủ thông tin
 
     return newOrder;
   }
@@ -451,12 +448,17 @@ export class OrderUseCase {
   }
 
   // --- EMAIL THÔNG BÁO THANH TOÁN ---
+  // Chỉ gửi cho COD/VNPay khi payment chuyển sang paid SAU khi tạo đơn
+  // Wallet đã gửi email đặt hàng (có ghi "Đã thanh toán") nên không cần email này
   private async sendPaymentEmail(orderId: number): Promise<void> {
     try {
       const aggregate = await this.orderRepository.findAdminDetail(orderId);
       if (!aggregate) return;
 
       const order = aggregate.order;
+
+      // Wallet: email đặt hàng đã đủ thông tin, không gửi thêm
+      if (order.paymentMethod === 'wallet') return;
 
       // Lấy thông tin user (email, name)
       const [userRows] = await pool.execute<RowDataPacket[]>(

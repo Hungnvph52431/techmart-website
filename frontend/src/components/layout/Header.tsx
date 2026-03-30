@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingCart, User, Search, Wallet, X, Flame } from 'lucide-react';
+import { ShoppingCart, User, Search, Wallet, X, Flame, UserCircle, Package, LogOut, Shield } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useCartStore } from '@/store/cartStore';
 import { productService } from '@/services/product.service';
@@ -324,60 +324,83 @@ export const Header = () => {
                 </button>
 
                 {isUserMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-2xl py-2 border border-gray-100 animate-in fade-in zoom-in duration-150">
+                  <div className="absolute right-0 mt-3 w-72 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden animate-in fade-in zoom-in duration-150">
+                    {/* User greeting */}
+                    <div className="px-5 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-100">
+                      <p className="text-sm font-black text-gray-800">Xin chào, {displayName}</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">{user?.email}</p>
+                    </div>
+
                     {user?.role === 'admin' || user?.role === 'staff' || user?.role === 'warehouse' ? (
-                      <>
+                      <div className="py-2">
                         <Link
                           to="/admin"
                           onClick={() => setIsUserMenuOpen(false)}
-                          className="block px-5 py-3 text-xs font-bold text-blue-700 hover:bg-blue-50 hover:text-blue-600 transition-colors uppercase"
+                          className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-blue-700 hover:bg-blue-50 transition-colors"
                         >
+                          <Shield className="h-4 w-4" />
                           Trang quản trị
                         </Link>
-                        <div className="border-t border-gray-50 my-1"></div>
+                        <div className="border-t border-gray-100 mx-4 my-1" />
                         <button
                           onClick={handleLogout}
-                          className="block w-full text-left px-5 py-3 text-xs font-black text-red-600 hover:bg-red-50 transition-colors uppercase"
+                          className="flex items-center gap-3 w-full text-left px-5 py-3 text-sm font-bold text-red-500 hover:bg-red-50 transition-colors"
                         >
+                          <LogOut className="h-4 w-4" />
                           Đăng xuất
                         </button>
-                      </>
+                      </div>
                     ) : (
                       <>
-                        <Link
-                          to="/profile"
-                          onClick={() => setIsUserMenuOpen(false)}
-                          className="block px-5 py-3 text-xs font-bold text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors uppercase"
-                        >
-                          Thông tin cá nhân
-                        </Link>
-                        <Link
-                          to="/orders"
-                          onClick={() => setIsUserMenuOpen(false)}
-                          className="block px-5 py-3 text-xs font-bold text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors uppercase"
-                        >
-                          Đơn hàng của tôi
-                        </Link>
+                        {/* Wallet card */}
                         <Link
                           to="/wallet"
                           onClick={() => setIsUserMenuOpen(false)}
-                          className="flex items-center justify-between px-5 py-3 text-xs font-bold text-orange-600 hover:bg-orange-50 transition-colors"
+                          className="block mx-4 mt-4 mb-2 p-3.5 bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-100 rounded-xl hover:shadow-md transition-all group"
                         >
-                          <span className="flex items-center gap-2 uppercase">
-                            <Wallet className="h-3.5 w-3.5" />
-                            Ví TechMart
-                          </span>
-                          <span className="font-black">
-                            {(user?.walletBalance ?? 0).toLocaleString('vi-VN')}₫
-                          </span>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="p-1.5 bg-orange-100 rounded-lg group-hover:bg-orange-200 transition-colors">
+                                <Wallet className="h-4 w-4 text-orange-600" />
+                              </div>
+                              <span className="text-xs font-bold text-orange-700 uppercase">Ví TechMart</span>
+                            </div>
+                            <span className="text-base font-black text-orange-600">
+                              {(user?.walletBalance ?? 0).toLocaleString('vi-VN')}₫
+                            </span>
+                          </div>
                         </Link>
-                        <div className="border-t border-gray-50 my-1"></div>
-                        <button
-                          onClick={handleLogout}
-                          className="block w-full text-left px-5 py-3 text-xs font-black text-red-600 hover:bg-red-50 transition-colors uppercase"
-                        >
-                          Đăng xuất
-                        </button>
+
+                        {/* Menu items */}
+                        <div className="py-2">
+                          <Link
+                            to="/profile"
+                            onClick={() => setIsUserMenuOpen(false)}
+                            className="flex items-center gap-3 px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                          >
+                            <UserCircle className="h-4 w-4 text-gray-400" />
+                            Thông tin cá nhân
+                          </Link>
+                          <Link
+                            to="/orders"
+                            onClick={() => setIsUserMenuOpen(false)}
+                            className="flex items-center gap-3 px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                          >
+                            <Package className="h-4 w-4 text-gray-400" />
+                            Đơn hàng của tôi
+                          </Link>
+                        </div>
+
+                        <div className="border-t border-gray-100 mx-4" />
+                        <div className="py-2">
+                          <button
+                            onClick={handleLogout}
+                            className="flex items-center gap-3 w-full text-left px-5 py-2.5 text-sm font-bold text-red-500 hover:bg-red-50 transition-colors"
+                          >
+                            <LogOut className="h-4 w-4" />
+                            Đăng xuất
+                          </button>
+                        </div>
                       </>
                     )}
                   </div>

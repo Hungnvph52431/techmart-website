@@ -49,8 +49,11 @@ export const useCartStore = create<CartState>()(
         } else {
           const finalQuantity =
             quantity > product.stockQuantity ? product.stockQuantity : quantity;
+          const newItems = [...items, { product, quantity: finalQuantity }];
           set({
-            items: [...items, { product, quantity: finalQuantity }],
+            items: newItems,
+            // Tự động chọn sản phẩm mới thêm
+            selectedProductIds: [...get().selectedProductIds, product.productId],
           });
         }
       },
@@ -126,7 +129,6 @@ export const useCartStore = create<CartState>()(
 
       getSelectedItems: () => {
         const { items, selectedProductIds } = get();
-        if (selectedProductIds.length === 0) return items;
         return items.filter((item) =>
           selectedProductIds.includes(item.product.productId)
         );
@@ -142,6 +144,12 @@ export const useCartStore = create<CartState>()(
     }),
     {
       name: 'cart-storage',
+      // Khi load từ localStorage: nếu selectedProductIds rỗng → chọn tất cả
+      onRehydrateStorage: () => (state) => {
+        if (state && state.items.length > 0 && state.selectedProductIds.length === 0) {
+          state.selectedProductIds = state.items.map((i) => i.product.productId);
+        }
+      },
     }
   )
 );

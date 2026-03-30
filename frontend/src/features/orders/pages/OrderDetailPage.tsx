@@ -9,9 +9,9 @@ import {
   Camera, ImageIcon, Trash2,
 } from 'lucide-react';
 import { orderService } from '@/services/order.service';
+import { reviewService } from '@/services/review.service';
 import type { OrderReturnView } from '@/types/order';
 import api from '@/services/api';
-import { Layout } from '@/components/layout/Layout';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const BACKEND_URL = (import.meta.env.VITE_API_URL as string)?.replace('/api', '') || 'http://localhost:5001';
@@ -57,7 +57,6 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   bank_transfer: 'Chuyển khoản',
   momo:          'MoMo',
   wallet:        'Ví TechMart',
-  deposit:       'Đặt cọc (Ví + COD)',
 };
 
 const PAYMENT_STATUS_LABELS: Record<string, string> = {
@@ -84,18 +83,48 @@ const ReviewModal = ({
   const [ratings, setRatings] = useState<Record<number, number>>({});
   const [comments, setComments] = useState<Record<number, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [reviewableItems, setReviewableItems] = useState<any[]>(items);
+  const [checking, setChecking] = useState(true);
+
+  // Kiểm tra sản phẩm nào đã review rồi → lọc ra
+  useEffect(() => {
+    const checkItems = async () => {
+      try {
+        const checks = await Promise.all(
+          items.map(async (item) => {
+            const productId = item.productId ?? item.product_id;
+            try {
+              const result = await reviewService.checkCanReview(productId);
+              return result.canReview ? item : null;
+            } catch {
+              return item; // Nếu check lỗi thì vẫn cho hiện
+            }
+          })
+        );
+        const filtered = checks.filter(Boolean);
+        setReviewableItems(filtered);
+        if (filtered.length === 0) {
+          onClose();
+        }
+      } catch {
+        setReviewableItems(items);
+      } finally {
+        setChecking(false);
+      }
+    };
+    checkItems();
+  }, []);
 
   const handleSubmit = async () => {
-    const unrated = items.findIndex((_, i) => !ratings[i]);
+    const unrated = reviewableItems.findIndex((_, i) => !ratings[i]);
     if (unrated !== -1) {
       toast.error(`Vui lòng đánh giá sản phẩm ${unrated + 1}`);
       return;
     }
     try {
       setSubmitting(true);
-      // ✅ Gọi đúng endpoint POST /api/reviews (review.routes.ts)
       const results = await Promise.allSettled(
-        items.map((item, i) =>
+        reviewableItems.map((item, i) =>
           api.post('/reviews', {
             productId:     item.productId    ?? item.product_id,
             orderId:       orderId,
@@ -108,8 +137,10 @@ const ReviewModal = ({
 
       const failed = results.filter(r => r.status === 'rejected');
       if (failed.length === results.length) {
-        // Tất cả đều thất bại
-        toast.error('Không thể gửi đánh giá, vui lòng thử lại');
+        // Lấy lỗi cụ thể từ backend
+        const firstErr = (failed[0] as PromiseRejectedResult).reason;
+        const msg = firstErr?.response?.data?.message || 'Không thể gửi đánh giá, vui lòng thử lại';
+        toast.error(msg);
       } else if (failed.length > 0) {
         toast.success(`Đã gửi ${results.length - failed.length}/${results.length} đánh giá`);
         onSubmitted();
@@ -130,15 +161,21 @@ const ReviewModal = ({
         <div className="sticky top-0 bg-white flex items-center justify-between px-6 py-4 border-b border-slate-100 rounded-t-3xl z-10">
           <div>
             <h3 className="text-base font-bold text-slate-800">⭐ Đánh giá sản phẩm</h3>
-            <p className="text-xs text-slate-400 mt-0.5">{items.length} sản phẩm cần đánh giá</p>
+            <p className="text-xs text-slate-400 mt-0.5">{reviewableItems.length} sản phẩm cần đánh giá</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
             <X size={17} className="text-slate-400" />
           </button>
         </div>
 
+        {checking ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-yellow-400 border-t-transparent" />
+            <span className="ml-2 text-sm text-slate-500">Đang kiểm tra...</span>
+          </div>
+        ) : (
         <div className="px-6 py-5 space-y-8">
-          {items.map((item, i) => {
+          {reviewableItems.map((item, i) => {
             const name = item.productName ?? item.product_name ?? `Sản phẩm ${i + 1}`;
             const img  = item.productImage ?? item.product_image ?? item.image ?? '';
             const rating = ratings[i] ?? 0;
@@ -184,11 +221,12 @@ const ReviewModal = ({
                   className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:border-yellow-400 focus:outline-none resize-none transition-colors"
                 />
 
-                {i < items.length - 1 && <hr className="border-slate-100" />}
+                {i < reviewableItems.length - 1 && <hr className="border-slate-100" />}
               </div>
             );
           })}
         </div>
+        )}
 
         <div className="sticky bottom-0 bg-white flex gap-3 px-6 pb-6 pt-3 border-t border-slate-100 rounded-b-3xl">
           <button onClick={onClose}
@@ -426,12 +464,29 @@ export const OrderDetailPage = () => {
   const [cancelReason, setCancelReason] = useState('');
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState(false);
+  const [allReviewed, setAllReviewed] = useState(false);
 
   const loadData = async () => {
     if (!Number.isFinite(orderId)) { setLoading(false); return; }
     try {
       setLoading(true);
-      setDetail(await orderService.getById(orderId));
+      const data = await orderService.getById(orderId);
+      setDetail(data);
+      // Kiểm tra đã review hết chưa
+      const orderItems = data.items ?? (data as any).orderDetails ?? [];
+      if (['delivered', 'completed'].includes(data.order?.status ?? (data as any).status)) {
+        try {
+          const checks = await Promise.all(
+            orderItems.map((item: any) => {
+              const pid = item.productId ?? item.product_id;
+              return reviewService.checkCanReview(pid).catch(() => ({ canReview: true }));
+            })
+          );
+          setAllReviewed(checks.every(c => !c.canReview));
+        } catch {
+          setAllReviewed(false);
+        }
+      }
     } catch {
       toast.error('Không thể tải chi tiết đơn hàng');
     } finally {
@@ -528,8 +583,8 @@ export const OrderDetailPage = () => {
   const canConfirmReceived = ['shipping', 'delivered'].includes(status);
   // ✅ Chỉ hiện badge "Đã nhận hàng" khi user đã xác nhận (completed)
   const alreadyReceived    = status === 'completed';
-  // ✅ Chỉ cho đánh giá khi đã xác nhận nhận hàng (completed)
-  const canReview          = ['delivered', 'completed'].includes(status);
+  // ✅ Chỉ cho đánh giá khi đã nhận hàng VÀ chưa review hết
+  const canReview          = ['delivered', 'completed'].includes(status) && !allReviewed;
   // ✅ Hoàn hàng: dùng flag từ server, fallback về delivered/completed
   const canRequestReturn   = order.canRequestReturn ?? ['delivered', 'completed'].includes(status);
 

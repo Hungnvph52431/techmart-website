@@ -47,7 +47,6 @@ const PAYMENT_LABELS: Record<string, string> = {
   bank_transfer: 'Chuyển khoản',
   momo: 'MoMo',
   wallet: 'Ví TechMart',
-  deposit: 'Đặt cọc',
 };
 
 const PAYMENT_STATUS_BADGES: Record<string, string> = {
@@ -117,7 +116,7 @@ export const AdminOrders = () => {
       {/* HEADER */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <h1 className="text-3xl font-black text-gray-800 uppercase italic tracking-tight">Quản lý đơn hàng</h1>
-              <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mt-1">
+              <p className="text-sm font-bold text-blue-600 uppercase tracking-widest mt-1">
             Tổng cộng: {totalOrders} vận đơn
           </p>
         <div className="flex items-center gap-3">
@@ -159,7 +158,7 @@ export const AdminOrders = () => {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50/50 border-b border-gray-100">
-              <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              <tr className="text-xs font-black text-gray-400 uppercase tracking-widest">
                 <th className="px-6 py-4 text-left">Đơn hàng</th>
                 <th className="px-6 py-4 text-left">Khách hàng</th>
                 <th className="px-6 py-4 text-left">Thanh toán</th>
@@ -176,8 +175,8 @@ export const AdminOrders = () => {
         className="cursor-pointer transition-colors hover:bg-blue-50/40"
       >
         <td className="px-6 py-4">
-          <div className="text-sm font-black text-blue-600 font-mono">{order.orderCode}</div>
-          <div className="text-[10px] text-gray-400 uppercase font-bold">
+          <div className="text-base font-black text-blue-600 font-mono">{order.orderCode}</div>
+          <div className="text-xs text-gray-400 uppercase font-bold">
             {order.orderDate
               ? new Date(order.orderDate).toLocaleDateString('vi-VN')
               : order.createdAt
@@ -185,32 +184,34 @@ export const AdminOrders = () => {
               : 'Không rõ ngày'}
           </div>
               </td>
-              <div className="text-sm font-bold text-gray-800">
-        {order.customer?.name || order.shipping?.name || 'Khách lẻ'}
-      </div>
-      <div className="flex items-center gap-1 text-[11px] text-gray-400 mt-0.5">
-        <Phone size={10} />
-        <span>{order.customer?.phone || order.shipping?.phone || '—'}</span>
-      </div>
+              <td className="px-6 py-4">
+                <div className="text-base font-bold text-gray-800">
+                  {order.customer?.name || order.shipping?.name || 'Khách lẻ'}
+                </div>
+                <div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">
+                  <Phone size={12} />
+                  <span>{order.customer?.phone || order.shipping?.phone || '—'}</span>
+                </div>
+              </td>
         <td className="px-6 py-4">
-          <div className="flex items-center gap-1 text-[11px] font-bold text-gray-600 mb-1">
-            <CreditCard size={10} className="text-gray-400" />
+          <div className="flex items-center gap-1 text-sm font-bold text-gray-600 mb-1">
+            <CreditCard size={14} className="text-gray-400" />
             {PAYMENT_LABELS[order.paymentMethod] || order.paymentMethod}
           </div>
-          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${PAYMENT_STATUS_BADGES[order.paymentStatus] || 'bg-gray-100 text-gray-500'}`}>
+          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-black ${PAYMENT_STATUS_BADGES[order.paymentStatus] || 'bg-gray-100 text-gray-500'}`}>
             {PAYMENT_STATUS_LABELS[order.paymentStatus] || order.paymentStatus}
           </span>
         </td>
-        <td className="px-6 py-4 text-sm font-black text-red-500">
+        <td className="px-6 py-4 text-base font-black text-red-500">
           {Number(order.totalAmount || order.total).toLocaleString('vi-VN')}₫
         </td>
         <td className="px-6 py-4">
           <div className="flex items-center gap-2">
-            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${STATUS_BADGES[order.status]}`}>
+            <span className={`px-3 py-1 rounded-full text-xs font-black uppercase ${STATUS_BADGES[order.status]}`}>
               {STATUS_LABELS[order.status]}
             </span>
             {order.openReturnCount > 0 && (
-              <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-orange-100 text-orange-600 border border-orange-200">
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-orange-100 text-orange-600 border border-orange-200">
                 🔄 Đang hoàn trả
               </span>
             )}
