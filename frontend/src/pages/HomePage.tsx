@@ -150,8 +150,10 @@ const ProductRow = ({ products, loading }: { products: Product[]; loading: boole
 
 // --- HOMEPAGE ---
 export const HomePage = () => {
+  const [dealProducts, setDealProducts] = useState<Product[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [newProducts, setNewProducts] = useState<Product[]>([]);
+  const [bestsellerProducts, setBestsellerProducts] = useState<Product[]>([]);
   const [sliderBanners, setSliderBanners] = useState<Banner[]>([]);
   const [middleBanners, setMiddleBanners] = useState<Banner[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -162,20 +164,23 @@ export const HomePage = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [featuredData, newestData, sliders, middles, cats, brds] = await Promise.all([
-          productService.getAll({ featured: true }),
-          productService.getAll({}),
+        const [dealData, featuredData, newData, bestsellerData, sliders, middles, cats, brds] = await Promise.all([
+          productService.getAll({ onSale: true, limit: 10 }),
+          productService.getAll({ isFeatured: true, limit: 10 }),
+          productService.getAll({ isNew: true, limit: 10 }),
+          productService.getAll({ isBestseller: true, limit: 10 }),
           bannerService.getActive('home_slider'),
           bannerService.getActive('home_middle'),
           categoryService.getAll(),
           brandService.getAll(),
         ]);
 
-        const featuredList = Array.isArray(featuredData) ? featuredData : ((featuredData as any)?.products || []);
-        const newestList = Array.isArray(newestData) ? newestData : ((newestData as any)?.products || []);
+        const toList = (data: any) => Array.isArray(data) ? data : (data?.products || []);
 
-        setFeaturedProducts(featuredList.slice(0, 10));
-        setNewProducts(newestList.slice(0, 10));
+        setDealProducts(toList(dealData).slice(0, 10));
+        setFeaturedProducts(toList(featuredData).slice(0, 10));
+        setNewProducts(toList(newData).slice(0, 10));
+        setBestsellerProducts(toList(bestsellerData).slice(0, 10));
         setSliderBanners(sliders);
         setMiddleBanners(middles);
         setCategories((cats || []).filter((c: Category) => c.isActive && c.slug !== 'khong-xac-dinh'));
@@ -256,22 +261,30 @@ export const HomePage = () => {
           </div>
         </section>
 
-        {/* ── SĂN DEAL GIÁ SỐC ── */}
+        {/* ── SĂN DEAL GIÁ SỐC — SP đang giảm giá (onSale) ── */}
+        {(loading || dealProducts.length > 0) && (
         <section className="py-4">
           <div className="container mx-auto px-4">
             <div className="bg-white rounded-2xl border border-red-100 overflow-hidden">
-              <div className="bg-gradient-to-r from-red-600 to-pink-600 px-6 py-4 flex items-center gap-3 text-white">
-                <Zap className="fill-current text-yellow-400" size={22} />
-                <h2 className="text-xl font-extrabold uppercase tracking-wide">Săn Deal Giá Sốc</h2>
+              <div className="bg-gradient-to-r from-red-600 to-pink-600 px-6 py-4 flex items-center justify-between text-white">
+                <div className="flex items-center gap-3">
+                  <Zap className="fill-current text-yellow-400" size={22} />
+                  <h2 className="text-xl font-extrabold uppercase tracking-wide">Săn Deal Giá Sốc</h2>
+                </div>
+                <Link to="/products?onSale=true" className="text-white/80 font-semibold text-sm flex items-center gap-0.5 hover:text-white">
+                  Xem tất cả <ChevronRight size={16} />
+                </Link>
               </div>
               <div className="p-5">
-                <ProductRow products={featuredProducts.slice(0, 5)} loading={loading} />
+                <ProductRow products={dealProducts} loading={loading} />
               </div>
             </div>
           </div>
         </section>
+        )}
 
-        {/* ── SẢN PHẨM NỔI BẬT ── */}
+        {/* ── SẢN PHẨM NỔI BẬT — is_featured ── */}
+        {(loading || featuredProducts.length > 0) && (
         <section className="py-6">
           <div className="container mx-auto px-4">
             <div className="flex items-center justify-between mb-5">
@@ -279,26 +292,52 @@ export const HomePage = () => {
                 <Award className="text-blue-600" size={22} />
                 <h2 className="text-xl font-extrabold text-gray-800">Sản phẩm nổi bật</h2>
               </div>
-              <Link to="/products?featured=true" className="text-blue-600 font-semibold text-sm flex items-center gap-0.5 hover:underline">
+              <Link to="/products?isFeatured=true" className="text-blue-600 font-semibold text-sm flex items-center gap-0.5 hover:underline">
                 Xem tất cả <ChevronRight size={16} />
               </Link>
             </div>
             <ProductRow products={featuredProducts} loading={loading} />
           </div>
         </section>
+        )}
 
-        {/* ── MỚI CẬP BẾN ── */}
+        {/* ── BÁN CHẠY — is_bestseller ── */}
+        {(loading || bestsellerProducts.length > 0) && (
         <section className="py-6 bg-white">
           <div className="container mx-auto px-4">
-            <div className="flex items-center gap-2 mb-5">
-              <div className="bg-blue-600 p-1.5 rounded-lg">
-                <Smartphone className="text-white" size={18} />
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                <Zap className="text-orange-500" size={22} />
+                <h2 className="text-xl font-extrabold text-gray-800">Bán chạy nhất</h2>
               </div>
-              <h2 className="text-xl font-extrabold text-gray-800">Mới cập bến</h2>
+              <Link to="/products?isBestseller=true" className="text-blue-600 font-semibold text-sm flex items-center gap-0.5 hover:underline">
+                Xem tất cả <ChevronRight size={16} />
+              </Link>
+            </div>
+            <ProductRow products={bestsellerProducts} loading={loading} />
+          </div>
+        </section>
+        )}
+
+        {/* ── MỚI CẬP BẾN — is_new ── */}
+        {(loading || newProducts.length > 0) && (
+        <section className="py-6">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                <div className="bg-emerald-500 p-1.5 rounded-lg">
+                  <Smartphone className="text-white" size={18} />
+                </div>
+                <h2 className="text-xl font-extrabold text-gray-800">Mới cập bến</h2>
+              </div>
+              <Link to="/products?isNew=true" className="text-blue-600 font-semibold text-sm flex items-center gap-0.5 hover:underline">
+                Xem tất cả <ChevronRight size={16} />
+              </Link>
             </div>
             <ProductRow products={newProducts} loading={loading} />
           </div>
         </section>
+        )}
 
         {/* ── LỢI ÍCH ── */}
         <section className="py-10 bg-white border-t border-gray-100">

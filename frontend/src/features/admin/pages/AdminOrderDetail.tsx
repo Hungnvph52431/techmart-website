@@ -84,7 +84,6 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   bank_transfer: 'Chuyển khoản',
   momo: 'MoMo',
   wallet: 'Ví TechMart',
-  deposit: 'Đặt cọc (Ví + COD)',
 };
 
 const RETURN_STATUS_LABELS: Record<string, string> = {
