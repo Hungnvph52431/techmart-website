@@ -290,6 +290,7 @@ export const CheckoutPage = () => {
           productId: item.product.productId,
           quantity: item.quantity,
           price: item.product.salePrice || item.product.price,
+          variantId: item.selectedVariantId,
         })),
         shippingName: form.shippingName,
         shippingPhone: form.shippingPhone,

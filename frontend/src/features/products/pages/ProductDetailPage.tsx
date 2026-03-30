@@ -132,7 +132,7 @@ export const ProductDetailPage = () => {
       toast.error('Vui lòng chọn phiên bản sản phẩm');
       return;
     }
-    addItem(product, quantity);
+    addItem(product, quantity, selectedVariantId ?? undefined);
     toast.success(`Đã thêm ${quantity} sản phẩm vào giỏ hàng!`);
   };
 
@@ -142,7 +142,7 @@ export const ProductDetailPage = () => {
       toast.error('Vui lòng chọn phiên bản sản phẩm');
       return;
     }
-    addItem(product, quantity);
+    addItem(product, quantity, selectedVariantId ?? undefined);
     navigate('/checkout');
   };
 

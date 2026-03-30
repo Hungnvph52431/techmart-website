@@ -116,6 +116,7 @@ export interface User {
 export interface CartItem {
   product: Product;
   quantity: number;
+  selectedVariantId?: number; // Variant được chọn (nếu có)
 }
 
 // --- 5. ĐƠN HÀNG ---

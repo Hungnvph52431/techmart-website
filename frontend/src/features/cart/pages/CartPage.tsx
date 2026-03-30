@@ -52,7 +52,11 @@ export const CartPage = () => {
         // Tự động bỏ chọn SP ngừng bán
         if (bad.size > 0) {
           const { selectedProductIds } = useCartStore.getState();
-          const filtered = selectedProductIds.filter(id => !bad.has(id));
+          // Lọc selection keys - bỏ những keys bắt đầu bằng productId ngừng bán
+          const filtered = selectedProductIds.filter(key => {
+            const productId = parseInt(key.split('-')[0]);
+            return !bad.has(productId);
+          });
           useCartStore.setState({ selectedProductIds: filtered });
         }
       } catch { /* ignore */ }
@@ -60,21 +64,21 @@ export const CartPage = () => {
     validate();
   }, []);
 
-  const handleUpdateQuantity = (productId: number, newQuantity: number, stockQuantity: number) => {
+  const handleUpdateQuantity = (productId: number, newQuantity: number, stockQuantity: number, selectedVariantId?: number) => {
     if (newQuantity === 0) {
       if (window.confirm('Bạn có muốn xóa sản phẩm này khỏi giỏ hàng không?')) {
-        removeItem(productId);
+        removeItem(productId, selectedVariantId);
       }
     } else if (newQuantity > stockQuantity) {
       toast.error(`Rất tiếc, sản phẩm này chỉ còn ${stockQuantity} cái trong kho.`);
     } else {
-      updateQuantity(productId, newQuantity);
+      updateQuantity(productId, newQuantity, selectedVariantId);
     }
   };
 
-  const handleRemoveItem = (productId: number) => {
+  const handleRemoveItem = (productId: number, selectedVariantId?: number) => {
     if (window.confirm('Bạn có muốn xóa sản phẩm này khỏi giỏ hàng không?')) {
-      removeItem(productId);
+      removeItem(productId, selectedVariantId);
     }
   };
 
@@ -98,8 +102,15 @@ export const CartPage = () => {
     );
   }
 
-  const allSelected = selectedProductIds.length === items.length;
-  const selectedCount = items.filter((i) => selectedProductIds.includes(i.product.productId)).length;
+  // Helper: tạo composite key
+  const getSelectionKey = (productId: number, variantId?: number): string => {
+    return variantId ? `${productId}-${variantId}` : `${productId}`;
+  };
+
+  const allSelected = selectedProductIds.length === items.length && items.length > 0;
+  const selectedCount = items.filter((i) =>
+    selectedProductIds.includes(getSelectionKey(i.product.productId, i.selectedVariantId))
+  ).length;
   const selectedSubtotal = getSelectedTotalPrice();
   const shippingFee = selectedSubtotal >= 5000000 ? 0 : 30000;
 
@@ -142,9 +153,9 @@ export const CartPage = () => {
                     )}
                     <input
                       type="checkbox"
-                      checked={selectedProductIds.includes(item.product.productId)}
+                      checked={selectedProductIds.includes(getSelectionKey(item.product.productId, item.selectedVariantId))}
                       disabled={isUnavailable}
-                      onChange={() => toggleSelect(item.product.productId)}
+                      onChange={() => toggleSelect(item.product.productId, item.selectedVariantId)}
                       className={`h-4 w-4 rounded border-gray-300 focus:ring-primary-500 ${isUnavailable ? 'text-gray-300 cursor-not-allowed' : 'text-primary-600'}`}
                     />
                     <img
@@ -161,6 +172,11 @@ export const CartPage = () => {
                       >
                         {item.product.name}
                       </Link>
+                      {item.selectedVariantId && item.product.variants && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          {item.product.variants.find(v => v.variantId === item.selectedVariantId)?.variantName || ''}
+                        </p>
+                      )}
                       <p className="text-red-600 font-bold mt-1">
                         {(item.product.salePrice || item.product.price).toLocaleString('vi-VN')}₫
                       </p>
@@ -171,14 +187,14 @@ export const CartPage = () => {
 
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => handleUpdateQuantity(item.product.productId, item.quantity - 1, item.product.stockQuantity)}
+                        onClick={() => handleUpdateQuantity(item.product.productId, item.quantity - 1, item.product.stockQuantity, item.selectedVariantId)}
                         className="p-1 border border-gray-300 rounded hover:bg-gray-100 transition-colors"
                       >
                         <Minus className="h-4 w-4" />
                       </button>
                       <span className="w-8 text-center">{item.quantity}</span>
                       <button
-                        onClick={() => handleUpdateQuantity(item.product.productId, item.quantity + 1, item.product.stockQuantity)}
+                        onClick={() => handleUpdateQuantity(item.product.productId, item.quantity + 1, item.product.stockQuantity, item.selectedVariantId)}
                         className={`p-1 border rounded transition-colors ${item.quantity >= item.product.stockQuantity
                             ? 'border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed'
                             : 'border-gray-300 hover:bg-gray-100'
@@ -196,7 +212,7 @@ export const CartPage = () => {
                     </div>
 
                     <button
-                      onClick={() => handleRemoveItem(item.product.productId)}
+                      onClick={() => handleRemoveItem(item.product.productId, item.selectedVariantId)}
                       className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                       title="Xóa sản phẩm"
                     >
@@ -242,7 +258,10 @@ export const CartPage = () => {
                   className="block w-full bg-gray-300 text-gray-500 text-center py-3 rounded-lg cursor-not-allowed">
                   Chọn sản phẩm để thanh toán
                 </button>
-              ) : selectedProductIds.some(id => unavailableIds.has(id)) ? (
+              ) : selectedProductIds.some(key => {
+                const productId = parseInt(key.split('-')[0]);
+                return unavailableIds.has(productId);
+              }) ? (
                 <button disabled
                   className="block w-full bg-gray-300 text-gray-500 text-center py-3 rounded-lg cursor-not-allowed">
                   Bỏ chọn sản phẩm ngừng bán để tiếp tục
