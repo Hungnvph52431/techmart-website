@@ -46,8 +46,8 @@ const ORDER_STATUS_STYLES: Record<string, string> = {
   shipping:  'bg-purple-100 text-purple-800',
   delivered: 'bg-emerald-100 text-emerald-800',
   completed: 'bg-lime-100 text-lime-800',
-  cancelled: 'bg-rose-100 text-rose-800',
-  returned:  'bg-gray-100 text-gray-800',
+  cancelled: 'bg-red-100 text-red-600',
+  returned:  'bg-orange-100 text-orange-600',
 };
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
@@ -64,6 +64,13 @@ const PAYMENT_STATUS_LABELS: Record<string, string> = {
   paid:     'Đã thanh toán',
   failed:   'Thất bại',
   refunded: 'Đã hoàn tiền',
+};
+
+const PAYMENT_STATUS_STYLES: Record<string, string> = {
+  pending:  'text-amber-600',
+  paid:     'text-emerald-600 font-semibold',
+  failed:   'text-rose-600 font-semibold',
+  refunded: 'text-violet-600 font-semibold',
 };
 
 // ─── Review Modal ─────────────────────────────────────────────────────────────
@@ -700,7 +707,9 @@ export const OrderDetailPage = () => {
             <p className="mt-1 text-sm text-gray-500">
               Đặt lúc {orderDate ? formatDateTime(orderDate) : '—'} ·{' '}
               {PAYMENT_METHOD_LABELS[payMethod] ?? payMethod} /{' '}
-              {PAYMENT_STATUS_LABELS[payStatus] ?? payStatus}
+              <span className={PAYMENT_STATUS_STYLES[payStatus] ?? ''}>
+                {PAYMENT_STATUS_LABELS[payStatus] ?? payStatus}
+              </span>
             </p>
           </div>
 
@@ -821,6 +830,35 @@ export const OrderDetailPage = () => {
                 })}
               </div>
             </section>
+
+            {/* ── Đánh giá sản phẩm ── */}
+            {canReview && (
+              <section className="rounded-2xl border-2 border-yellow-200 bg-yellow-50 p-6 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-black text-gray-900 uppercase italic flex items-center gap-2">
+                    <Star size={18} className="text-yellow-500 fill-yellow-500" /> Đánh giá sản phẩm
+                  </h3>
+                  <button onClick={() => setShowReviewModal(true)}
+                    className="inline-flex items-center gap-2 rounded-xl bg-yellow-400 px-5 py-2.5 text-sm font-bold text-slate-900 hover:bg-yellow-500 transition-colors shadow-sm">
+                    <Star size={15} className="fill-current" /> Viết đánh giá ngay
+                  </button>
+                </div>
+                <p className="text-sm text-gray-600 mt-2">
+                  Hãy chia sẻ trải nghiệm của bạn về sản phẩm để giúp những người mua khác!
+                </p>
+              </section>
+            )}
+
+            {allReviewed && ['delivered', 'completed'].includes(status) && (
+              <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={18} className="text-emerald-600" />
+                  <p className="text-sm font-semibold text-emerald-700">
+                    Bạn đã đánh giá tất cả sản phẩm trong đơn hàng này. Cảm ơn bạn!
+                  </p>
+                </div>
+              </section>
+            )}
 
             {/* ── Timeline ── */}
             {timeline.length > 0 && (

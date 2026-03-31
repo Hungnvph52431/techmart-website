@@ -170,7 +170,7 @@ export const CheckoutPage = () => {
     walletService.getBalance().then((balance) => updateUser({ walletBalance: balance })).catch(() => {});
   }, []);
 
-  const [paymentMethod, setPaymentMethod] = useState<"cod" | "bank_transfer" | "vnpay" | "wallet">("cod");
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "vnpay" | "wallet">("cod");
   const [loading, setLoading] = useState(false);
 
   // Voucher states
@@ -286,12 +286,21 @@ export const CheckoutPage = () => {
       setLoading(true);
 
       const orderData = {
-        items: checkoutItems.map((item) => ({
-          productId: item.product.productId,
-          quantity: item.quantity,
-          price: item.product.salePrice || item.product.price,
-          variantId: item.selectedVariantId,
-        })),
+        items: checkoutItems.map((item) => {
+          const basePrice = Number(item.product.salePrice || item.product.price);
+          const variant = item.selectedVariantId && item.product.variants
+            ? item.product.variants.find(v => v.variantId === item.selectedVariantId)
+            : undefined;
+          const price = variant?.priceAdjustment != null
+            ? basePrice + Number(variant.priceAdjustment)
+            : basePrice;
+          return {
+            productId: item.product.productId,
+            quantity: item.quantity,
+            price,
+            variantId: item.selectedVariantId,
+          };
+        }),
         shippingName: form.shippingName,
         shippingPhone: form.shippingPhone,
         shippingAddress: form.shippingAddress,
@@ -313,11 +322,6 @@ export const CheckoutPage = () => {
           orderId: result.orderId,
         });
         window.location.href = data.paymentUrl;
-        return;
-      }
-
-      if (paymentMethod === 'bank_transfer') {
-        navigate(`/payment/bank-transfer/${result.orderId}`);
         return;
       }
 
@@ -575,25 +579,6 @@ export const CheckoutPage = () => {
                   )}
                 </button>
 
-                {/* QR Banking */}
-                <button
-                  onClick={() => setPaymentMethod("bank_transfer")}
-                  className={`flex items-center gap-4 p-5 rounded-2xl border-2 transition-all ${
-                    paymentMethod === "bank_transfer"
-                      ? "border-blue-600 bg-blue-50"
-                      : "border-gray-100 hover:border-gray-300"
-                  }`}
-                >
-                  <span className="text-3xl">📱</span>
-                  <div className="text-left">
-                    <p className="font-black text-sm uppercase tracking-widest">Chuyển khoản QR</p>
-                    <p className="text-xs text-gray-400 font-bold">VietQR - Tất cả ngân hàng</p>
-                  </div>
-                  {paymentMethod === "bank_transfer" && (
-                    <span className="ml-auto text-blue-600 font-black text-lg">✓</span>
-                  )}
-                </button>
-
                 {/* Ví TechMart */}
                 <button
                   onClick={() => setPaymentMethod("wallet")}
@@ -642,16 +627,6 @@ export const CheckoutPage = () => {
                   )}
                 </button>
               </div>
-
-              {/* Thông báo khi chọn chuyển khoản */}
-              {paymentMethod === "bank_transfer" && (
-                <div className="mt-6 flex items-center gap-3 bg-blue-50 rounded-2xl p-4 border border-blue-200">
-                  <span className="text-2xl">📱</span>
-                  <p className="text-xs font-bold text-blue-700">
-                    Sau khi đặt hàng, bạn sẽ được chuyển đến trang mã QR để thanh toán qua ngân hàng.
-                  </p>
-                </div>
-              )}
 
             </div>
           </div>
