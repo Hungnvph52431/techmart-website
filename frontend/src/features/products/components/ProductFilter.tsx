@@ -72,7 +72,7 @@ export const ProductsFilter = () => {
   const [searchInput, setSearchInput] = useState(searchParams.get("search") || "");
   const [showPanel, setShowPanel] = useState(false);
   const [brands, setBrands] = useState<Brand[]>([]);
-  const [childCategories, setChildCategories] = useState<Category[]>([]);
+  const [parentCategories, setParentCategories] = useState<Category[]>([]);
   const [tempFilters, setTempFilters] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -80,7 +80,7 @@ export const ProductsFilter = () => {
       .then(data => setBrands((data || []).filter((b: Brand) => b.isActive)))
       .catch(() => {});
     categoryService.getAll()
-      .then(data => setChildCategories((data || []).filter((c: Category) => c.parentId && c.isActive !== false)))
+      .then(data => setParentCategories((data || []).filter((c: Category) => !c.parentId && c.isActive !== false)))
       .catch(() => {});
   }, []);
 
@@ -214,8 +214,8 @@ export const ProductsFilter = () => {
           ))}
         </div>
 
-        {/* Category pills */}
-        {childCategories.length > 0 && (
+        {/* Category pills (chỉ danh mục cha) */}
+        {parentCategories.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-gray-100">
             <span className="text-xs font-bold text-gray-400 uppercase tracking-wide mr-1">Danh mục:</span>
             <button onClick={() => updateParams({ category: "" })}
@@ -224,7 +224,7 @@ export const ProductsFilter = () => {
               }`}>
               Tất cả
             </button>
-            {childCategories.map(c => (
+            {parentCategories.map(c => (
               <button key={c.categoryId} onClick={() => updateParams({ category: category === c.slug ? "" : c.slug })}
                 className={`px-3.5 py-1.5 rounded-xl text-sm font-semibold border transition-all ${
                   category === c.slug ? "border-blue-600 bg-blue-600 text-white" : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
