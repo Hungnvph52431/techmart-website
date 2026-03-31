@@ -39,10 +39,12 @@ import { ReviewUseCase } from './application/use-cases/ReviewUseCase';
 import { BrandUseCase } from './application/use-cases/BrandUseCase'; //
 import { CouponUseCase } from './application/use-cases/CouponUseCase'; //
 import { BannerUseCase } from './application/use-cases/BannerUseCase';
+import { VietnamAdministrativeService } from './application/services/VietnamAdministrativeService';
 
 // --- CONTROLLERS ---
 import { AddressController } from './presentation/controllers/AddressController';
 import { AuthController } from './presentation/controllers/AuthController';
+import { LocationController } from './presentation/controllers/LocationController';
 import { ProductController } from './presentation/controllers/ProductController';
 import { AdminProductController } from './presentation/controllers/AdminProductController';
 import { OrderController } from './presentation/controllers/OrderController';
@@ -76,6 +78,7 @@ import { createBrandRoutes } from './presentation/routes/brand.routes'; //
 import { createCouponRoutes } from './presentation/routes/coupon.routes'; //
 import { createBannerRoutes, createAdminBannerRoutes } from './presentation/routes/banner.routes';
 import { createReviewRoutes, createAdminReviewRoutes } from './presentation/routes/review.routes';
+import { createLocationRoutes } from './presentation/routes/location.routes';
 import path from 'path';
 
 
@@ -116,9 +119,14 @@ const bannerRepository = new BannerRepository(); // db là pool MySQL của bạ
 const addressRepository = new AddressRepository();
 
 // Use Cases
+const vietnamAdministrativeService = new VietnamAdministrativeService();
 const authUseCase = new AuthUseCase(userRepository);
 const productUseCase = new ProductUseCase(productRepository);
-const orderUseCase = new OrderUseCase(orderRepository, productRepository);
+const orderUseCase = new OrderUseCase(
+  orderRepository,
+  productRepository,
+  vietnamAdministrativeService
+);
 const userUseCase = new UserUseCase(userRepository);
 const voucherUseCase = new VoucherUseCase(voucherRepo);
 const categoryUseCase = new CategoryUseCase(categoryRepository);
@@ -131,6 +139,7 @@ const bannerUseCase = new BannerUseCase(bannerRepository);
 // Controllers
 const authController = new AuthController(authUseCase);
 const productController = new ProductController(productUseCase);
+const locationController = new LocationController(vietnamAdministrativeService);
 const adminProductController = new AdminProductController(productUseCase);
 const orderController = new OrderController(orderUseCase);
 const adminOrderController = new AdminOrderController(orderUseCase);
@@ -150,6 +159,7 @@ const walletController = new WalletController(walletUseCase);
 // Public & Customer Routes
 app.use('/api/auth', createAuthRoutes(authController));
 app.use('/api/products', createProductRoutes(productController));
+app.use('/api/locations', createLocationRoutes(locationController));
 app.use('/api/categories', createCategoryRoutes(categoryController));
 app.use('/api/orders', createOrderRoutes(orderController));
 app.use('/api/users', createUserRoutes(userController));
@@ -182,6 +192,9 @@ const startServer = async () => {
     app.listen(PORT, () => {
       console.log(`🚀 Server is running on port ${PORT}`);
       console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(
+        `🗺️ Vietnam administrative dataset: ${vietnamAdministrativeService.getSummary().provinceCount} provinces, ${vietnamAdministrativeService.getSummary().wardCount} wards`
+      );
 
       // ✅ THÊM ĐOẠN NÀY:
       const scheduler = new OrderScheduler(orderUseCase);

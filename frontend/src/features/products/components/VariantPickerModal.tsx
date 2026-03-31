@@ -3,6 +3,11 @@ import { X, Check, ShoppingCart, Minus, Plus } from 'lucide-react';
 import { Product } from '@/types';
 import { useCartStore } from '@/store/cartStore';
 import toast from 'react-hot-toast';
+import {
+  CART_QUANTITY_EXCEEDED_MESSAGE,
+  getProductPurchaseStockLimit,
+  getRemainingProductQuantity,
+} from '@/features/cart/lib/cartQuantity';
 
 const BACKEND_URL = (import.meta.env.VITE_API_URL as string)?.replace('/api', '') || 'http://localhost:5001';
 const getImageUrl = (url?: string): string => {
@@ -18,11 +23,12 @@ interface VariantPickerModalProps {
 }
 
 export const VariantPickerModal = ({ product, open, onClose }: VariantPickerModalProps) => {
-  const { addItem } = useCartStore();
+  const { addItem, items } = useCartStore();
   const variants = product.variants ?? [];
 
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [quantityDraft, setQuantityDraft] = useState('1');
 
   // Auto-chọn variant đầu tiên khi mở
   useEffect(() => {
@@ -94,19 +100,90 @@ export const VariantPickerModal = ({ product, open, onClose }: VariantPickerModa
     : basePrice;
 
   // Tính stock
-  const variantStock = selectedVariant
-    ? Number(selectedVariant.stockQuantity ?? (selectedVariant as any).stock ?? 0)
-    : 0;
   const stockToUse = selectedVariant
-    ? (variantStock > 0 ? variantStock : product.stockQuantity)
+    ? getProductPurchaseStockLimit(product, selectedVariant)
     : product.stockQuantity;
+  const availableStock = getRemainingProductQuantity(items, product, selectedVariant);
+  const isDisabled = stockToUse <= 0 || availableStock <= 0;
+
+  useEffect(() => {
+    if (!open) return;
+
+    setQuantity((currentQuantity) => {
+      if (availableStock <= 0) {
+        return 0;
+      }
+
+      if (currentQuantity < 1) {
+        return 1;
+      }
+
+      if (currentQuantity > availableStock) {
+        return availableStock;
+      }
+
+      return currentQuantity;
+    });
+  }, [availableStock, open]);
+
+  useEffect(() => {
+    if (!open) return;
+    setQuantityDraft(String(quantity));
+  }, [open, quantity]);
+
+  const handleQuantityDraftChange = (rawValue: string) => {
+    if (!/^\d*$/.test(rawValue)) {
+      return;
+    }
+
+    if (rawValue !== '' && Number(rawValue) > availableStock) {
+      toast.error(CART_QUANTITY_EXCEEDED_MESSAGE);
+      return;
+    }
+
+    setQuantityDraft(rawValue);
+  };
+
+  const resolveQuantityDraft = () => {
+    const fallbackQuantity = availableStock > 0
+      ? Math.min(Math.max(quantity, 1), availableStock)
+      : 0;
+
+    if (quantityDraft === '') {
+      return fallbackQuantity;
+    }
+
+    const parsedQuantity = Number(quantityDraft);
+    if (!Number.isFinite(parsedQuantity) || parsedQuantity < 0) {
+      return fallbackQuantity;
+    }
+
+    if (parsedQuantity > availableStock) {
+      toast.error(CART_QUANTITY_EXCEEDED_MESSAGE);
+      return fallbackQuantity;
+    }
+
+    return availableStock > 0 ? Math.max(1, parsedQuantity) : 0;
+  };
+
+  const commitQuantityDraft = () => {
+    const nextQuantity = resolveQuantityDraft();
+    setQuantity(nextQuantity);
+    setQuantityDraft(String(nextQuantity));
+    return nextQuantity;
+  };
 
   const handleAdd = () => {
     if (!selectedVariantId) {
       toast.error('Vui lòng chọn phiên bản');
       return;
     }
-    addItem(product, quantity, selectedVariantId);
+    const nextQuantity = commitQuantityDraft();
+    if (nextQuantity <= 0 || nextQuantity > availableStock) {
+      toast.error(CART_QUANTITY_EXCEEDED_MESSAGE);
+      return;
+    }
+    addItem(product, nextQuantity, selectedVariantId);
     toast.success(`Đã thêm ${product.name} vào giỏ hàng!`);
     onClose();
   };
@@ -134,7 +211,9 @@ export const VariantPickerModal = ({ product, open, onClose }: VariantPickerModa
             <p className="text-xl font-black text-red-600 mt-1">
               {displayPrice.toLocaleString('vi-VN')}₫
             </p>
-            <p className="text-xs text-gray-400 mt-0.5">Kho: {stockToUse} sản phẩm</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Kho: {stockToUse} • Có thể thêm: {availableStock}
+            </p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
             <X size={20} className="text-gray-400" />
@@ -206,18 +285,36 @@ export const VariantPickerModal = ({ product, open, onClose }: VariantPickerModa
             <div className="flex items-center gap-3">
               <div className="flex items-center border-2 border-gray-200 rounded-xl overflow-hidden">
                 <button onClick={() => quantity > 1 && setQuantity(q => q - 1)}
-                  disabled={quantity <= 1}
+                  disabled={quantity <= 1 || isDisabled}
                   className="w-10 h-10 flex items-center justify-center hover:bg-gray-50 disabled:opacity-30 transition-colors">
                   <Minus size={16} />
                 </button>
-                <span className="w-12 text-center font-bold text-gray-800">{quantity}</span>
-                <button onClick={() => quantity < stockToUse && setQuantity(q => q + 1)}
-                  disabled={quantity >= stockToUse}
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={quantityDraft}
+                  disabled={isDisabled}
+                  onChange={(event) => handleQuantityDraftChange(event.target.value)}
+                  onBlur={commitQuantityDraft}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.currentTarget.blur();
+                    }
+                  }}
+                  className="w-12 bg-transparent text-center font-bold text-gray-800 outline-none disabled:text-gray-400"
+                  aria-label={`Số lượng ${product.name}`}
+                />
+                <button onClick={() => quantity < availableStock && setQuantity(q => q + 1)}
+                  disabled={quantity >= availableStock || isDisabled}
                   className="w-10 h-10 flex items-center justify-center hover:bg-gray-50 disabled:opacity-30 transition-colors">
                   <Plus size={16} />
                 </button>
               </div>
-              <span className="text-xs text-gray-400">Còn {stockToUse} sản phẩm</span>
+              <span className="text-xs text-gray-400">
+                {availableStock > 0
+                  ? `Còn có thể thêm ${availableStock} sản phẩm`
+                  : 'Đã đạt tối đa trong giỏ hàng'}
+              </span>
             </div>
           </div>
         </div>
@@ -226,7 +323,7 @@ export const VariantPickerModal = ({ product, open, onClose }: VariantPickerModa
         <div className="p-5 border-t border-gray-100 bg-gray-50/50">
           <button
             onClick={handleAdd}
-            disabled={stockToUse <= 0}
+            disabled={isDisabled || quantity <= 0}
             className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-3 rounded-2xl font-bold text-sm hover:bg-blue-700 active:scale-[0.98] transition-all disabled:bg-gray-300 disabled:cursor-not-allowed shadow-lg shadow-blue-100">
             <ShoppingCart size={16} />
             Thêm vào giỏ hàng — {(displayPrice * quantity).toLocaleString('vi-VN')}₫
