@@ -186,6 +186,29 @@ interface AddressFormData {
   addressLine: string; ward: string; district: string; city: string;
   isDefault: boolean;
 }
+
+// ─── Validate trùng lặp (chỉ check fullName & phone) ────────────────────────
+function validateDuplicate(
+  formData: Pick<AddressFormData, 'fullName' | 'phone'>,
+  existing: Array<Pick<Address, 'fullName' | 'phone'>>,
+): string[] {
+  const name = formData.fullName.trim().toLowerCase();
+  const phone = formData.phone.trim();
+  const errors: string[] = [];
+
+  const dupName = existing.some(a => a.fullName.trim().toLowerCase() === name);
+  const dupPhone = existing.some(a => a.phone.trim() === phone);
+
+  if (dupName && dupPhone) {
+    errors.push('Tên người nhận và số điện thoại đã tồn tại');
+  } else if (dupName) {
+    errors.push('Tên người nhận đã tồn tại');
+  } else if (dupPhone) {
+    errors.push('Số điện thoại đã tồn tại');
+  }
+
+  return errors;
+}
 const EMPTY_FORM: AddressFormData = { fullName: '', phone: '', addressLine: '', ward: '', district: '', city: '', isDefault: false };
 
 // ─── Address Modal ────────────────────────────────────────────────────────────
@@ -740,12 +763,25 @@ export const ProfilePage = () => {
   };
 
   const handleSaveAddress = async (data: AddressFormData) => {
+    // Validate trùng lặp: chỉ check fullName và phone
+    const others = editingAddress
+      ? addresses.filter(a => a.addressId !== editingAddress.addressId)
+      : addresses;
+
+    const errors = validateDuplicate(data, others);
+    if (errors.length > 0) {
+      errors.forEach(msg => toast.error(msg));
+      return;
+    }
+
     try {
       if (editingAddress) { await addressService.update(editingAddress.addressId, data); toast.success('Đã cập nhật địa chỉ'); }
       else { await addressService.create(data); toast.success('Đã thêm địa chỉ mới'); }
       setShowModal(false); setEditingAddress(undefined);
       setAddresses(await addressService.getMyAddresses());
-    } catch { toast.error('Không thể lưu địa chỉ'); }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Không thể lưu địa chỉ');
+    }
   };
 
   const handleDeleteAddress = async (id: number) => {
