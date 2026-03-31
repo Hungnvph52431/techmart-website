@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Package, Truck, ShoppingBag, CheckCircle2, Star } from 'lucide-react'; // Đã xóa RotateCcw thừa
+import { Package, Truck, ShoppingBag, CheckCircle2, Star, Search, X } from 'lucide-react';
 import { orderService } from '@/services/order.service';
 // Đã xóa dòng import api thừa
 
@@ -53,6 +53,8 @@ export const OrdersPage = () => {
   // ✅ confirmingId: track đơn nào đang xác nhận nhận hàng
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
 
+  const [searchQuery, setSearchQuery] = useState('');
+
   const [summary, setSummary] = useState({ total: 0, pending: 0, shipping: 0, delivered: 0 });
 
   const fetchOrders = async (status: FilterStatus = filter) => {
@@ -100,7 +102,15 @@ export const OrdersPage = () => {
     }
   };
 
-  const filteredOrders = orders;
+  const filteredOrders = searchQuery.trim()
+    ? orders.filter(o => {
+        const q = searchQuery.trim().toLowerCase();
+        return (
+          o.orderCode?.toLowerCase().includes(q) ||
+          o.shippingPhone?.toLowerCase().includes(q)
+        );
+      })
+    : orders;
 
   if (loading && orders.length === 0) {
     return (
@@ -132,6 +142,24 @@ export const OrdersPage = () => {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* ── Tìm kiếm ── */}
+      <div className="relative">
+        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Tìm theo mã đơn hàng hoặc số điện thoại..."
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          className="w-full rounded-2xl border border-gray-200 bg-white py-3 pl-11 pr-10 text-sm font-medium text-gray-700 placeholder-gray-400 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+        />
+        {searchQuery && (
+          <button onClick={() => setSearchQuery('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-100 transition-colors">
+            <X size={16} className="text-gray-400" />
+          </button>
+        )}
       </div>
 
       {/* ── Filter tabs ── */}
@@ -226,8 +254,8 @@ export const OrdersPage = () => {
                     </button>
                   )}
 
-                  {/* Nút đánh giá */}
-                  {canReview && (
+                  {/* Nút đánh giá - ẩn nếu đã đánh giá hết */}
+                  {canReview && !order.allReviewed && (
                     <Link to={`/orders/${oid}`}
                       className="flex items-center gap-2 rounded-xl bg-yellow-400 px-4 py-2 text-xs font-bold text-slate-900 hover:bg-yellow-500 transition-colors">
                       <Star size={13} className="fill-current" /> Đánh giá

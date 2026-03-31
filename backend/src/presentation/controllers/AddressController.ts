@@ -26,6 +26,26 @@ export class AddressController {
         return res.status(400).json({ message: 'Vui lòng điền đầy đủ thông tin địa chỉ' });
       }
 
+      // Check trùng lặp
+      const allAddresses = await this.addressRepository.findByUserId(req.user.userId);
+      const duplicate = allAddresses.find(a =>
+        a.fullName === fullName && a.phone === phone && a.addressLine === addressLine
+        && a.ward === ward && a.district === district && a.city === city
+      );
+      if (duplicate) {
+        return res.status(400).json({ message: 'Địa chỉ này đã tồn tại (trùng hoàn toàn với địa chỉ của ' + duplicate.fullName + ' - ' + duplicate.phone + ', ' + duplicate.addressLine + ', ' + duplicate.ward + ', ' + duplicate.district + ', ' + duplicate.city + ')' });
+      }
+
+      // Check trùng từng phần - cảnh báo cụ thể
+      for (const a of allAddresses) {
+        const trung: string[] = [];
+        if (a.fullName === fullName && a.phone === phone) trung.push('họ tên & SĐT');
+        if (a.addressLine === addressLine && a.ward === ward && a.district === district && a.city === city) trung.push('địa chỉ');
+        if (trung.length > 0) {
+          return res.status(400).json({ message: `Trùng ${trung.join(' và ')} với địa chỉ đã lưu: "${a.fullName} - ${a.phone}, ${a.addressLine}, ${a.ward}, ${a.district}, ${a.city}"` });
+        }
+      }
+
       const address = await this.addressRepository.create(req.user.userId, {
         fullName, phone, addressLine, ward, district, city, isDefault,
       });
@@ -44,6 +64,27 @@ export class AddressController {
 
       if (!existing || existing.userId !== req.user.userId) {
         return res.status(404).json({ message: 'Không tìm thấy địa chỉ' });
+      }
+
+      // Check trùng lặp (trừ chính nó)
+      const { fullName, phone, addressLine, ward, district, city } = req.body;
+      if (fullName && phone && addressLine && ward && district && city) {
+        const others = (await this.addressRepository.findByUserId(req.user.userId)).filter(a => a.addressId !== addressId);
+        const duplicate = others.find(a =>
+          a.fullName === fullName && a.phone === phone && a.addressLine === addressLine
+          && a.ward === ward && a.district === district && a.city === city
+        );
+        if (duplicate) {
+          return res.status(400).json({ message: 'Địa chỉ này đã tồn tại (trùng hoàn toàn với địa chỉ của ' + duplicate.fullName + ' - ' + duplicate.phone + ', ' + duplicate.addressLine + ')' });
+        }
+        for (const a of others) {
+          const trung: string[] = [];
+          if (a.fullName === fullName && a.phone === phone) trung.push('họ tên & SĐT');
+          if (a.addressLine === addressLine && a.ward === ward && a.district === district && a.city === city) trung.push('địa chỉ');
+          if (trung.length > 0) {
+            return res.status(400).json({ message: `Trùng ${trung.join(' và ')} với địa chỉ đã lưu: "${a.fullName} - ${a.phone}, ${a.addressLine}, ${a.ward}"` });
+          }
+        }
       }
 
       const updated = await this.addressRepository.update(addressId, req.body);
