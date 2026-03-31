@@ -25,11 +25,11 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
 const ORDER_STATUS_STYLES: Record<string, string> = {
   pending:   'bg-amber-100 text-amber-700 border-amber-200',
   confirmed: 'bg-blue-100 text-blue-700 border-blue-200',
-  shipping:  'bg-purple-100 text-purple-700 border-purple-200', // ✅ FIX: Đã đổi màu Xanh dương sang Tím giống Admin
+  shipping:  'bg-purple-100 text-purple-700 border-purple-200',
   delivered: 'bg-emerald-100 text-emerald-700 border-emerald-200',
   completed: 'bg-lime-100 text-lime-700 border-lime-200',
-  cancelled: 'bg-rose-100 text-rose-700 border-rose-200',
-  returned:  'bg-gray-100 text-gray-600 border-gray-200',
+  cancelled: 'bg-red-100 text-red-600 border-red-200',
+  returned:  'bg-orange-100 text-orange-600 border-orange-200',
 };
 
 // ✅ Bỏ "processing" khỏi filters vì đã remove khỏi luồng
@@ -205,41 +205,40 @@ export const OrdersPage = () => {
                         <p className="text-xs text-gray-400 truncate max-w-sm">📍 {order.shipping.fullAddress}</p>
                       )}
                     </div>
-                    <p className="text-lg font-black text-blue-600">{formatCurrency(total)}</p>
+                    <p className={`text-lg font-black ${
+                      status === 'cancelled' ? 'text-red-500 line-through' :
+                      status === 'returned' ? 'text-orange-500' :
+                      'text-blue-600'
+                    }`}>{formatCurrency(total)}</p>
                   </div>
                 </Link>
 
                 {/* Actions */}
-                {/* ✅ FIX: Ẩn luôn thanh Actions nếu không có nút nào cần hiện, nhưng cho hiện nếu là delivered/completed để người ta xem chi tiết/đánh giá */}
-                {(isDelivered || canReview || status === 'shipping') && (
-                  <div className="flex gap-2 px-5 pb-4">
-                    
-                    {/* ✅ FIX: Chỉ hiện nút "Đã nhận hàng" khi trạng thái là 'delivered' (Đã giao) */}
-                    {isDelivered && (
-                      <button
-                        onClick={e => handleConfirmDelivered(e, oid)}
-                        disabled={confirmingId === oid}
-                        className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors shadow-sm shadow-emerald-100">
-                        <CheckCircle2 size={14} />
-                        {confirmingId === oid ? 'Đang xác nhận...' : 'Đã nhận hàng'}
-                      </button>
-                    )}
+                <div className="flex gap-2 px-5 pb-4">
+                  {/* Nút "Đã nhận hàng" khi trạng thái là 'delivered' */}
+                  {isDelivered && (
+                    <button
+                      onClick={e => handleConfirmDelivered(e, oid)}
+                      disabled={confirmingId === oid}
+                      className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors shadow-sm shadow-emerald-100">
+                      <CheckCircle2 size={14} />
+                      {confirmingId === oid ? 'Đang xác nhận...' : 'Đã nhận hàng'}
+                    </button>
+                  )}
 
-                    {/* Nút đánh giá */}
-                    {canReview && (
-                      <Link to={`/orders/${oid}`}
-                        onClick={() => {/* sẽ mở modal từ OrderDetailPage */}}
-                        className="flex items-center gap-2 rounded-xl bg-yellow-400 px-4 py-2 text-xs font-bold text-slate-900 hover:bg-yellow-500 transition-colors">
-                        <Star size={13} className="fill-current" /> Đánh giá
-                      </Link>
-                    )}
-
+                  {/* Nút đánh giá */}
+                  {canReview && (
                     <Link to={`/orders/${oid}`}
-                      className="flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors ml-auto">
-                      Xem chi tiết →
+                      className="flex items-center gap-2 rounded-xl bg-yellow-400 px-4 py-2 text-xs font-bold text-slate-900 hover:bg-yellow-500 transition-colors">
+                      <Star size={13} className="fill-current" /> Đánh giá
                     </Link>
-                  </div>
-                )}
+                  )}
+
+                  <Link to={`/orders/${oid}`}
+                    className="flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors ml-auto">
+                    Xem chi tiết →
+                  </Link>
+                </div>
               </div>
             );
           })}

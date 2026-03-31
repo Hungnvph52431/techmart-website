@@ -107,9 +107,14 @@ export const CartPage = () => {
     return variantId ? `${productId}-${variantId}` : `${productId}`;
   };
 
-  const allSelected = selectedProductIds.length === items.length && items.length > 0;
+  // Safety: ensure selectedProductIds are strings (migrate from old format if needed)
+  const normalizedSelectedIds = selectedProductIds.map((id) =>
+    typeof id === 'string' ? id : String(id)
+  );
+
+  const allSelected = normalizedSelectedIds.length === items.length && items.length > 0;
   const selectedCount = items.filter((i) =>
-    selectedProductIds.includes(getSelectionKey(i.product.productId, i.selectedVariantId))
+    normalizedSelectedIds.includes(getSelectionKey(i.product.productId, i.selectedVariantId))
   ).length;
   const selectedSubtotal = getSelectedTotalPrice();
   const shippingFee = selectedSubtotal >= 5000000 ? 0 : 30000;
@@ -129,6 +134,7 @@ export const CartPage = () => {
                     checked={allSelected}
                     onChange={() => (allSelected ? clearSelection() : selectAll())}
                     className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    title={allSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
                   />
                   <span className="text-sm font-medium text-gray-700">
                     Chọn tất cả ({selectedCount}/{items.length})
@@ -153,7 +159,7 @@ export const CartPage = () => {
                     )}
                     <input
                       type="checkbox"
-                      checked={selectedProductIds.includes(getSelectionKey(item.product.productId, item.selectedVariantId))}
+                      checked={normalizedSelectedIds.includes(getSelectionKey(item.product.productId, item.selectedVariantId))}
                       disabled={isUnavailable}
                       onChange={() => toggleSelect(item.product.productId, item.selectedVariantId)}
                       className={`h-4 w-4 rounded border-gray-300 focus:ring-primary-500 ${isUnavailable ? 'text-gray-300 cursor-not-allowed' : 'text-primary-600'}`}
@@ -165,6 +171,14 @@ export const CartPage = () => {
                       onError={e => { const el = e.target as HTMLImageElement; el.onerror = null; el.src = '/placeholder.jpg'; }}
                     />
 
+                    {(() => {
+                      // Lấy giá & stock từ variant đã lưu sẵn trên CartItem
+                      const itemPrice = item.selectedVariantPrice
+                        ?? Number(item.product.salePrice || item.product.price);
+                      const stockToUse = item.selectedVariantStock
+                        ?? item.product.stockQuantity;
+
+                      return (<>
                     <div className="flex-1">
                       <Link
                         to={`/products/${item.product.slug}`}
@@ -172,34 +186,34 @@ export const CartPage = () => {
                       >
                         {item.product.name}
                       </Link>
-                      {item.selectedVariantId && item.product.variants && (
+                      {item.selectedVariantName && (
                         <p className="text-xs text-gray-500 mt-1">
-                          {item.product.variants.find(v => v.variantId === item.selectedVariantId)?.variantName || ''}
+                          Phiên bản: {item.selectedVariantName}
                         </p>
                       )}
                       <p className="text-red-600 font-bold mt-1">
-                        {(item.product.salePrice || item.product.price).toLocaleString('vi-VN')}₫
+                        {itemPrice.toLocaleString('vi-VN')}₫
                       </p>
                       <p className="text-sm text-green-600 mt-1">
-                        Còn lại: {item.product.stockQuantity} SP
+                        Còn lại: {stockToUse} SP
                       </p>
                     </div>
 
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => handleUpdateQuantity(item.product.productId, item.quantity - 1, item.product.stockQuantity, item.selectedVariantId)}
+                        onClick={() => handleUpdateQuantity(item.product.productId, item.quantity - 1, stockToUse, item.selectedVariantId)}
                         className="p-1 border border-gray-300 rounded hover:bg-gray-100 transition-colors"
                       >
                         <Minus className="h-4 w-4" />
                       </button>
                       <span className="w-8 text-center">{item.quantity}</span>
                       <button
-                        onClick={() => handleUpdateQuantity(item.product.productId, item.quantity + 1, item.product.stockQuantity, item.selectedVariantId)}
-                        className={`p-1 border rounded transition-colors ${item.quantity >= item.product.stockQuantity
+                        onClick={() => handleUpdateQuantity(item.product.productId, item.quantity + 1, stockToUse, item.selectedVariantId)}
+                        className={`p-1 border rounded transition-colors ${item.quantity >= stockToUse
                             ? 'border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed'
                             : 'border-gray-300 hover:bg-gray-100'
                           }`}
-                        title={item.quantity >= item.product.stockQuantity ? 'Đã đạt giới hạn kho' : ''}
+                        title={item.quantity >= stockToUse ? 'Đã đạt giới hạn kho' : ''}
                       >
                         <Plus className="h-4 w-4" />
                       </button>
@@ -207,7 +221,7 @@ export const CartPage = () => {
 
                     <div className="text-right min-w-[120px]">
                       <p className="font-bold text-lg text-primary-700">
-                        {((item.product.salePrice || item.product.price) * item.quantity).toLocaleString('vi-VN')}₫
+                        {(itemPrice * item.quantity).toLocaleString('vi-VN')}₫
                       </p>
                     </div>
 
@@ -218,6 +232,8 @@ export const CartPage = () => {
                     >
                       <Trash2 className="h-5 w-5" />
                     </button>
+                  </>);
+                    })()}
                   </motion.div>
                   );
                 })}
@@ -258,8 +274,8 @@ export const CartPage = () => {
                   className="block w-full bg-gray-300 text-gray-500 text-center py-3 rounded-lg cursor-not-allowed">
                   Chọn sản phẩm để thanh toán
                 </button>
-              ) : selectedProductIds.some(key => {
-                const productId = parseInt(key.split('-')[0]);
+              ) : normalizedSelectedIds.some(key => {
+                const productId = parseInt(String(key).split('-')[0]);
                 return unavailableIds.has(productId);
               }) ? (
                 <button disabled
