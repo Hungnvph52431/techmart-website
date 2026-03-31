@@ -21,7 +21,7 @@ export const RelatedProducts = ({ category }: Props) => {
         
         // Vì data trả về là mảng Product[] trực tiếp nên slice luôn
         if (Array.isArray(data)) {
-          setProducts(data.slice(0, 4));
+          setProducts(data.slice(0, 5));
         }
       } catch (error) {
         console.error("Lỗi khi tải sản phẩm liên quan:", error);
@@ -35,7 +35,7 @@ export const RelatedProducts = ({ category }: Props) => {
     <div className="mt-16">
       <h2 className="mb-6 text-2xl font-bold">Sản phẩm liên quan</h2>
 
-      <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-5">
         {products.map((product) => (
           // 4. ProductCard đã được import nên sẽ hết lỗi
           <ProductCard key={product.productId} product={product} />
