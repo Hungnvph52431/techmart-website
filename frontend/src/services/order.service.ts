@@ -1,9 +1,13 @@
 import api from './api';
-import type { OrderDetailView, OrderReturnView, CreateOrderReturnPayload } from '@/types/order';
+import type {
+  CreateOrderPayload,
+  CreateOrderReturnPayload,
+  OrderDetailView,
+  OrderReturnView,
+} from '@/types/order';
 import {
   Order,
   OrderStats,
-  OrderItem,
 } from '@/types';
 
 // Các type bổ trợ cho tính năng Đơn hàng nâng cao
@@ -15,13 +19,6 @@ export type OrderStatus =
   | 'completed'
   | 'cancelled'
   | 'returned';
-
-export interface CreateOrderPayload {
-  items: OrderItem[];
-  totalAmount: number;
-  paymentMethod: 'cod' | 'online';
-  note?: string;
-}
 
 export const orderService = {
   // 1. DÀNH CHO KHÁCH HÀNG (Customer)

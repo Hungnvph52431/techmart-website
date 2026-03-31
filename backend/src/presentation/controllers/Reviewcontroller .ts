@@ -137,11 +137,11 @@ export class ReviewController {
 
       const [result] = await pool.execute<ResultSetHeader>(
         `INSERT INTO reviews (product_id, user_id, order_id, order_detail_id, rating, title, comment, is_verified_purchase, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'pending')`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'approved')`,
         [productId, userId, orderId, orderDetailId, rating, title || null, comment || null]
       );
 
-      res.status(201).json({ reviewId: result.insertId, message: 'Đánh giá đang chờ duyệt' });
+      res.status(201).json({ reviewId: result.insertId, message: 'Đánh giá thành công!' });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

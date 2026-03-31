@@ -16,13 +16,15 @@ import {
   RETURN_DEADLINE_DAYS,
 } from '../policies/OrderLifecycle';
 import { sendPaymentSuccessEmail, sendOrderCreatedEmail } from '../services/EmailService';
+import { VietnamAdministrativeService } from '../services/VietnamAdministrativeService';
 import pool from '../../infrastructure/database/connection';
 import { RowDataPacket } from 'mysql2';
 
 export class OrderUseCase {
   constructor(
     private orderRepository: IOrderRepository,
-    private productRepository: IProductRepository
+    private productRepository: IProductRepository,
+    private vietnamAdministrativeService: VietnamAdministrativeService
   ) {}
 
   // --- TRUY VẤN DÀNH CHO ADMIN ---
@@ -71,6 +73,20 @@ export class OrderUseCase {
     // Gửi email thông báo thanh toán thành công (không chặn flow chính)
     if (updated && paymentStatus === 'paid') {
       this.sendPaymentEmail(orderId).catch(() => {});
+
+      // VNPay/Bank Transfer: khi payment confirm → auto-transition to shipping (skip pending/confirmed)
+      if (['vnpay', 'bank_transfer'].includes(order.paymentMethod)) {
+        try {
+          const updatedOrder = await this.orderRepository.findById(orderId);
+          if (updatedOrder && updatedOrder.status === 'pending') {
+            // Skip confirmed → go directly to shipping
+            await this.transitionOrderStatus(orderId, 'confirmed', actorUserId || 0, 'system', 'Tự động xác nhận do thanh toán online');
+            await this.transitionOrderStatus(orderId, 'shipping', actorUserId || 0, 'system', 'Tự động bắt đầu giao do thanh toán online');
+          }
+        } catch (err) {
+          console.error('[OrderUseCase] Auto-transition for vnpay/bank_transfer failed:', err);
+        }
+      }
     }
 
     return updated;
@@ -181,6 +197,16 @@ export class OrderUseCase {
       throw new Error('Đơn hàng phải có ít nhất một sản phẩm');
     }
 
+    const validatedLocation =
+      this.vietnamAdministrativeService.validateCurrentSelection({
+        city: orderData.shippingCity,
+        ward: orderData.shippingWard,
+      });
+
+    orderData.shippingCity = validatedLocation.province.name;
+    orderData.shippingWard = validatedLocation.ward.name;
+    orderData.shippingDistrict = orderData.shippingDistrict?.trim() || undefined;
+
     // Kiểm tra tồn kho trước khi đặt hàng
     for (const item of orderData.items) {
       if (item.quantity <= 0) throw new Error('Số lượng sản phẩm phải lớn hơn 0');
@@ -210,9 +236,17 @@ export class OrderUseCase {
       this.sendOrderCreatedEmailNotification(newOrder.orderId).catch(() => {});
     }
 
-    // Wallet payment → đã paid ngay → gửi thêm email thanh toán thành công
+    // Wallet: thanh toán ngay → tự động chuyển sang shipping
     if (orderData.paymentMethod === 'wallet' && newOrder) {
-      this.sendPaymentEmail(newOrder.orderId).catch(() => {});
+      try {
+        // Mark as paid
+        await this.updateOrderPaymentStatus(newOrder.orderId, 'paid', orderData.userId, 'customer', 'Thanh toán qua ví TechMart');
+        // Transition to shipping (skip pending → confirmed → shipping)
+        await this.transitionOrderStatus(newOrder.orderId, 'confirmed', orderData.userId, 'customer', 'Tự động xác nhận do thanh toán ví');
+        await this.transitionOrderStatus(newOrder.orderId, 'shipping', orderData.userId, 'system', 'Tự động bắt đầu giao do thanh toán ví');
+      } catch (err) {
+        console.error('[OrderUseCase] Auto-transition for wallet failed:', err);
+      }
     }
 
     return newOrder;
@@ -451,12 +485,17 @@ export class OrderUseCase {
   }
 
   // --- EMAIL THÔNG BÁO THANH TOÁN ---
+  // Chỉ gửi cho COD/VNPay khi payment chuyển sang paid SAU khi tạo đơn
+  // Wallet đã gửi email đặt hàng (có ghi "Đã thanh toán") nên không cần email này
   private async sendPaymentEmail(orderId: number): Promise<void> {
     try {
       const aggregate = await this.orderRepository.findAdminDetail(orderId);
       if (!aggregate) return;
 
       const order = aggregate.order;
+
+      // Wallet: email đặt hàng đã đủ thông tin, không gửi thêm
+      if (order.paymentMethod === 'wallet') return;
 
       // Lấy thông tin user (email, name)
       const [userRows] = await pool.execute<RowDataPacket[]>(

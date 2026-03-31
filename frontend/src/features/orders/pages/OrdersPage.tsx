@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Package, Truck, RotateCcw, ShoppingBag, CheckCircle2, Star } from 'lucide-react';
+import { Package, Truck, ShoppingBag, CheckCircle2, Star, Search, X } from 'lucide-react';
 import { orderService } from '@/services/order.service';
-import api from '@/services/api';
+// Đã xóa dòng import api thừa
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const formatCurrency = (amount: number) =>
@@ -25,11 +25,11 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
 const ORDER_STATUS_STYLES: Record<string, string> = {
   pending:   'bg-amber-100 text-amber-700 border-amber-200',
   confirmed: 'bg-blue-100 text-blue-700 border-blue-200',
-  shipping:  'bg-sky-100 text-sky-700 border-sky-200',
+  shipping:  'bg-purple-100 text-purple-700 border-purple-200',
   delivered: 'bg-emerald-100 text-emerald-700 border-emerald-200',
   completed: 'bg-lime-100 text-lime-700 border-lime-200',
-  cancelled: 'bg-rose-100 text-rose-700 border-rose-200',
-  returned:  'bg-gray-100 text-gray-600 border-gray-200',
+  cancelled: 'bg-red-100 text-red-600 border-red-200',
+  returned:  'bg-orange-100 text-orange-600 border-orange-200',
 };
 
 // ✅ Bỏ "processing" khỏi filters vì đã remove khỏi luồng
@@ -52,6 +52,8 @@ export const OrdersPage = () => {
   const [loading, setLoading] = useState(true);
   // ✅ confirmingId: track đơn nào đang xác nhận nhận hàng
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
+
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [summary, setSummary] = useState({ total: 0, pending: 0, shipping: 0, delivered: 0 });
 
@@ -100,7 +102,15 @@ export const OrdersPage = () => {
     }
   };
 
-  const filteredOrders = orders;
+  const filteredOrders = searchQuery.trim()
+    ? orders.filter(o => {
+        const q = searchQuery.trim().toLowerCase();
+        return (
+          o.orderCode?.toLowerCase().includes(q) ||
+          o.shippingPhone?.toLowerCase().includes(q)
+        );
+      })
+    : orders;
 
   if (loading && orders.length === 0) {
     return (
@@ -132,6 +142,24 @@ export const OrdersPage = () => {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* ── Tìm kiếm ── */}
+      <div className="relative">
+        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Tìm theo mã đơn hàng hoặc số điện thoại..."
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          className="w-full rounded-2xl border border-gray-200 bg-white py-3 pl-11 pr-10 text-sm font-medium text-gray-700 placeholder-gray-400 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+        />
+        {searchQuery && (
+          <button onClick={() => setSearchQuery('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-100 transition-colors">
+            <X size={16} className="text-gray-400" />
+          </button>
+        )}
       </div>
 
       {/* ── Filter tabs ── */}
@@ -173,7 +201,9 @@ export const OrdersPage = () => {
             const total      = Number(order.total ?? order.totalAmount ?? 0);
             const date       = order.orderDate ?? order.created_at ?? '';
             const itemCount  = order.itemCount ?? order.items?.length ?? 0;
-            const isShipping = status === 'shipping';
+            
+            // ✅ FIX: Sửa lại điều kiện kiểm tra trạng thái
+            const isDelivered = status === 'delivered'; 
             const canReview  = ['delivered', 'completed'].includes(status);
 
             return (
@@ -203,39 +233,40 @@ export const OrdersPage = () => {
                         <p className="text-xs text-gray-400 truncate max-w-sm">📍 {order.shipping.fullAddress}</p>
                       )}
                     </div>
-                    <p className="text-lg font-black text-blue-600">{formatCurrency(total)}</p>
+                    <p className={`text-lg font-black ${
+                      status === 'cancelled' ? 'text-red-500 line-through' :
+                      status === 'returned' ? 'text-orange-500' :
+                      'text-blue-600'
+                    }`}>{formatCurrency(total)}</p>
                   </div>
                 </Link>
 
                 {/* Actions */}
-                {(isShipping || canReview) && (
-                  <div className="flex gap-2 px-5 pb-4">
-                    {/* ✅ Nút "Đã nhận hàng" ngay trong danh sách */}
-                    {isShipping && (
-                      <button
-                        onClick={e => handleConfirmDelivered(e, oid)}
-                        disabled={confirmingId === oid}
-                        className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors shadow-sm shadow-emerald-100">
-                        <CheckCircle2 size={14} />
-                        {confirmingId === oid ? 'Đang xác nhận...' : 'Đã nhận hàng'}
-                      </button>
-                    )}
+                <div className="flex gap-2 px-5 pb-4">
+                  {/* Nút "Đã nhận hàng" khi trạng thái là 'delivered' */}
+                  {isDelivered && (
+                    <button
+                      onClick={e => handleConfirmDelivered(e, oid)}
+                      disabled={confirmingId === oid}
+                      className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors shadow-sm shadow-emerald-100">
+                      <CheckCircle2 size={14} />
+                      {confirmingId === oid ? 'Đang xác nhận...' : 'Đã nhận hàng'}
+                    </button>
+                  )}
 
-                    {/* Nút đánh giá */}
-                    {canReview && (
-                      <Link to={`/orders/${oid}`}
-                        onClick={() => {/* sẽ mở modal từ OrderDetailPage */}}
-                        className="flex items-center gap-2 rounded-xl bg-yellow-400 px-4 py-2 text-xs font-bold text-slate-900 hover:bg-yellow-500 transition-colors">
-                        <Star size={13} className="fill-current" /> Đánh giá
-                      </Link>
-                    )}
-
+                  {/* Nút đánh giá - ẩn nếu đã đánh giá hết */}
+                  {canReview && !order.allReviewed && (
                     <Link to={`/orders/${oid}`}
-                      className="flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors ml-auto">
-                      Xem chi tiết →
+                      className="flex items-center gap-2 rounded-xl bg-yellow-400 px-4 py-2 text-xs font-bold text-slate-900 hover:bg-yellow-500 transition-colors">
+                      <Star size={13} className="fill-current" /> Đánh giá
                     </Link>
-                  </div>
-                )}
+                  )}
+
+                  <Link to={`/orders/${oid}`}
+                    className="flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors ml-auto">
+                    Xem chi tiết →
+                  </Link>
+                </div>
               </div>
             );
           })}

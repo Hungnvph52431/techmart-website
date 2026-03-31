@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { useCartStore } from '@/store/cartStore';
 import { productService } from '@/services/product.service';
@@ -6,6 +6,11 @@ import toast from 'react-hot-toast';
 import { Trash2, Plus, Minus, ShoppingCart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  CART_QUANTITY_EXCEEDED_MESSAGE,
+  getCartItemStockLimit,
+  getCartSelectionKey,
+} from '@/features/cart/lib/cartQuantity';
 
 const BACKEND_URL = (import.meta.env.VITE_API_URL as string)?.replace('/api', '') || 'http://localhost:5001';
 const getImageUrl = (url?: string | null) => {
@@ -19,7 +24,6 @@ export const CartPage = () => {
     items,
     removeItem,
     updateQuantity,
-    getTotalPrice,
     getTotalItems,
     selectedProductIds,
     toggleSelect,
@@ -28,10 +32,13 @@ export const CartPage = () => {
     getSelectedTotalPrice,
   } = useCartStore();
   const [unavailableIds, setUnavailableIds] = useState<Set<number>>(new Set());
+  const [quantityDrafts, setQuantityDrafts] = useState<Record<string, string>>({});
+  const validatedRef = useRef(false);
 
   // Validate giỏ hàng khi vào trang — xóa SP đã bị xóa, đánh dấu SP ngừng bán
   useEffect(() => {
-    if (items.length === 0) return;
+    if (items.length === 0 || validatedRef.current) return;
+    validatedRef.current = true;
     const validate = async () => {
       try {
         const results = await productService.validateCart(items.map(i => i.product.productId));
@@ -48,28 +55,105 @@ export const CartPage = () => {
           }
         }
         setUnavailableIds(bad);
-        if (removed > 0) toast.error(`Đã xóa ${removed} sản phẩm không còn tồn tại khỏi giỏ hàng`);
-        if (bad.size > 0) toast.error(`${bad.size} sản phẩm đã ngừng bán hoặc hết hàng, không thể thanh toán`);
+        // Tự động bỏ chọn SP ngừng bán
+        if (bad.size > 0) {
+          const { selectedProductIds } = useCartStore.getState();
+          // Lọc selection keys - bỏ những keys bắt đầu bằng productId ngừng bán
+          const filtered = selectedProductIds.filter(key => {
+            const productId = parseInt(key.split('-')[0]);
+            return !bad.has(productId);
+          });
+          useCartStore.setState({ selectedProductIds: filtered });
+        }
       } catch { /* ignore */ }
     };
     validate();
   }, []);
 
-  const handleUpdateQuantity = (productId: number, newQuantity: number, stockQuantity: number) => {
+  useEffect(() => {
+    const nextDrafts = items.reduce<Record<string, string>>((drafts, item) => {
+      drafts[getCartSelectionKey(item.product.productId, item.selectedVariantId)] = String(
+        item.quantity
+      );
+      return drafts;
+    }, {});
+
+    setQuantityDrafts(nextDrafts);
+  }, [items]);
+
+  const handleUpdateQuantity = (productId: number, newQuantity: number, stockQuantity: number, selectedVariantId?: number) => {
     if (newQuantity === 0) {
       if (window.confirm('Bạn có muốn xóa sản phẩm này khỏi giỏ hàng không?')) {
-        removeItem(productId);
+        removeItem(productId, selectedVariantId);
       }
     } else if (newQuantity > stockQuantity) {
-      toast.error(`Rất tiếc, sản phẩm này chỉ còn ${stockQuantity} cái trong kho.`);
+      toast.error(CART_QUANTITY_EXCEEDED_MESSAGE);
     } else {
-      updateQuantity(productId, newQuantity);
+      updateQuantity(productId, newQuantity, selectedVariantId);
     }
   };
 
-  const handleRemoveItem = (productId: number) => {
+  const handleQuantityDraftChange = (
+    selectionKey: string,
+    rawValue: string,
+    stockQuantity: number
+  ) => {
+    if (!/^\d*$/.test(rawValue)) {
+      return;
+    }
+
+    if (rawValue !== '' && Number(rawValue) > stockQuantity) {
+      toast.error(CART_QUANTITY_EXCEEDED_MESSAGE);
+      return;
+    }
+
+    setQuantityDrafts((prev) => ({
+      ...prev,
+      [selectionKey]: rawValue,
+    }));
+  };
+
+  const commitQuantityDraft = (
+    productId: number,
+    selectedVariantId: number | undefined,
+    stockQuantity: number,
+    currentQuantity: number
+  ) => {
+    const selectionKey = getCartSelectionKey(productId, selectedVariantId);
+    const draftValue = quantityDrafts[selectionKey];
+
+    if (draftValue == null || draftValue === '') {
+      setQuantityDrafts((prev) => ({
+        ...prev,
+        [selectionKey]: String(currentQuantity),
+      }));
+      return;
+    }
+
+    const parsedQuantity = Number(draftValue);
+    if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
+      setQuantityDrafts((prev) => ({
+        ...prev,
+        [selectionKey]: String(currentQuantity),
+      }));
+      return;
+    }
+
+    if (parsedQuantity > stockQuantity) {
+      toast.error(CART_QUANTITY_EXCEEDED_MESSAGE);
+      setQuantityDrafts((prev) => ({
+        ...prev,
+        [selectionKey]: String(currentQuantity),
+      }));
+      return;
+    }
+
+    updateQuantity(productId, parsedQuantity, selectedVariantId);
+  };
+
+  const handleRemoveItem = (productId: number, selectedVariantId?: number) => {
     if (window.confirm('Bạn có muốn xóa sản phẩm này khỏi giỏ hàng không?')) {
-      removeItem(productId);
+      removeItem(productId, selectedVariantId);
     }
   };
 
@@ -93,11 +177,17 @@ export const CartPage = () => {
     );
   }
 
-  const allSelected = selectedProductIds.length > 0 && selectedProductIds.length === items.length;
-  const selectedCount =
-    selectedProductIds.length > 0
-      ? items.filter((i) => selectedProductIds.includes(i.product.productId)).length
-      : items.length;
+  // Safety: ensure selectedProductIds are strings (migrate from old format if needed)
+  const normalizedSelectedIds = selectedProductIds.map((id) =>
+    typeof id === 'string' ? id : String(id)
+  );
+
+  const allSelected = normalizedSelectedIds.length === items.length && items.length > 0;
+  const selectedCount = items.filter((i) =>
+    normalizedSelectedIds.includes(
+      getCartSelectionKey(i.product.productId, i.selectedVariantId)
+    )
+  ).length;
   const selectedSubtotal = getSelectedTotalPrice();
   const shippingFee = selectedSubtotal >= 5000000 ? 0 : 30000;
 
@@ -116,6 +206,7 @@ export const CartPage = () => {
                     checked={allSelected}
                     onChange={() => (allSelected ? clearSelection() : selectAll())}
                     className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    title={allSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
                   />
                   <span className="text-sm font-medium text-gray-700">
                     Chọn tất cả ({selectedCount}/{items.length})
@@ -125,9 +216,13 @@ export const CartPage = () => {
               <AnimatePresence>
                 {items.map((item) => {
                   const isUnavailable = unavailableIds.has(item.product.productId);
+                  const selectionKey = getCartSelectionKey(
+                    item.product.productId,
+                    item.selectedVariantId
+                  );
                   return (
                   <motion.div
-                    key={item.product.productId}
+                    key={selectionKey}
                     layout
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
@@ -140,12 +235,10 @@ export const CartPage = () => {
                     )}
                     <input
                       type="checkbox"
-                      checked={
-                        selectedProductIds.length === 0 ||
-                        selectedProductIds.includes(item.product.productId)
-                      }
-                      onChange={() => toggleSelect(item.product.productId)}
-                      className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      checked={normalizedSelectedIds.includes(getCartSelectionKey(item.product.productId, item.selectedVariantId))}
+                      disabled={isUnavailable}
+                      onChange={() => toggleSelect(item.product.productId, item.selectedVariantId)}
+                      className={`h-4 w-4 rounded border-gray-300 focus:ring-primary-500 ${isUnavailable ? 'text-gray-300 cursor-not-allowed' : 'text-primary-600'}`}
                     />
                     <img
                       src={getImageUrl(item.product.mainImage)}
@@ -154,6 +247,13 @@ export const CartPage = () => {
                       onError={e => { const el = e.target as HTMLImageElement; el.onerror = null; el.src = '/placeholder.jpg'; }}
                     />
 
+                    {(() => {
+                      // Lấy giá & stock từ variant đã lưu sẵn trên CartItem
+                      const itemPrice = item.selectedVariantPrice
+                        ?? Number(item.product.salePrice || item.product.price);
+                      const stockToUse = getCartItemStockLimit(item);
+
+                      return (<>
                     <div className="flex-1">
                       <Link
                         to={`/products/${item.product.slug}`}
@@ -161,29 +261,65 @@ export const CartPage = () => {
                       >
                         {item.product.name}
                       </Link>
+                      {item.selectedVariantName && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Phiên bản: {item.selectedVariantName}
+                        </p>
+                      )}
                       <p className="text-red-600 font-bold mt-1">
-                        {(item.product.salePrice || item.product.price).toLocaleString('vi-VN')}₫
+                        {itemPrice.toLocaleString('vi-VN')}₫
                       </p>
                       <p className="text-sm text-green-600 mt-1">
-                        Còn lại: {item.product.stockQuantity} SP
+                        Còn lại: {stockToUse} SP
                       </p>
                     </div>
 
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => handleUpdateQuantity(item.product.productId, item.quantity - 1, item.product.stockQuantity)}
-                        className="p-1 border border-gray-300 rounded hover:bg-gray-100 transition-colors"
+                        onClick={() => handleUpdateQuantity(item.product.productId, item.quantity - 1, stockToUse, item.selectedVariantId)}
+                        disabled={isUnavailable}
+                        className="p-1 border border-gray-300 rounded hover:bg-gray-100 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         <Minus className="h-4 w-4" />
                       </button>
-                      <span className="w-8 text-center">{item.quantity}</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={quantityDrafts[selectionKey] ?? String(item.quantity)}
+                        disabled={isUnavailable}
+                        onChange={(event) =>
+                          handleQuantityDraftChange(
+                            selectionKey,
+                            event.target.value,
+                            stockToUse
+                          )
+                        }
+                        onBlur={() =>
+                          commitQuantityDraft(
+                            item.product.productId,
+                            item.selectedVariantId,
+                            stockToUse,
+                            item.quantity
+                          )
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.currentTarget.blur();
+                          }
+                        }}
+                        className="w-12 rounded border border-gray-300 px-1 py-1 text-center text-sm font-semibold outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                        aria-label={`Số lượng ${item.product.name}`}
+                      />
                       <button
-                        onClick={() => handleUpdateQuantity(item.product.productId, item.quantity + 1, item.product.stockQuantity)}
-                        className={`p-1 border rounded transition-colors ${item.quantity >= item.product.stockQuantity
+                        onClick={() => handleUpdateQuantity(item.product.productId, item.quantity + 1, stockToUse, item.selectedVariantId)}
+                        disabled={isUnavailable || item.quantity >= stockToUse}
+                        className={`p-1 border rounded transition-colors ${item.quantity >= stockToUse
                             ? 'border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed'
-                            : 'border-gray-300 hover:bg-gray-100'
+                            : isUnavailable
+                              ? 'border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed'
+                              : 'border-gray-300 hover:bg-gray-100'
                           }`}
-                        title={item.quantity >= item.product.stockQuantity ? 'Đã đạt giới hạn kho' : ''}
+                        title={item.quantity >= stockToUse ? 'Đã đạt giới hạn kho' : ''}
                       >
                         <Plus className="h-4 w-4" />
                       </button>
@@ -191,17 +327,19 @@ export const CartPage = () => {
 
                     <div className="text-right min-w-[120px]">
                       <p className="font-bold text-lg text-primary-700">
-                        {((item.product.salePrice || item.product.price) * item.quantity).toLocaleString('vi-VN')}₫
+                        {(itemPrice * item.quantity).toLocaleString('vi-VN')}₫
                       </p>
                     </div>
 
                     <button
-                      onClick={() => handleRemoveItem(item.product.productId)}
+                      onClick={() => handleRemoveItem(item.product.productId, item.selectedVariantId)}
                       className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                       title="Xóa sản phẩm"
                     >
                       <Trash2 className="h-5 w-5" />
                     </button>
+                  </>);
+                    })()}
                   </motion.div>
                   );
                 })}
@@ -237,10 +375,18 @@ export const CartPage = () => {
                 </div>
               </div>
 
-              {unavailableIds.size > 0 ? (
+              {selectedCount === 0 ? (
                 <button disabled
                   className="block w-full bg-gray-300 text-gray-500 text-center py-3 rounded-lg cursor-not-allowed">
-                  Có sản phẩm ngừng bán — vui lòng xóa trước
+                  Chọn sản phẩm để thanh toán
+                </button>
+              ) : normalizedSelectedIds.some(key => {
+                const productId = parseInt(String(key).split('-')[0]);
+                return unavailableIds.has(productId);
+              }) ? (
+                <button disabled
+                  className="block w-full bg-gray-300 text-gray-500 text-center py-3 rounded-lg cursor-not-allowed">
+                  Bỏ chọn sản phẩm ngừng bán để tiếp tục
                 </button>
               ) : (
                 <Link

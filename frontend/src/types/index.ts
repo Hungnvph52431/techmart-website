@@ -116,6 +116,10 @@ export interface User {
 export interface CartItem {
   product: Product;
   quantity: number;
+  selectedVariantId?: number; // Variant được chọn (nếu có)
+  selectedVariantName?: string; // Tên variant (vd: "iPhone 14 Pro 256GB - Tím")
+  selectedVariantPrice?: number; // Giá đã tính variant adjustment
+  selectedVariantStock?: number; // Tồn kho của variant
 }
 
 // --- 5. ĐƠN HÀNG ---
@@ -229,6 +233,9 @@ export interface ProductFilter {
   brandSlug?: string;
   status?: string;
   isFeatured?: boolean;
+  isNew?: boolean;
+  isBestseller?: boolean;
+  onSale?: boolean;
   sort?: string;
   page?: number;
   limit?: number;

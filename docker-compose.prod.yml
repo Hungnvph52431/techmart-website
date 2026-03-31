@@ -4,11 +4,12 @@ services:
     image: mysql:8.0
     container_name: techmart-mysql-prod
     restart: always
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --character-set-client-handshake=FALSE
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${DB_NAME}
-      MYSQL_USER: ${DB_USER}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-techmart123}
+      MYSQL_DATABASE: ${DB_NAME:-mobile_shop}
+      MYSQL_USER: ${DB_USER:-techmart_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-techmart123}
     ports:
       - "3306:3306"
     volumes:
@@ -36,12 +37,25 @@ services:
       - PORT=5000
       - DB_HOST=mysql
       - DB_PORT=3306
-      - DB_NAME=${DB_NAME}
-      - DB_USER=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - JWT_SECRET=${JWT_SECRET}
+      - DB_NAME=${DB_NAME:-mobile_shop}
+      - DB_USER=${DB_USER:-techmart_user}
+      - DB_PASSWORD=${DB_PASSWORD:-techmart123}
+      - JWT_SECRET=${JWT_SECRET:-techmart_jwt_secret_key_2026}
       - JWT_EXPIRES_IN=7d
-      - CORS_ORIGIN=${CORS_ORIGIN}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost}
+      - UPLOAD_PATH=uploads
+      - MAX_FILE_SIZE=5242880
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost}
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM_NAME=TechMart
+      - VNPAY_TMN_CODE=${VNPAY_TMN_CODE:-}
+      - VNPAY_HASH_SECRET=${VNPAY_HASH_SECRET:-}
+      - VNPAY_RETURN_URL=${VNPAY_RETURN_URL:-http://localhost:5001/api/payment/vnpay/return}
+    volumes:
+      - backend_uploads:/app/uploads
     depends_on:
       mysql:
         condition: service_healthy
@@ -53,6 +67,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:5001/api}
     container_name: techmart-frontend-prod
     restart: always
     ports:
@@ -68,3 +84,4 @@ networks:
 
 volumes:
   mysql_data:
+  backend_uploads:

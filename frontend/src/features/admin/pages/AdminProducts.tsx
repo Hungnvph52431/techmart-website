@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { PlusCircle, Search, RefreshCw, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, Search, RefreshCw, Edit, Trash2, AlertTriangle, XCircle } from 'lucide-react';
 import { productService } from '@/services/product.service';
 import { adminProductService } from '@/services/admin/product.service';
 import { adminCategoryService } from '@/services/admin/category.service'; 
@@ -30,6 +30,16 @@ export const AdminProducts = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+
+  // --- CONFIRM DIALOG ---
+  const [confirmDialog, setConfirmDialog] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    confirmLabel: string;
+    confirmStyle: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   // --- BỘ LỌC (FILTERS) ---
   const [filters, setFilters] = useState({
@@ -73,20 +83,10 @@ export const AdminProducts = () => {
   }
 };
 
-  const handleDelete = async (product: AdminProduct) => {
-    const isInactive = product.status === 'inactive';
-
-    if (isInactive) {
-      // Đã ngừng bán → xóa hẳn khỏi hệ thống
-      if (!confirm(`Sản phẩm "${product.name}" đã ngừng bán.\n\nBấm OK để XÓA VĨNH VIỄN khỏi hệ thống. Thao tác này không thể hoàn tác!`)) {
-        return;
-      }
-    }
-
+  const executeDelete = async (product: AdminProduct) => {
     try {
       setActionLoading(product.productId);
       const resp = await productService.deleteProduct(product.productId) as any;
-
       if (resp?.action === 'deactivated') {
         toast.success(`"${product.name}" đã chuyển sang Ngừng bán`);
       } else {
@@ -96,23 +96,47 @@ export const AdminProducts = () => {
     } catch (error: any) {
       const resp = error?.response;
       if (resp?.status === 409 && resp?.data?.code === 'PRODUCT_IN_USE') {
-        const doArchive = confirm(
-          `${resp.data.message}\n\nBạn có muốn chuyển sang "Ngừng bán" thay vì xóa?`
-        );
-        if (doArchive) {
-          try {
-            await adminProductService.archive(product.productId);
-            toast.success('Đã chuyển sản phẩm sang Ngừng bán');
-            fetchProducts();
-          } catch {
-            toast.error('Không thể chuyển trạng thái sản phẩm');
-          }
-        }
+        // Sản phẩm đang được sử dụng → hỏi chuyển ngừng bán
+        setConfirmDialog({
+          show: true,
+          title: 'Không thể xóa sản phẩm',
+          message: `${resp.data.message}\n\nBạn có muốn chuyển sang "Ngừng bán" thay vì xóa?`,
+          confirmLabel: 'Ngừng bán',
+          confirmStyle: 'bg-orange-600 hover:bg-orange-700',
+          onConfirm: async () => {
+            try {
+              await adminProductService.archive(product.productId);
+              toast.success('Đã chuyển sản phẩm sang Ngừng bán');
+              fetchProducts();
+            } catch {
+              toast.error('Không thể chuyển trạng thái sản phẩm');
+            }
+          },
+        });
       } else {
         toast.error('Không thể xóa sản phẩm này');
       }
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleDelete = (product: AdminProduct) => {
+    const isInactive = product.status === 'inactive';
+
+    if (isInactive) {
+      // Đã ngừng bán → confirm xóa vĩnh viễn
+      setConfirmDialog({
+        show: true,
+        title: 'Xóa vĩnh viễn sản phẩm',
+        message: `Sản phẩm "${product.name}" đã ngừng bán.\n\nHành động này sẽ XÓA VĨNH VIỄN khỏi hệ thống và không thể hoàn tác!`,
+        confirmLabel: 'Xóa vĩnh viễn',
+        confirmStyle: 'bg-red-600 hover:bg-red-700',
+        onConfirm: () => executeDelete(product),
+      });
+    } else {
+      // Đang bán → chuyển ngừng bán (không cần confirm)
+      executeDelete(product);
     }
   };
 
@@ -306,6 +330,49 @@ export const AdminProducts = () => {
           </div>
         )}
       </div>
+
+      {/* CONFIRM DIALOG MODAL */}
+      {confirmDialog?.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setConfirmDialog(null)} />
+          <div className="relative bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 animate-in zoom-in-95">
+            <button
+              onClick={() => setConfirmDialog(null)}
+              className="absolute top-4 right-4 p-1.5 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-100 transition-colors"
+            >
+              <XCircle size={20} />
+            </button>
+
+            <div className="flex items-start gap-4 mb-5">
+              <div className="flex-shrink-0 w-12 h-12 bg-red-100 rounded-2xl flex items-center justify-center">
+                <AlertTriangle size={24} className="text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-gray-900 uppercase italic">{confirmDialog.title}</h3>
+                <p className="text-sm text-gray-600 mt-2 whitespace-pre-line leading-relaxed">{confirmDialog.message}</p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="px-5 py-2.5 text-xs font-black uppercase tracking-widest text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={() => {
+                  confirmDialog.onConfirm();
+                  setConfirmDialog(null);
+                }}
+                className={`px-5 py-2.5 text-xs font-black uppercase tracking-widest text-white rounded-xl transition-colors shadow-lg ${confirmDialog.confirmStyle}`}
+              >
+                {confirmDialog.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

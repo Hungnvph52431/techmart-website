@@ -100,8 +100,13 @@ export class OrderRepository implements IOrderRepository {
 
   async findUserList(userId: number, status?: Order['status'] | 'all'): Promise<OrderListItem[]> {
     const params: any[] = [userId];
-    let query = `SELECT o.*, (SELECT COUNT(*) FROM order_details od WHERE od.order_id = o.order_id) AS item_count,
-                 (SELECT COUNT(*) FROM order_returns orr WHERE orr.order_id = o.order_id AND orr.status NOT IN ('closed', 'rejected')) AS open_return_count
+    let query = `SELECT o.*,
+                 (SELECT COUNT(*) FROM order_details od WHERE od.order_id = o.order_id) AS item_count,
+                 (SELECT COUNT(*) FROM order_returns orr WHERE orr.order_id = o.order_id AND orr.status NOT IN ('closed', 'rejected')) AS open_return_count,
+                 CASE WHEN (SELECT COUNT(*) FROM order_details od3 WHERE od3.order_id = o.order_id) > 0
+                      AND (SELECT COUNT(*) FROM order_details od3 WHERE od3.order_id = o.order_id)
+                        = (SELECT COUNT(*) FROM reviews pr WHERE pr.order_id = o.order_id AND pr.user_id = o.user_id)
+                      THEN 1 ELSE 0 END AS all_reviewed
                  FROM orders o WHERE o.user_id = ?`;
     if (status && status !== 'all') { query += ' AND o.status = ?'; params.push(status); }
     query += ' ORDER BY o.order_date DESC';
@@ -925,7 +930,13 @@ export class OrderRepository implements IOrderRepository {
   }
 
   private mapRowToOrderListItem(row: any): OrderListItem {
-    return { ...this.mapRowToOrder(row), customerName: row.customer_name, itemCount: Number(row.item_count), openReturnCount: Number(row.open_return_count) };
+    return {
+      ...this.mapRowToOrder(row),
+      customerName: row.customer_name,
+      itemCount: Number(row.item_count),
+      openReturnCount: Number(row.open_return_count),
+      allReviewed: !!row.all_reviewed,
+    };
   }
 
   private mapRowToOrderDetail(row: any): OrderDetail {
