@@ -20,7 +20,7 @@ import { UserRepository } from './infrastructure/repositories/UserRepository';
 import { ProductRepository } from './infrastructure/repositories/ProductRepository';
 import { OrderRepository } from './infrastructure/repositories/OrderRepository';
 import { VoucherRepository } from './infrastructure/repositories/VoucherRepository'; //
-import { CategoryRepository } from './infrastructure/repositories/CategoryRepository'; 
+import { CategoryRepository } from './infrastructure/repositories/CategoryRepository';
 import { AttributeRepository } from './infrastructure/repositories/AttributeRepository'; //
 import { ReviewRepository } from './infrastructure/repositories/ReviewRepository'; //
 import { BrandRepository } from './infrastructure/repositories/BrandRepository'; //
@@ -182,7 +182,7 @@ const startServer = async () => {
     app.listen(PORT, () => {
       console.log(`🚀 Server is running on port ${PORT}`);
       console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
- 
+
       // ✅ THÊM ĐOẠN NÀY:
       const scheduler = new OrderScheduler(orderUseCase);
       scheduler.start();

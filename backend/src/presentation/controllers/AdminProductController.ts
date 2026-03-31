@@ -8,7 +8,7 @@ export class AdminProductController {
     try {
       const products = await this.productUseCase.getAdminProducts({
         search: req.query.search as string | undefined,
-        categoryId: req.query.categoryId ? Number(req.query.categoryId) : undefined,
+        categoryId: (req.query.categoryId || req.query.category_id) ? Number(req.query.categoryId || req.query.category_id) : undefined,
         status: (req.query.status as any) || 'all',
       });
       res.json(products);

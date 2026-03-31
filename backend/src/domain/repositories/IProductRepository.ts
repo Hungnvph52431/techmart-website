@@ -1,10 +1,10 @@
-import { 
-  Product, 
-  CreateProductDTO, 
-  UpdateProductDTO, 
-  ProductStatus, 
-  ProductVariant, 
-  SaveProductPayload 
+import {
+  Product,
+  CreateProductDTO,
+  UpdateProductDTO,
+  ProductStatus,
+  ProductVariant,
+  SaveProductPayload
 } from '../entities/Product';
 import { ProductImage, CreateProductImageDTO } from '../entities/ProductImage';
 import { CreateProductVariantDTO, UpdateProductVariantDTO } from '../entities/ProductVariant';
@@ -24,9 +24,9 @@ export interface PaginatedResult<T> {
 export interface ProductFilters {
   productId?: number;
   categoryId?: number;
-  categorySlug?: string; 
+  categorySlug?: string;
   brandId?: number;
-  brandSlug?: string;    
+  brandSlug?: string;
   minPrice?: number;
   maxPrice?: number;
   search?: string;
@@ -70,7 +70,7 @@ export interface IProductRepository {
   // Truy vấn danh sách
   findAll(filters?: ProductFilters): Promise<Product[]>;
   findAllPaginated(filters: ProductFilters, page: number, limit: number): Promise<PaginatedResult<Product>>;
-  
+
   // Truy vấn chi tiết
   findById(productId: number): Promise<Product | null>;
   findBySlug(slug: string): Promise<Product | null>;
@@ -79,6 +79,7 @@ export interface IProductRepository {
   create(product: CreateProductDTO): Promise<Product>;
   update(product: UpdateProductDTO): Promise<Product | null>;
   delete(productId: number): Promise<boolean>;
+  hardDelete(productId: number): Promise<boolean>;
   updateStock(productId: number, quantity: number): Promise<boolean>;
 
   // --- 3. QUẢN LÝ ẢNH (BÍ QUYẾT HIỂN THỊ ẢNH CỦA TUẤN ANH) ---
@@ -105,7 +106,10 @@ export interface IProductRepository {
   findAdminById(productId: number): Promise<Product | null>;
   save(payload: SaveProductPayload, productId?: number): Promise<Product>;
   archive(productId: number): Promise<boolean>;
-  
+
+  // Kiểm tra sản phẩm đang được sử dụng (giỏ hàng, đơn hàng chờ)
+  checkProductInUse(productId: number): Promise<{ inCart: number; inPendingOrders: number }>;
+
   // Kiểm tra mã SKU
   isSkuTaken(sku: string, options?: {
     excludeProductId?: number;

@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Package, Truck, RotateCcw, ShoppingBag, CheckCircle2, Star } from 'lucide-react';
+import { Package, Truck, ShoppingBag, CheckCircle2, Star } from 'lucide-react'; // Đã xóa RotateCcw thừa
 import { orderService } from '@/services/order.service';
-import api from '@/services/api';
+// Đã xóa dòng import api thừa
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const formatCurrency = (amount: number) =>
@@ -25,11 +25,11 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
 const ORDER_STATUS_STYLES: Record<string, string> = {
   pending:   'bg-amber-100 text-amber-700 border-amber-200',
   confirmed: 'bg-blue-100 text-blue-700 border-blue-200',
-  shipping:  'bg-sky-100 text-sky-700 border-sky-200',
+  shipping:  'bg-purple-100 text-purple-700 border-purple-200',
   delivered: 'bg-emerald-100 text-emerald-700 border-emerald-200',
   completed: 'bg-lime-100 text-lime-700 border-lime-200',
-  cancelled: 'bg-rose-100 text-rose-700 border-rose-200',
-  returned:  'bg-gray-100 text-gray-600 border-gray-200',
+  cancelled: 'bg-red-100 text-red-600 border-red-200',
+  returned:  'bg-orange-100 text-orange-600 border-orange-200',
 };
 
 // ✅ Bỏ "processing" khỏi filters vì đã remove khỏi luồng
@@ -53,11 +53,13 @@ export const OrdersPage = () => {
   // ✅ confirmingId: track đơn nào đang xác nhận nhận hàng
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
 
-  const fetchOrders = async () => {
+  const [summary, setSummary] = useState({ total: 0, pending: 0, shipping: 0, delivered: 0 });
+
+  const fetchOrders = async (status: FilterStatus = filter) => {
     try {
       setLoading(true);
-      const data = await orderService.getMyOrders('all');
-      setOrders(data as any[]);
+      const data = await orderService.getMyOrders(status) as any[];
+      setOrders(data);
     } catch {
       toast.error('Không thể tải danh sách đơn hàng');
     } finally {
@@ -65,17 +67,32 @@ export const OrdersPage = () => {
     }
   };
 
-  useEffect(() => { void fetchOrders(); }, []);
+  // Lấy summary 1 lần (all) để hiển thị số đếm
+  const fetchSummary = async () => {
+    try {
+      const all = await orderService.getMyOrders('all') as any[];
+      setSummary({
+        total:     all.length,
+        pending:   all.filter(o => o.status === 'pending').length,
+        shipping:  all.filter(o => o.status === 'shipping').length,
+        delivered: all.filter(o => o.status === 'delivered').length,
+      });
+    } catch { /* ignore */ }
+  };
 
-  // ✅ Xác nhận đã nhận hàng ngay từ danh sách
+  useEffect(() => { void fetchSummary(); }, []);
+  useEffect(() => { void fetchOrders(filter); }, [filter]);
+
+  // Xác nhận đã nhận hàng ngay từ danh sách
   const handleConfirmDelivered = async (e: React.MouseEvent, orderId: number) => {
-    e.preventDefault(); // Ngăn Link navigate khi bấm nút
+    e.preventDefault();
     e.stopPropagation();
     try {
       setConfirmingId(orderId);
       await orderService.confirmDelivered(orderId);
-      toast.success('🎉 Xác nhận nhận hàng thành công!');
-      await fetchOrders();
+      toast.success('Xác nhận nhận hàng thành công!');
+      await fetchOrders(filter);
+      await fetchSummary();
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Không thể xác nhận');
     } finally {
@@ -83,17 +100,7 @@ export const OrdersPage = () => {
     }
   };
 
-  const filteredOrders = useMemo(() =>
-    filter === 'all' ? orders : orders.filter(o => o.status === filter),
-    [filter, orders]
-  );
-
-  const summary = useMemo(() => ({
-    total:     orders.length,
-    pending:   orders.filter(o => o.status === 'pending').length,
-    shipping:  orders.filter(o => o.status === 'shipping').length,
-    delivered: orders.filter(o => o.status === 'delivered').length,
-  }), [orders]);
+  const filteredOrders = orders;
 
   if (loading && orders.length === 0) {
     return (
@@ -137,9 +144,9 @@ export const OrdersPage = () => {
                 : 'bg-white text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50'
             }`}>
             {opt.label}
-            {opt.value !== 'all' && (
+            {opt.value !== 'all' && (summary as any)[opt.value] > 0 && (
               <span className="ml-1.5 text-xs opacity-60">
-                {orders.filter(o => o.status === opt.value).length}
+                {(summary as any)[opt.value]}
               </span>
             )}
           </button>
@@ -166,7 +173,9 @@ export const OrdersPage = () => {
             const total      = Number(order.total ?? order.totalAmount ?? 0);
             const date       = order.orderDate ?? order.created_at ?? '';
             const itemCount  = order.itemCount ?? order.items?.length ?? 0;
-            const isShipping = status === 'shipping';
+            
+            // ✅ FIX: Sửa lại điều kiện kiểm tra trạng thái
+            const isDelivered = status === 'delivered'; 
             const canReview  = ['delivered', 'completed'].includes(status);
 
             return (
@@ -178,6 +187,11 @@ export const OrdersPage = () => {
                     <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold border ${ORDER_STATUS_STYLES[status] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
                       {ORDER_STATUS_LABELS[status] ?? status}
                     </span>
+                    {order.openReturnCount > 0 && (
+                      <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold bg-orange-100 text-orange-600 border border-orange-200">
+                        Đang hoàn trả
+                      </span>
+                    )}
                   </div>
                   <span className="text-xs text-gray-400">{date ? formatDate(date) : '—'}</span>
                 </div>
@@ -191,39 +205,40 @@ export const OrdersPage = () => {
                         <p className="text-xs text-gray-400 truncate max-w-sm">📍 {order.shipping.fullAddress}</p>
                       )}
                     </div>
-                    <p className="text-lg font-black text-blue-600">{formatCurrency(total)}</p>
+                    <p className={`text-lg font-black ${
+                      status === 'cancelled' ? 'text-red-500 line-through' :
+                      status === 'returned' ? 'text-orange-500' :
+                      'text-blue-600'
+                    }`}>{formatCurrency(total)}</p>
                   </div>
                 </Link>
 
                 {/* Actions */}
-                {(isShipping || canReview) && (
-                  <div className="flex gap-2 px-5 pb-4">
-                    {/* ✅ Nút "Đã nhận hàng" ngay trong danh sách */}
-                    {isShipping && (
-                      <button
-                        onClick={e => handleConfirmDelivered(e, oid)}
-                        disabled={confirmingId === oid}
-                        className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors shadow-sm shadow-emerald-100">
-                        <CheckCircle2 size={14} />
-                        {confirmingId === oid ? 'Đang xác nhận...' : 'Đã nhận hàng'}
-                      </button>
-                    )}
+                <div className="flex gap-2 px-5 pb-4">
+                  {/* Nút "Đã nhận hàng" khi trạng thái là 'delivered' */}
+                  {isDelivered && (
+                    <button
+                      onClick={e => handleConfirmDelivered(e, oid)}
+                      disabled={confirmingId === oid}
+                      className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors shadow-sm shadow-emerald-100">
+                      <CheckCircle2 size={14} />
+                      {confirmingId === oid ? 'Đang xác nhận...' : 'Đã nhận hàng'}
+                    </button>
+                  )}
 
-                    {/* Nút đánh giá */}
-                    {canReview && (
-                      <Link to={`/orders/${oid}`}
-                        onClick={() => {/* sẽ mở modal từ OrderDetailPage */}}
-                        className="flex items-center gap-2 rounded-xl bg-yellow-400 px-4 py-2 text-xs font-bold text-slate-900 hover:bg-yellow-500 transition-colors">
-                        <Star size={13} className="fill-current" /> Đánh giá
-                      </Link>
-                    )}
-
+                  {/* Nút đánh giá */}
+                  {canReview && (
                     <Link to={`/orders/${oid}`}
-                      className="flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors ml-auto">
-                      Xem chi tiết →
+                      className="flex items-center gap-2 rounded-xl bg-yellow-400 px-4 py-2 text-xs font-bold text-slate-900 hover:bg-yellow-500 transition-colors">
+                      <Star size={13} className="fill-current" /> Đánh giá
                     </Link>
-                  </div>
-                )}
+                  )}
+
+                  <Link to={`/orders/${oid}`}
+                    className="flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors ml-auto">
+                    Xem chi tiết →
+                  </Link>
+                </div>
               </div>
             );
           })}

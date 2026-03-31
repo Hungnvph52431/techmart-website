@@ -7,7 +7,7 @@ export const createCategoryRoutes = (categoryController: CategoryController) => 
   const router = Router();
 
   // --- 1. ROUTES CÔNG KHAI (STOREFRONT) ---
-  
+
   router.get('/', categoryController.getAll);
 
   // LƯU Ý: Phải đặt đường dẫn '/tree' TRƯỚC '/:id' để tránh bị bắt nhầm tham số
@@ -20,23 +20,23 @@ export const createCategoryRoutes = (categoryController: CategoryController) => 
   // Các route này yêu cầu quyền Admin từ bản của Tuấn Anh
 
   router.post(
-    '/', 
-    authMiddleware, 
-    adminMiddleware, 
+    '/',
+    authMiddleware,
+    adminMiddleware,
     categoryController.create
   );
 
   router.put(
-    '/:id', 
-    authMiddleware, 
-    adminMiddleware, 
+    '/:id',
+    authMiddleware,
+    adminMiddleware,
     categoryController.update
   );
 
   router.delete(
-    '/:id', 
-    authMiddleware, 
-    adminMiddleware, 
+    '/:id',
+    authMiddleware,
+    adminMiddleware,
     categoryController.delete
   );
 

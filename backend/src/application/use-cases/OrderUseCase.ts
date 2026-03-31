@@ -15,7 +15,7 @@ import {
   getAllowedNextPaymentStatuses,
   RETURN_DEADLINE_DAYS,
 } from '../policies/OrderLifecycle';
-import { sendPaymentSuccessEmail } from '../services/EmailService';
+import { sendPaymentSuccessEmail, sendOrderCreatedEmail } from '../services/EmailService';
 import pool from '../../infrastructure/database/connection';
 import { RowDataPacket } from 'mysql2';
 
@@ -40,8 +40,8 @@ export class OrderUseCase {
     return this.orderRepository.getOrderTimeline(orderId);
   }
 
-  async getOrderStats() {
-    return this.orderRepository.getStats();
+  async getOrderStats(startDate?: string, endDate?: string) {
+    return this.orderRepository.getStats(startDate, endDate);
   }
 
   async updateOrderPaymentStatus(
@@ -71,6 +71,20 @@ export class OrderUseCase {
     // Gửi email thông báo thanh toán thành công (không chặn flow chính)
     if (updated && paymentStatus === 'paid') {
       this.sendPaymentEmail(orderId).catch(() => {});
+
+      // VNPay/Bank Transfer: khi payment confirm → auto-transition to shipping (skip pending/confirmed)
+      if (['vnpay', 'bank_transfer'].includes(order.paymentMethod)) {
+        try {
+          const updatedOrder = await this.orderRepository.findById(orderId);
+          if (updatedOrder && updatedOrder.status === 'pending') {
+            // Skip confirmed → go directly to shipping
+            await this.transitionOrderStatus(orderId, 'confirmed', actorUserId || 0, 'system', 'Tự động xác nhận do thanh toán online');
+            await this.transitionOrderStatus(orderId, 'shipping', actorUserId || 0, 'system', 'Tự động bắt đầu giao do thanh toán online');
+          }
+        } catch (err) {
+          console.error('[OrderUseCase] Auto-transition for vnpay/bank_transfer failed:', err);
+        }
+      }
     }
 
     return updated;
@@ -205,9 +219,22 @@ export class OrderUseCase {
     // Repository sẽ tự động thực hiện trừ kho trong Transaction
     const newOrder = await this.orderRepository.create(orderData);
 
-    // Wallet payment → đã paid ngay → gửi email
+    // Gửi email thông báo đặt hàng thành công (fire-and-forget, mọi phương thức)
+    if (newOrder) {
+      this.sendOrderCreatedEmailNotification(newOrder.orderId).catch(() => {});
+    }
+
+    // Wallet: thanh toán ngay → tự động chuyển sang shipping
     if (orderData.paymentMethod === 'wallet' && newOrder) {
-      this.sendPaymentEmail(newOrder.orderId).catch(() => {});
+      try {
+        // Mark as paid
+        await this.updateOrderPaymentStatus(newOrder.orderId, 'paid', orderData.userId, 'customer', 'Thanh toán qua ví TechMart');
+        // Transition to shipping (skip pending → confirmed → shipping)
+        await this.transitionOrderStatus(newOrder.orderId, 'confirmed', orderData.userId, 'customer', 'Tự động xác nhận do thanh toán ví');
+        await this.transitionOrderStatus(newOrder.orderId, 'shipping', orderData.userId, 'system', 'Tự động bắt đầu giao do thanh toán ví');
+      } catch (err) {
+        console.error('[OrderUseCase] Auto-transition for wallet failed:', err);
+      }
     }
 
     return newOrder;
@@ -224,12 +251,15 @@ export class OrderUseCase {
     const order = await this.orderRepository.findById(orderId);
     if (!order) return null;
 
-    // Kiểm tra chính sách chuyển đổi trạng thái (Ví dụ: Không thể nhảy từ Chờ duyệt sang Đã giao ngay)
-    if (!getAllowedNextOrderStatuses(order.status).includes(status)) {
+    // Kiểm tra chính sách chuyển đổi trạng thái (phân biệt admin/customer/system)
+    if (!getAllowedNextOrderStatuses(order.status, actorRole).includes(status)) {
+      if (actorRole === 'admin' && order.status === 'delivered' && status === 'completed') {
+        throw new Error('Admin không được chuyển sang Hoàn thành. Chỉ khách hàng mới có thể xác nhận đã nhận hàng.');
+      }
       throw new Error(`Không thể chuyển trạng thái đơn hàng từ ${order.status} sang ${status}`);
     }
 
-    return this.orderRepository.transitionStatus({
+    const result = await this.orderRepository.transitionStatus({
       orderId,
       currentStatus: order.status,
       nextStatus: status,
@@ -237,11 +267,28 @@ export class OrderUseCase {
       actorRole,
       note,
     });
+
+    // Khi chuyển sang completed, tự động cập nhật payment_status → paid nếu chưa paid
+    if (status === 'completed' && order.paymentStatus === 'pending') {
+      try {
+        await this.orderRepository.updatePaymentStatus({
+          orderId, currentStatus: 'pending', nextStatus: 'paid',
+          actorUserId, actorRole,
+          note: 'Tự động xác nhận thanh toán khi đơn hàng hoàn thành',
+        });
+      } catch (err) {
+        console.error('[OrderUseCase] Auto-pay on complete failed:', err);
+      }
+    }
+
+    return result;
   }
 
   async confirmDeliveredByCustomer(orderId: number, userId: number) {
     const order = await this.orderRepository.findOwnedById(orderId, userId);
     if (!order) return null;
+
+    let result: any;
 
     // Đơn đang giao → chuyển shipping → delivered → completed (2 bước)
     if (order.status === 'shipping') {
@@ -253,7 +300,7 @@ export class OrderUseCase {
         actorRole: 'customer',
         note: 'Khách hàng xác nhận đã nhận hàng',
       });
-      return this.orderRepository.transitionStatus({
+      result = await this.orderRepository.transitionStatus({
         orderId,
         currentStatus: 'delivered',
         nextStatus: 'completed',
@@ -261,11 +308,9 @@ export class OrderUseCase {
         actorRole: 'customer',
         note: 'Tự động hoàn thành sau khi khách xác nhận nhận hàng',
       });
-    }
-
-    // Đơn đã giao → chuyển thẳng sang completed
-    if (order.status === 'delivered') {
-      return this.orderRepository.transitionStatus({
+    } else if (order.status === 'delivered') {
+      // Đơn đã giao → chuyển thẳng sang completed
+      result = await this.orderRepository.transitionStatus({
         orderId,
         currentStatus: 'delivered',
         nextStatus: 'completed',
@@ -273,16 +318,33 @@ export class OrderUseCase {
         actorRole: 'customer',
         note: 'Khách hàng xác nhận đã nhận hàng',
       });
-    }
-
-    // Đã completed rồi → trả về luôn
-    if (order.status === 'completed') {
+    } else if (order.status === 'completed') {
       return order;
+    } else {
+      throw new Error(
+        `Chỉ có thể xác nhận đã nhận hàng khi đơn đang giao hoặc đã giao (hiện tại: ${order.status})`
+      );
     }
 
-    throw new Error(
-      `Chỉ có thể xác nhận đã nhận hàng khi đơn đang giao hoặc đã giao (hiện tại: ${order.status})`
-    );
+    // Tự động chuyển payment_status → paid khi khách xác nhận nhận hàng (COD)
+    if (order.paymentStatus === 'pending') {
+      try {
+        await this.orderRepository.updatePaymentStatus({
+          orderId,
+          currentStatus: 'pending',
+          nextStatus: 'paid',
+          actorUserId: userId,
+          actorRole: 'customer',
+          note: 'Tự động xác nhận thanh toán khi khách nhận hàng (COD)',
+        });
+        // Gửi email thanh toán thành công
+        this.sendPaymentEmail(orderId).catch(() => {});
+      } catch (err) {
+        console.error('[OrderUseCase] Auto-pay on confirm failed:', err);
+      }
+    }
+
+    return result;
   }
 
   async cancelOrder(
@@ -372,13 +434,56 @@ export class OrderUseCase {
     return this.orderRepository.refundReturn({ orderId, orderReturnId, actorUserId, actorRole, adminNote });
   }
 
+  // --- EMAIL THÔNG BÁO ĐẶT HÀNG THÀNH CÔNG ---
+  private async sendOrderCreatedEmailNotification(orderId: number): Promise<void> {
+    try {
+      const aggregate = await this.orderRepository.findAdminDetail(orderId);
+      if (!aggregate) return;
+
+      const order = aggregate.order;
+
+      const [userRows] = await pool.execute<RowDataPacket[]>(
+        'SELECT name, email FROM users WHERE user_id = ?',
+        [order.userId]
+      );
+      const user = userRows[0];
+      if (!user?.email) return;
+
+      await sendOrderCreatedEmail({
+        customerName: user.name,
+        customerEmail: user.email,
+        orderCode: order.orderCode,
+        orderId: order.orderId,
+        total: order.total,
+        paymentMethod: order.paymentMethod,
+        items: aggregate.items.map((item) => ({
+          productName: item.productName,
+          quantity: item.quantity,
+          price: item.price,
+          subtotal: item.subtotal,
+        })),
+        shippingName: order.shippingName,
+        shippingPhone: order.shippingPhone,
+        shippingAddress: order.shippingAddress,
+        shippingCity: order.shippingCity,
+      });
+    } catch (error) {
+      console.error('[OrderUseCase] sendOrderCreatedEmail failed:', error);
+    }
+  }
+
   // --- EMAIL THÔNG BÁO THANH TOÁN ---
+  // Chỉ gửi cho COD/VNPay khi payment chuyển sang paid SAU khi tạo đơn
+  // Wallet đã gửi email đặt hàng (có ghi "Đã thanh toán") nên không cần email này
   private async sendPaymentEmail(orderId: number): Promise<void> {
     try {
       const aggregate = await this.orderRepository.findAdminDetail(orderId);
       if (!aggregate) return;
 
       const order = aggregate.order;
+
+      // Wallet: email đặt hàng đã đủ thông tin, không gửi thêm
+      if (order.paymentMethod === 'wallet') return;
 
       // Lấy thông tin user (email, name)
       const [userRows] = await pool.execute<RowDataPacket[]>(

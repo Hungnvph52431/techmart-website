@@ -321,9 +321,10 @@ CREATE TABLE orders (
     coupon_code VARCHAR(50),
     
     -- Thanh toán
-    payment_method ENUM('cod', 'bank_transfer', 'momo', 'vnpay', 'wallet') NOT NULL,
+    payment_method ENUM('cod', 'bank_transfer', 'momo', 'vnpay', 'wallet', 'deposit') NOT NULL,
     payment_status ENUM('pending', 'paid', 'failed', 'refunded') DEFAULT 'pending',
     payment_date TIMESTAMP NULL,
+    deposit_amount DECIMAL(15, 2) DEFAULT 0,
 
     -- Trạng thái
     status ENUM('pending', 'confirmed', 'processing', 'shipping', 'delivered', 'completed', 'cancelled', 'returned') DEFAULT 'pending',

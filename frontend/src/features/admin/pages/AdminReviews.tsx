@@ -8,7 +8,7 @@ import { reviewService, Review } from '@/services/review.service';
 
 const STATUS_LABELS: Record<string, string> = {
   pending: 'Chờ duyệt',
-  approved: 'Đã hiện',
+  approved: 'Đang hiện',
   rejected: 'Đã ẩn',
 };
 
@@ -158,7 +158,7 @@ export const AdminReviews = () => {
   const [submitting, setSubmitting] = useState<number | null>(null);
   const [selectedReview, setSelectedReview] = useState<Review | null>(null);
 
-  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'approved' | 'rejected'>('all');
   const [filterRating, setFilterRating] = useState<number | undefined>();
   const [filterSuspicious, setFilterSuspicious] = useState(false);
   const [search, setSearch] = useState('');
@@ -246,7 +246,7 @@ export const AdminReviews = () => {
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
         <div className="flex gap-1 bg-white border border-gray-100 rounded-xl p-1 shadow-sm">
-          {(['all', 'pending', 'approved', 'rejected'] as const).map((s) => (
+          {(['all', 'approved', 'rejected'] as const).map((s) => (
             <button key={s} onClick={() => { setFilterStatus(s); setPage(1); }}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${filterStatus === s ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
               {s === 'all' ? 'Tất cả' : STATUS_LABELS[s]}

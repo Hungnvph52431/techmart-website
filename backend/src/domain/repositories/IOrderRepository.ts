@@ -69,7 +69,8 @@ export interface IOrderRepository {
   
   // 4. Lịch sử & Thống kê
   getOrderTimeline(orderId: number): Promise<OrderEvent[]>;
-  getStats(): Promise<OrderStats>; // Phục vụ AdminDashboard
+  getStats(startDate?: string, endDate?: string): Promise<OrderStats>;
+ // Phục vụ AdminDashboard
   
   // 5. Thao tác đơn hàng
   create(order: CreateOrderDTO): Promise<Order>;

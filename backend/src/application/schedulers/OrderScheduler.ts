@@ -86,7 +86,7 @@ export class OrderScheduler {
     const now = Date.now();
     const [rows] = await pool.execute<RowDataPacket[]>(
       `SELECT order_id, status, updated_at FROM orders
-       WHERE payment_method = 'cod'
+       WHERE payment_method IN ('cod', 'deposit')
          AND status IN ('pending', 'confirmed')
        LIMIT 100`
     );

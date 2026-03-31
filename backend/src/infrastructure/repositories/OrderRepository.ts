@@ -174,12 +174,14 @@ export class OrderRepository implements IOrderRepository {
 
       const total = subtotal + shippingFee - discountAmount;
 
+      const depositAmount = (orderData as any).depositAmount || 0;
+
       const [orderResult] = await connection.execute<ResultSetHeader>(
         `INSERT INTO orders (order_code, user_id, shipping_name, shipping_phone, shipping_address, shipping_city,
-         subtotal, shipping_fee, discount_amount, coupon_id, coupon_code, total, payment_method, payment_status, status, order_date, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'pending', ?, ?)`,
+         subtotal, shipping_fee, discount_amount, coupon_id, coupon_code, total, payment_method, payment_status, deposit_amount, status, order_date, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 'pending', ?, ?)`,
         [orderCode, orderData.userId, orderData.shippingName, orderData.shippingPhone, orderData.shippingAddress,
-         orderData.shippingCity, subtotal, shippingFee, discountAmount, couponId, couponCode, total, orderData.paymentMethod, now, now]
+         orderData.shippingCity, subtotal, shippingFee, discountAmount, couponId, couponCode, total, orderData.paymentMethod, depositAmount, now, now]
       );
 
       const orderId = orderResult.insertId;
@@ -213,6 +215,13 @@ export class OrderRepository implements IOrderRepository {
           'UPDATE users SET wallet_balance = wallet_balance - ? WHERE user_id = ?',
           [total, orderData.userId]
         );
+        // Ghi wallet_transaction
+        const [wRows] = await connection.execute<RowDataPacket[]>('SELECT wallet_balance FROM users WHERE user_id = ?', [orderData.userId]);
+        await connection.execute(
+          `INSERT INTO wallet_transactions (user_id, type, amount, balance_after, reference_type, reference_id, note, created_at)
+           VALUES (?, 'payment', ?, ?, 'order', ?, ?, ?)`,
+          [orderData.userId, -total, Number((wRows as RowDataPacket[])[0]?.wallet_balance), orderId, `Thanh toán đơn #${orderCode}`, now]
+        );
         await connection.execute(
           "UPDATE orders SET payment_status = 'paid', payment_date = ? WHERE order_id = ?",
           [now, orderId]
@@ -221,6 +230,35 @@ export class OrderRepository implements IOrderRepository {
           orderId, eventType: 'payment_status_changed', toStatus: 'paid',
           actorUserId: orderData.userId, actorRole: 'customer',
           note: `Thanh toán bằng ví TechMart (${total.toLocaleString('vi-VN')}đ)`,
+        });
+      }
+
+      // Đặt cọc: trừ deposit_amount từ ví, phần còn lại COD khi nhận hàng
+      if (orderData.paymentMethod === 'deposit' && depositAmount > 0) {
+        const [[dWalletRow]] = await connection.execute<RowDataPacket[]>(
+          'SELECT wallet_balance FROM users WHERE user_id = ? FOR UPDATE',
+          [orderData.userId]
+        );
+        const dBalance = Number(dWalletRow?.wallet_balance ?? 0);
+        if (dBalance < depositAmount) {
+          await connection.rollback();
+          throw new Error(`Số dư ví không đủ để đặt cọc (cần ${depositAmount.toLocaleString('vi-VN')}đ, hiện có ${dBalance.toLocaleString('vi-VN')}đ)`);
+        }
+        await connection.execute(
+          'UPDATE users SET wallet_balance = wallet_balance - ? WHERE user_id = ?',
+          [depositAmount, orderData.userId]
+        );
+        // Ghi wallet_transaction cho tiền cọc
+        const [dRows] = await connection.execute<RowDataPacket[]>('SELECT wallet_balance FROM users WHERE user_id = ?', [orderData.userId]);
+        await connection.execute(
+          `INSERT INTO wallet_transactions (user_id, type, amount, balance_after, reference_type, reference_id, note, created_at)
+           VALUES (?, 'payment', ?, ?, 'order', ?, ?, ?)`,
+          [orderData.userId, -depositAmount, Number((dRows as RowDataPacket[])[0]?.wallet_balance), orderId, `Đặt cọc đơn #${orderCode} (${depositAmount.toLocaleString('vi-VN')}đ)`, now]
+        );
+        await this.appendEventWithConnection(connection, {
+          orderId, eventType: 'payment_status_changed', toStatus: 'pending',
+          actorUserId: orderData.userId, actorRole: 'customer',
+          note: `Đặt cọc ${depositAmount.toLocaleString('vi-VN')}đ từ ví, còn lại ${(total - depositAmount).toLocaleString('vi-VN')}đ COD khi nhận`,
         });
       }
 
@@ -269,9 +307,61 @@ export class OrderRepository implements IOrderRepository {
       for (const detail of details) { await this.restoreInventory(connection, detail.productId, detail.variantId, detail.quantity); }
 
       const now = new Date();
-      await connection.execute("UPDATE orders SET status = 'cancelled', cancel_reason = ?, updated_at = ? WHERE order_id = ?", [input.reason, now, input.orderId]);
+
+      // Auto-refund: hoàn tiền về ví nếu đơn đã thanh toán (VNPay/Wallet/Online)
+      let refundNote = '';
+      if (order.paymentStatus === 'paid') {
+        const totalRefund = Number(order.total);
+        if (totalRefund > 0) {
+          await connection.execute(
+            'UPDATE users SET wallet_balance = wallet_balance + ? WHERE user_id = ?',
+            [totalRefund, order.userId]
+          );
+          const [userRows] = await connection.execute<RowDataPacket[]>(
+            'SELECT wallet_balance FROM users WHERE user_id = ?',
+            [order.userId]
+          );
+          const newBalance = Number((userRows as RowDataPacket[])[0]?.wallet_balance ?? 0);
+          await connection.execute(
+            `INSERT INTO wallet_transactions (user_id, type, amount, balance_after, reference_type, reference_id, note, created_at)
+             VALUES (?, 'refund', ?, ?, 'order', ?, ?, ?)`,
+            [order.userId, totalRefund, newBalance, input.orderId, `Hoàn tiền hủy đơn #${input.orderId}`, now]
+          );
+          refundNote = ` | Hoàn ${totalRefund.toLocaleString('vi-VN')}đ vào ví`;
+        }
+        await connection.execute(
+          "UPDATE orders SET status = 'cancelled', payment_status = 'refunded', cancel_reason = ?, updated_at = ? WHERE order_id = ?",
+          [input.reason, now, input.orderId]
+        );
+      } else {
+        // Hoàn tiền cọc nếu là đơn đặt cọc (deposit) chưa paid
+        const depositAmt = Number((order as any).depositAmount ?? 0);
+        if (order.paymentMethod === 'deposit' && depositAmt > 0) {
+          await connection.execute(
+            'UPDATE users SET wallet_balance = wallet_balance + ? WHERE user_id = ?',
+            [depositAmt, order.userId]
+          );
+          const [dUserRows] = await connection.execute<RowDataPacket[]>(
+            'SELECT wallet_balance FROM users WHERE user_id = ?',
+            [order.userId]
+          );
+          const dNewBalance = Number((dUserRows as RowDataPacket[])[0]?.wallet_balance ?? 0);
+          await connection.execute(
+            `INSERT INTO wallet_transactions (user_id, type, amount, balance_after, reference_type, reference_id, note, created_at)
+             VALUES (?, 'refund', ?, ?, 'order', ?, ?, ?)`,
+            [order.userId, depositAmt, dNewBalance, input.orderId, `Hoàn tiền cọc hủy đơn #${input.orderId}`, now]
+          );
+          refundNote = ` | Hoàn cọc ${depositAmt.toLocaleString('vi-VN')}đ vào ví`;
+        }
+        await connection.execute(
+          "UPDATE orders SET status = 'cancelled', cancel_reason = ?, updated_at = ? WHERE order_id = ?",
+          [input.reason, now, input.orderId]
+        );
+      }
+
       await this.appendEventWithConnection(connection, {
-        orderId: input.orderId, eventType: 'order_cancelled', actorUserId: input.actorUserId, actorRole: input.actorRole, note: input.reason
+        orderId: input.orderId, eventType: 'order_cancelled', actorUserId: input.actorUserId, actorRole: input.actorRole,
+        note: (input.reason + refundNote).trim()
       });
       await connection.commit();
       return this.findById(input.orderId);
@@ -279,15 +369,21 @@ export class OrderRepository implements IOrderRepository {
   }
 
   // --- STATS ---
-  async getStats(): Promise<OrderStats> {
-    // 1. Tổng quan
+  async getStats(startDate?: string, endDate?: string): Promise<OrderStats> {
+    // 1. Tổng quan + So sánh tháng trước
     const [[summary]] = await pool.execute<RowDataPacket[]>(
       `SELECT
         COUNT(*) AS total_orders,
         COALESCE(SUM(total), 0) AS total_revenue,
         COALESCE(SUM(CASE WHEN MONTH(order_date) = MONTH(NOW()) AND YEAR(order_date) = YEAR(NOW()) THEN total ELSE 0 END), 0) AS revenue_this_month,
+        COALESCE(SUM(CASE WHEN MONTH(order_date) = MONTH(DATE_SUB(NOW(), INTERVAL 1 MONTH)) AND YEAR(order_date) = YEAR(DATE_SUB(NOW(), INTERVAL 1 MONTH)) THEN total ELSE 0 END), 0) AS revenue_last_month,
         COALESCE(SUM(CASE WHEN DATE(order_date) = CURDATE() THEN total ELSE 0 END), 0) AS revenue_today,
-        SUM(CASE WHEN DATE(order_date) = CURDATE() THEN 1 ELSE 0 END) AS orders_today
+        COALESCE(SUM(CASE WHEN DATE(order_date) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) THEN total ELSE 0 END), 0) AS revenue_yesterday,
+        SUM(CASE WHEN DATE(order_date) = CURDATE() THEN 1 ELSE 0 END) AS orders_today,
+        SUM(CASE WHEN MONTH(order_date) = MONTH(NOW()) AND YEAR(order_date) = YEAR(NOW()) THEN 1 ELSE 0 END) AS orders_this_month,
+        SUM(CASE WHEN MONTH(order_date) = MONTH(DATE_SUB(NOW(), INTERVAL 1 MONTH)) AND YEAR(order_date) = YEAR(DATE_SUB(NOW(), INTERVAL 1 MONTH)) THEN 1 ELSE 0 END) AS orders_last_month,
+        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_orders,
+        SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_orders
        FROM orders WHERE deleted_at IS NULL`
     );
 
@@ -302,13 +398,16 @@ export class OrderRepository implements IOrderRepository {
       ordersByStatus[r.status] = Number(r.cnt);
     }
 
-    // 3. Đếm theo payment method
+    // 3. Đếm theo payment method + doanh thu theo phương thức
     const [pmRows] = await pool.execute<RowDataPacket[]>(
-      `SELECT payment_method, COUNT(*) AS cnt FROM orders WHERE deleted_at IS NULL GROUP BY payment_method`
+      `SELECT payment_method, COUNT(*) AS cnt, COALESCE(SUM(total), 0) AS revenue
+       FROM orders WHERE deleted_at IS NULL GROUP BY payment_method`
     );
     const paymentMethodStats: Record<string, number> = {};
+    const paymentMethodRevenue: Record<string, number> = {};
     for (const r of pmRows) {
       paymentMethodStats[r.payment_method] = Number(r.cnt);
+      paymentMethodRevenue[r.payment_method] = parseFloat(r.revenue);
     }
 
     // 4. Đơn hàng mới nhất (10 đơn)
@@ -330,11 +429,17 @@ export class OrderRepository implements IOrderRepository {
       createdAt: r.order_date,
     }));
 
-    // 5. Doanh thu 7 ngày gần nhất
+    // 5. Doanh thu theo khoảng ngày (mặc định 7 ngày gần nhất)
+    const dateFilter = startDate && endDate
+      ? `AND DATE(order_date) BETWEEN ? AND ?`
+      : `AND order_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)`;
+    const dateParams = startDate && endDate ? [startDate, endDate] : [];
+
     const [dailyRows] = await pool.execute<RowDataPacket[]>(
       `SELECT DATE(order_date) AS date, COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS order_count
-       FROM orders WHERE deleted_at IS NULL AND order_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
-       GROUP BY DATE(order_date) ORDER BY date ASC`
+       FROM orders WHERE deleted_at IS NULL ${dateFilter}
+       GROUP BY DATE(order_date) ORDER BY date ASC`,
+      dateParams
     );
     const revenueByDay = dailyRows.map((r: any) => ({
       date: r.date,
@@ -342,25 +447,72 @@ export class OrderRepository implements IOrderRepository {
       orderCount: Number(r.order_count),
     }));
 
+    // 6. Thống kê hoàn trả
+    const [[returnSummary]] = await pool.execute<RowDataPacket[]>(
+      `SELECT
+        COUNT(*) AS total_returns,
+        SUM(CASE WHEN status = 'requested' THEN 1 ELSE 0 END) AS pending_returns,
+        SUM(CASE WHEN status = 'refunded' THEN 1 ELSE 0 END) AS refunded_returns
+       FROM order_returns`
+    );
+
+    // 7. Top khách hàng theo doanh thu tháng này
+    const [topCustomerRows] = await pool.execute<RowDataPacket[]>(
+      `SELECT u.name, u.email, COUNT(o.order_id) AS order_count, COALESCE(SUM(o.total), 0) AS total_spent
+       FROM orders o JOIN users u ON u.user_id = o.user_id
+       WHERE o.deleted_at IS NULL
+         AND MONTH(o.order_date) = MONTH(NOW()) AND YEAR(o.order_date) = YEAR(NOW())
+         AND o.status NOT IN ('cancelled')
+       GROUP BY o.user_id, u.name, u.email
+       ORDER BY total_spent DESC LIMIT 5`
+    );
+    const topCustomers = topCustomerRows.map((r: any) => ({
+      name: r.name,
+      email: r.email,
+      orderCount: Number(r.order_count),
+      totalSpent: parseFloat(r.total_spent),
+    }));
+
     const totalOrders = Number(summary.total_orders) || 0;
+    const completedOrders = Number(summary.completed_orders) || 0;
+    const cancelledOrders = Number(summary.cancelled_orders) || 0;
+    const revenueThisMonth = parseFloat(summary.revenue_this_month);
+    const revenueLastMonth = parseFloat(summary.revenue_last_month);
+    const ordersThisMonth = Number(summary.orders_this_month) || 0;
+    const ordersLastMonth = Number(summary.orders_last_month) || 0;
+
     return {
       totalOrders,
       totalRevenue: parseFloat(summary.total_revenue),
-      revenueThisMonth: parseFloat(summary.revenue_this_month),
+      revenueThisMonth,
+      revenueLastMonth,
       revenueToday: parseFloat(summary.revenue_today || 0),
+      revenueYesterday: parseFloat(summary.revenue_yesterday || 0),
       ordersToday: Number(summary.orders_today || 0),
+      ordersThisMonth,
+      ordersLastMonth,
       avgOrderValue: totalOrders > 0 ? parseFloat(summary.total_revenue) / totalOrders : 0,
+      completionRate: totalOrders > 0 ? Math.round((completedOrders / totalOrders) * 100) : 0,
+      cancellationRate: totalOrders > 0 ? Math.round((cancelledOrders / totalOrders) * 100) : 0,
       ordersByStatus,
       paymentMethodStats,
+      paymentMethodRevenue,
       recentOrders,
       revenueByDay,
+      returnStats: {
+        total: Number(returnSummary?.total_returns || 0),
+        pending: Number(returnSummary?.pending_returns || 0),
+        refunded: Number(returnSummary?.refunded_returns || 0),
+      },
+      topCustomers,
     } as any;
   }
 
   // --- RETURN LOGIC ---
 
   async listAllReturns(filters?: { status?: string }): Promise<OrderReturn[]> {
-    let sql = `SELECT orr.*, o.order_code, u.name AS customer_name
+    let sql = `SELECT orr.*, o.order_code, o.total AS order_total, o.payment_method, o.payment_status,
+                      u.name AS customer_name, u.email AS customer_email, u.phone AS customer_phone
                FROM order_returns orr
                JOIN orders o ON o.order_id = orr.order_id
                JOIN users u ON u.user_id = orr.requested_by
@@ -372,7 +524,19 @@ export class OrderRepository implements IOrderRepository {
     }
     sql += ' ORDER BY orr.requested_at DESC';
     const [rows] = await pool.execute<RowDataPacket[]>(sql, params);
-    return rows.map(this.mapRowToOrderReturn);
+    return rows.map((row) => {
+      const base = this.mapRowToOrderReturn(row);
+      return {
+        ...base,
+        orderCode: row.order_code,
+        orderTotal: Number(row.order_total ?? 0),
+        paymentMethod: row.payment_method,
+        paymentStatus: row.payment_status,
+        customerName: row.customer_name,
+        customerEmail: row.customer_email,
+        customerPhone: row.customer_phone,
+      };
+    });
   }
 
   async listReturns(orderId: number): Promise<OrderReturn[]> {
@@ -545,17 +709,30 @@ export class OrderRepository implements IOrderRepository {
       const paymentStatus = orderRows[0]?.payment_status;
       const paymentMethod = orderRows[0]?.payment_method;
 
-      // Fix #6: Chỉ hoàn tiền vào ví nếu khách đã thanh toán (paid)
-      // COD chưa trả tiền thì KHÔNG cộng ví
+      // Chỉ hoàn tiền vào ví khi payment_status === 'paid'
+      // COD chưa xác nhận thanh toán (pending) = khách chưa trả tiền → không hoàn
+      // Admin cần bấm "Đã thanh toán" trước khi duyệt hoàn trả nếu khách COD đã trả tiền mặt
       let refundNote = '';
       if (userId && refundAmount > 0 && paymentStatus === 'paid') {
+        // Cộng tiền về ví khách
         await connection.execute(
           'UPDATE users SET wallet_balance = wallet_balance + ? WHERE user_id = ?',
           [refundAmount, userId]
         );
+        // Ghi lịch sử giao dịch ví
+        const [walletRows] = await connection.execute<RowDataPacket[]>(
+          'SELECT wallet_balance FROM users WHERE user_id = ?',
+          [userId]
+        );
+        const newBalance = Number((walletRows as RowDataPacket[])[0]?.wallet_balance ?? 0);
+        await connection.execute(
+          `INSERT INTO wallet_transactions (user_id, type, amount, balance_after, reference_type, reference_id, note, created_at)
+           VALUES (?, 'refund', ?, ?, 'order_return', ?, ?, ?)`,
+          [userId, refundAmount, newBalance, input.orderReturnId, `Hoàn tiền trả hàng đơn #${input.orderId}`, now]
+        );
         refundNote = `Hoàn ${refundAmount.toLocaleString('vi-VN')}đ vào ví`;
       } else if (paymentStatus !== 'paid') {
-        refundNote = `Đơn ${paymentMethod?.toUpperCase()} chưa thanh toán — không hoàn tiền`;
+        refundNote = `Đơn ${paymentMethod?.toUpperCase()} chưa thanh toán — không hoàn tiền vào ví`;
       }
 
       // Fix #5: Hoàn kho theo restockAction
@@ -725,8 +902,13 @@ export class OrderRepository implements IOrderRepository {
 
   private buildListWhereClause(filters?: AdminOrderListFilters) {
     let whereClause = ''; const params: any[] = [];
-    if (filters?.search) { whereClause += ' AND (order_code LIKE ? OR shipping_name LIKE ?)'; params.push(`%${filters.search}%`, `%${filters.search}%`); }
-    if (filters?.status && filters.status !== 'all') { whereClause += ' AND status = ?'; params.push(filters.status); }
+    if (filters?.search) {
+      whereClause += ` AND (o.order_code LIKE ? OR o.shipping_name LIKE ? OR u.phone LIKE ?
+        OR EXISTS (SELECT 1 FROM order_details od JOIN products p ON p.product_id = od.product_id WHERE od.order_id = o.order_id AND p.name LIKE ?))`;
+      params.push(`%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`);
+    }
+    if (filters?.status && filters.status !== 'all') { whereClause += ' AND o.status = ?'; params.push(filters.status); }
+    if (filters?.paymentStatus && filters.paymentStatus !== 'all') { whereClause += ' AND o.payment_status = ?'; params.push(filters.paymentStatus); }
     return { whereClause, params };
   }
 
@@ -737,7 +919,8 @@ export class OrderRepository implements IOrderRepository {
       shippingName: row.shipping_name, shippingPhone: row.shipping_phone, shippingAddress: row.shipping_address,
       shippingCity: row.shipping_city, subtotal: Number(row.subtotal), shippingFee: Number(row.shipping_fee),
       discountAmount: Number(row.discount_amount), total: Number(row.total), paymentMethod: row.payment_method,
-      paymentStatus: row.payment_status, status: row.status, orderDate: row.order_date, updatedAt: row.updated_at
+      paymentStatus: row.payment_status, paymentDate: row.payment_date, depositAmount: Number(row.deposit_amount ?? 0),
+      status: row.status, orderDate: row.order_date, deliveredAt: row.delivered_at, updatedAt: row.updated_at
     };
   }
 

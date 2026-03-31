@@ -1,8 +1,8 @@
 import api from '../api';
 
 export const adminOrderService = {
-  getAll: async () => {
-    const response = await api.get('/admin/orders');
+  getAll: async (params?: { search?: string; status?: string; paymentStatus?: string; page?: number; limit?: number }) => {
+    const response = await api.get('/admin/orders', { params });
     return response.data;
   },
 
@@ -36,27 +36,30 @@ export const adminOrderService = {
   },
 
   reviewReturn: async (orderId: number | string, returnId: number | string, payload: { decision: string; adminNote?: string }) => {
-    const response = await api.patch(`/admin/orders/${orderId}/returns/${returnId}/review`, payload);
+    const response = await api.post(`/admin/orders/${orderId}/returns/${returnId}/review`, payload);
     return response.data;
   },
 
   receiveReturn: async (orderId: number | string, returnId: number | string, payload?: { adminNote?: string }) => {
-    const response = await api.patch(`/admin/orders/${orderId}/returns/${returnId}/receive`, payload || {});
+    const response = await api.post(`/admin/orders/${orderId}/returns/${returnId}/receive`, payload || {});
     return response.data;
   },
 
   refundReturn: async (orderId: number | string, returnId: number | string, payload?: { adminNote?: string }) => {
-    const response = await api.patch(`/admin/orders/${orderId}/returns/${returnId}/refund`, payload || {});
+    const response = await api.post(`/admin/orders/${orderId}/returns/${returnId}/refund`, payload || {});
     return response.data;
   },
 
   closeReturn: async (orderId: number | string, returnId: number | string, payload?: { adminNote?: string }) => {
-    const response = await api.patch(`/admin/orders/${orderId}/returns/${returnId}/close`, payload || {});
+    const response = await api.post(`/admin/orders/${orderId}/returns/${returnId}/close`, payload || {});
     return response.data;
   },
 
-  getStats: async () => {
-    const response = await api.get('/orders/stats');
+  getStats: async (startDate?: string, endDate?: string) => {
+    const params: Record<string, string> = {};
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    const response = await api.get("/orders/stats", { params });
     return response.data.data || response.data;
   },
 };

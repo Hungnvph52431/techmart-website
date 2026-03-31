@@ -19,7 +19,7 @@ services:
     networks:
       - techmart-network
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       timeout: 20s
       retries: 10
 
@@ -32,13 +32,32 @@ services:
     restart: always
     ports:
       - "5001:5000"
-    env_file:
-      - ./backend/.env
     environment:
+      - NODE_ENV=development
+      - PORT=5000
       - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=mobile_shop
+      - DB_USER=techmart_user
+      - DB_PASSWORD=techmart123
+      - JWT_SECRET=techmart_jwt_secret_key_2026
+      - JWT_EXPIRES_IN=7d
+      - CORS_ORIGIN=http://localhost:5173,http://localhost:5174
+      - UPLOAD_PATH=uploads
+      - MAX_FILE_SIZE=5242880
+      - FRONTEND_URL=http://localhost:5173
+      - SMTP_HOST=smtp.gmail.com
+      - SMTP_PORT=587
+      - SMTP_USER=
+      - SMTP_PASS=
+      - SMTP_FROM_NAME=TechMart
+      - VNPAY_TMN_CODE=
+      - VNPAY_HASH_SECRET=
+      - VNPAY_RETURN_URL=http://localhost:5001/api/payment/vnpay/return
     volumes:
       - ./backend:/app
       - /app/node_modules
+      - backend_uploads:/app/uploads
     depends_on:
       mysql:
         condition: service_healthy
@@ -70,3 +89,4 @@ networks:
 
 volumes:
   mysql_data:
+  backend_uploads:

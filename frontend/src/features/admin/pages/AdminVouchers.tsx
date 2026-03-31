@@ -2,6 +2,21 @@ import { useEffect, useState } from 'react';
 import { voucherService, Voucher, CreateVoucherPayload } from '@/services/voucher.service';
 import { Ticket, Plus, X, Save, Loader2, AlertCircle, Trash2 } from 'lucide-react';
 
+// Helper: lấy datetime hiện tại dạng "YYYY-MM-DDTHH:mm" cho input min
+const getNowLocal = () => {
+  const now = new Date();
+  now.setSeconds(0, 0);
+  return now.toISOString().slice(0, 16);
+};
+
+// Helper: cộng thêm N giờ vào datetime string
+const addHours = (datetimeStr: string, hours: number) => {
+  if (!datetimeStr) return '';
+  const d = new Date(datetimeStr);
+  d.setHours(d.getHours() + hours);
+  return d.toISOString().slice(0, 16);
+};
+
 export const AdminVoucher = () => {
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,15 +58,28 @@ export const AdminVoucher = () => {
     if (!formData.description.trim()) return "Mô tả không được bỏ trống!";
     if (formData.discount_value <= 0) return "Giá trị giảm phải lớn hơn 0!";
     if (formData.min_order_value < 0) return "Đơn tối thiểu không được là số âm!";
-    
+
     if (formData.discount_type === 'percentage' && formData.discount_value > 100) {
       return "Giảm theo phần trăm không được vượt quá 100%!";
     }
 
     if (!formData.valid_from || !formData.valid_to) return "Vui lòng chọn thời gian hiệu lực!";
-    if (new Date(formData.valid_from) >= new Date(formData.valid_to)) {
-      return "Thời gian kết thúc phải sau thời gian bắt đầu!";
+
+    const now = new Date();
+    const startDate = new Date(formData.valid_from);
+    const endDate = new Date(formData.valid_to);
+
+    // Rule 1: Ngày bắt đầu không được ở quá khứ
+    if (startDate < now) {
+      return "Ngày bắt đầu không được ở trong quá khứ!";
     }
+
+    // Rule 2: Ngày kết thúc phải sau ngày bắt đầu ít nhất 1 giờ
+    const diffMs = endDate.getTime() - startDate.getTime();
+    if (diffMs < 60 * 60 * 1000) {
+      return "Ngày kết thúc phải cách ngày bắt đầu ít nhất 1 giờ!";
+    }
+
     return null;
   };
 
@@ -267,11 +295,23 @@ export const AdminVoucher = () => {
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <label className="block text-xs font-black text-gray-400 uppercase mb-2 ml-1">Bắt đầu từ *</label>
-                  <input type="datetime-local" className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-4 py-3 font-bold focus:border-blue-500 outline-none" value={formData.valid_from || ''} onChange={e => setFormData({...formData, valid_from: e.target.value})} />
+                  <input
+                    type="datetime-local"
+                    min={getNowLocal()}
+                    className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-4 py-3 font-bold focus:border-blue-500 outline-none"
+                    value={formData.valid_from || ''}
+                    onChange={e => setFormData({...formData, valid_from: e.target.value, valid_to: ''})}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-black text-gray-400 uppercase mb-2 ml-1">Kết thúc vào *</label>
-                  <input type="datetime-local" className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-4 py-3 font-bold focus:border-blue-500 outline-none" value={formData.valid_to || ''} onChange={e => setFormData({...formData, valid_to: e.target.value})} />
+                  <input
+                    type="datetime-local"
+                    min={formData.valid_from ? addHours(formData.valid_from, 1) : getNowLocal()}
+                    className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-4 py-3 font-bold focus:border-blue-500 outline-none"
+                    value={formData.valid_to || ''}
+                    onChange={e => setFormData({...formData, valid_to: e.target.value})}
+                  />
                 </div>
               </div>
 
