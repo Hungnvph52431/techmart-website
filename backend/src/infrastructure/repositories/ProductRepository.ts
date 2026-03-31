@@ -663,8 +663,9 @@ async delete(id: number): Promise<boolean> {
   }
 
   if (filters?.isFeatured === true || filters?.featured === 'true') query += ' AND p.is_featured = 1';
-  if (filters?.isNew === true) query += ' AND p.is_new = 1';
-  if (filters?.isBestseller === true) query += ' AND p.is_bestseller = 1';
+  if (filters?.isNew === true || filters?.isNew === 'true') query += ' AND p.is_new = 1';
+  if (filters?.isBestseller === true || filters?.isBestseller === 'true') query += ' AND p.is_bestseller = 1';
+  if (filters?.onSale === true || filters?.onSale === 'true') query += ' AND p.sale_price IS NOT NULL AND p.sale_price < p.price';
  if (filters?.ram) {
     const ramValues = String(filters.ram).split(',').map(v => v.trim()).filter(Boolean);
     if (ramValues.length === 1) {

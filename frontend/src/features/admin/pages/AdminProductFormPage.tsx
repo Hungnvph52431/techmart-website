@@ -583,56 +583,197 @@ export const AdminProductFormPage = () => {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3 pt-2">
-            {(['isFeatured', 'isNew', 'isBestseller'] as const).map((key) => {
-              const labels: Record<string, string> = { isFeatured: '⭐ Nổi bật', isNew: '🆕 Hàng mới', isBestseller: '🔥 Bán chạy' };
-              return (
-                <Controller key={key} name={key} control={control}
-                  render={({ field }) => (
-                    <label className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 cursor-pointer select-none transition-all text-sm font-semibold ${
-                      field.value ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'
-                    }`}>
-                      <input type="checkbox" className="hidden" checked={Boolean(field.value)} onChange={(e) => field.onChange(e.target.checked)} />
-                      {labels[key]}
-                    </label>
-                  )} />
-              );
-            })}
+        </Section>
+
+        {/* ── Hiển thị trên trang chủ ── */}
+        <Section title="Hiển thị trên trang chủ" subtitle="Chọn section mà sản phẩm sẽ xuất hiện. Có giá khuyến mãi sẽ tự động vào 'Săn Deal Giá Sốc'.">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Săn Deal — tự động theo giá KM */}
+            <div className={`rounded-xl border-2 p-4 transition-all ${
+              watch('salePrice') && watch('price') && watch('salePrice')! < watch('price')
+                ? 'border-red-300 bg-red-50'
+                : 'border-slate-100 bg-slate-50 opacity-60'
+            }`}>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-lg">🔥</span>
+                <span className="text-sm font-bold text-slate-800">Săn Deal Giá Sốc</span>
+              </div>
+              <p className="text-[11px] text-slate-500">Tự động khi có giá khuyến mãi</p>
+              {watch('salePrice') && watch('price') && watch('salePrice')! < watch('price') ? (
+                <span className="inline-block mt-2 text-[10px] font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
+                  Đang giảm {Math.round(((watch('price') - watch('salePrice')!) / watch('price')) * 100)}%
+                </span>
+              ) : (
+                <span className="inline-block mt-2 text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                  Chưa có giá KM
+                </span>
+              )}
+            </div>
+
+            {/* Nổi bật */}
+            <Controller name="isFeatured" control={control}
+              render={({ field }) => (
+                <label className={`rounded-xl border-2 p-4 cursor-pointer transition-all ${
+                  field.value ? 'border-blue-300 bg-blue-50' : 'border-slate-100 bg-white hover:border-slate-200'
+                }`}>
+                  <input type="checkbox" className="hidden" checked={Boolean(field.value)} onChange={e => field.onChange(e.target.checked)} />
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-lg">⭐</span>
+                    <span className="text-sm font-bold text-slate-800">Sản phẩm nổi bật</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">Hiện ở section "Sản phẩm nổi bật"</p>
+                  <span className={`inline-block mt-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    field.value ? 'text-blue-600 bg-blue-100' : 'text-slate-400 bg-slate-100'
+                  }`}>
+                    {field.value ? 'Đang bật' : 'Tắt'}
+                  </span>
+                </label>
+              )} />
+
+            {/* Bán chạy */}
+            <Controller name="isBestseller" control={control}
+              render={({ field }) => (
+                <label className={`rounded-xl border-2 p-4 cursor-pointer transition-all ${
+                  field.value ? 'border-orange-300 bg-orange-50' : 'border-slate-100 bg-white hover:border-slate-200'
+                }`}>
+                  <input type="checkbox" className="hidden" checked={Boolean(field.value)} onChange={e => field.onChange(e.target.checked)} />
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-lg">🏆</span>
+                    <span className="text-sm font-bold text-slate-800">Bán chạy nhất</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">Hiện ở section "Bán chạy nhất"</p>
+                  <span className={`inline-block mt-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    field.value ? 'text-orange-600 bg-orange-100' : 'text-slate-400 bg-slate-100'
+                  }`}>
+                    {field.value ? 'Đang bật' : 'Tắt'}
+                  </span>
+                </label>
+              )} />
+
+            {/* Mới */}
+            <Controller name="isNew" control={control}
+              render={({ field }) => (
+                <label className={`rounded-xl border-2 p-4 cursor-pointer transition-all ${
+                  field.value ? 'border-emerald-300 bg-emerald-50' : 'border-slate-100 bg-white hover:border-slate-200'
+                }`}>
+                  <input type="checkbox" className="hidden" checked={Boolean(field.value)} onChange={e => field.onChange(e.target.checked)} />
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-lg">🆕</span>
+                    <span className="text-sm font-bold text-slate-800">Mới cập bến</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">Hiện ở section "Mới cập bến"</p>
+                  <span className={`inline-block mt-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    field.value ? 'text-emerald-600 bg-emerald-100' : 'text-slate-400 bg-slate-100'
+                  }`}>
+                    {field.value ? 'Đang bật' : 'Tắt'}
+                  </span>
+                </label>
+              )} />
           </div>
         </Section>
 
         {/* ── Giá & tồn kho ── */}
         <Section title="Giá và tồn kho">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {([
-              { name: 'price', label: 'Giá niêm yết *' },
-              { name: 'salePrice', label: 'Giá khuyến mãi' },
-              { name: 'costPrice', label: 'Giá vốn (nội bộ)' },
-              { name: 'stockQuantity', label: 'Tồn kho' },
-            ] as const).map(({ name, label }) => (
-              <div key={name} className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">{label}</label>
-                <Controller name={name} control={control}
-                  render={({ field }) => (
-                    <input type="number" min="0"
-                      value={field.value ?? ''}
-                      onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
-                      placeholder="0"
-                      disabled={name === 'stockQuantity' && watchedVariants.length > 0}
-                      className={`w-full border-2 rounded-xl px-4 py-2.5 text-sm font-medium focus:outline-none transition-colors disabled:bg-slate-50 disabled:text-slate-400 ${
-                        errors[name] ? 'border-red-300' : 'border-slate-200 focus:border-blue-400'
-                      }`} />
-                  )} />
-                <FieldError message={errors[name]?.message} />
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {/* Giá niêm yết */}
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Giá niêm yết *</label>
+              <Controller name="price" control={control}
+                render={({ field }) => (
+                  <input type="number" min="0"
+                    value={field.value ?? ''}
+                    onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                    placeholder="0"
+                    className={`w-full border-2 rounded-xl px-4 py-2.5 text-sm font-medium focus:outline-none transition-colors ${
+                      errors.price ? 'border-red-300' : 'border-slate-200 focus:border-blue-400'
+                    }`} />
+                )} />
+              <FieldError message={errors.price?.message} />
+            </div>
+
+            {/* Giảm giá % */}
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Giảm giá (%)</label>
+              <div className="relative">
+                <input type="number" min="0" max="99"
+                  value={(() => {
+                    const price = watch('price');
+                    const sale = watch('salePrice');
+                    if (!price || !sale || sale >= price) return '';
+                    return Math.round(((price - sale) / price) * 100);
+                  })()}
+                  onChange={(e) => {
+                    const pct = Number(e.target.value);
+                    const price = watch('price');
+                    if (!price || pct <= 0 || pct >= 100) {
+                      setValue('salePrice', undefined as any, { shouldValidate: true });
+                    } else {
+                      const newSale = Math.round(price * (1 - pct / 100));
+                      setValue('salePrice', newSale, { shouldValidate: true });
+                    }
+                  }}
+                  placeholder="0"
+                  className="w-full border-2 rounded-xl px-4 py-2.5 pr-10 text-sm font-medium focus:outline-none transition-colors border-slate-200 focus:border-blue-400" />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">%</span>
               </div>
-            ))}
+            </div>
+
+            {/* Giá khuyến mãi (auto từ %) */}
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Giá khuyến mãi</label>
+              <Controller name="salePrice" control={control}
+                render={({ field }) => (
+                  <input type="number" min="0"
+                    value={field.value ?? ''}
+                    onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                    placeholder="Tự tính từ %"
+                    className={`w-full border-2 rounded-xl px-4 py-2.5 text-sm font-medium focus:outline-none transition-colors ${
+                      errors.salePrice ? 'border-red-300' : 'border-slate-200 focus:border-blue-400'
+                    }`} />
+                )} />
+              {watch('salePrice') && watch('price') && watch('salePrice')! < watch('price') && (
+                <p className="text-xs text-red-500 font-bold">
+                  Giảm {Math.round(((watch('price') - watch('salePrice')!) / watch('price')) * 100)}% → {watch('salePrice')!.toLocaleString('vi-VN')}₫
+                </p>
+              )}
+              <FieldError message={errors.salePrice?.message} />
+            </div>
           </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {/* Giá vốn */}
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Giá vốn (nội bộ)</label>
+              <Controller name="costPrice" control={control}
+                render={({ field }) => (
+                  <input type="number" min="0"
+                    value={field.value ?? ''}
+                    onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                    placeholder="0"
+                    className="w-full border-2 rounded-xl px-4 py-2.5 text-sm font-medium focus:outline-none transition-colors border-slate-200 focus:border-blue-400" />
+                )} />
+            </div>
+
+            {/* Tồn kho */}
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Tồn kho</label>
+              <Controller name="stockQuantity" control={control}
+                render={({ field }) => (
+                  <input type="number" min="0"
+                    value={field.value ?? ''}
+                    onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                    placeholder="0"
+                    disabled={watchedVariants.length > 0}
+                    className="w-full border-2 rounded-xl px-4 py-2.5 text-sm font-medium focus:outline-none transition-colors disabled:bg-slate-50 disabled:text-slate-400 border-slate-200 focus:border-blue-400" />
+                )} />
+            </div>
+          </div>
+
           {watchedVariants.length > 0 && (
             <p className="text-xs text-slate-400 bg-slate-50 px-3 py-2 rounded-lg">
               Tồn kho đang được tính tự động từ tổng các biến thể đang kích hoạt.
             </p>
           )}
-          {errors.salePrice && <FieldError message={errors.salePrice.message} />}
         </Section>
 
         {/* ── Hình ảnh ── */}

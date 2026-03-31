@@ -9,9 +9,9 @@ import {
   Camera, ImageIcon, Trash2,
 } from 'lucide-react';
 import { orderService } from '@/services/order.service';
+import { reviewService } from '@/services/review.service';
 import type { OrderReturnView } from '@/types/order';
 import api from '@/services/api';
-import { Layout } from '@/components/layout/Layout';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const BACKEND_URL = (import.meta.env.VITE_API_URL as string)?.replace('/api', '') || 'http://localhost:5001';
@@ -43,11 +43,11 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
 const ORDER_STATUS_STYLES: Record<string, string> = {
   pending:   'bg-amber-100 text-amber-800',
   confirmed: 'bg-blue-100 text-blue-800',
-  shipping:  'bg-sky-100 text-sky-800',
+  shipping:  'bg-purple-100 text-purple-800',
   delivered: 'bg-emerald-100 text-emerald-800',
   completed: 'bg-lime-100 text-lime-800',
-  cancelled: 'bg-rose-100 text-rose-800',
-  returned:  'bg-gray-100 text-gray-800',
+  cancelled: 'bg-red-100 text-red-600',
+  returned:  'bg-orange-100 text-orange-600',
 };
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
@@ -57,7 +57,6 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   bank_transfer: 'Chuyển khoản',
   momo:          'MoMo',
   wallet:        'Ví TechMart',
-  deposit:       'Đặt cọc (Ví + COD)',
 };
 
 const PAYMENT_STATUS_LABELS: Record<string, string> = {
@@ -65,6 +64,13 @@ const PAYMENT_STATUS_LABELS: Record<string, string> = {
   paid:     'Đã thanh toán',
   failed:   'Thất bại',
   refunded: 'Đã hoàn tiền',
+};
+
+const PAYMENT_STATUS_STYLES: Record<string, string> = {
+  pending:  'text-amber-600',
+  paid:     'text-emerald-600 font-semibold',
+  failed:   'text-rose-600 font-semibold',
+  refunded: 'text-violet-600 font-semibold',
 };
 
 // ─── Review Modal ─────────────────────────────────────────────────────────────
@@ -84,18 +90,48 @@ const ReviewModal = ({
   const [ratings, setRatings] = useState<Record<number, number>>({});
   const [comments, setComments] = useState<Record<number, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [reviewableItems, setReviewableItems] = useState<any[]>(items);
+  const [checking, setChecking] = useState(true);
+
+  // Kiểm tra sản phẩm nào đã review rồi → lọc ra
+  useEffect(() => {
+    const checkItems = async () => {
+      try {
+        const checks = await Promise.all(
+          items.map(async (item) => {
+            const productId = item.productId ?? item.product_id;
+            try {
+              const result = await reviewService.checkCanReview(productId);
+              return result.canReview ? item : null;
+            } catch {
+              return item; // Nếu check lỗi thì vẫn cho hiện
+            }
+          })
+        );
+        const filtered = checks.filter(Boolean);
+        setReviewableItems(filtered);
+        if (filtered.length === 0) {
+          onClose();
+        }
+      } catch {
+        setReviewableItems(items);
+      } finally {
+        setChecking(false);
+      }
+    };
+    checkItems();
+  }, []);
 
   const handleSubmit = async () => {
-    const unrated = items.findIndex((_, i) => !ratings[i]);
+    const unrated = reviewableItems.findIndex((_, i) => !ratings[i]);
     if (unrated !== -1) {
       toast.error(`Vui lòng đánh giá sản phẩm ${unrated + 1}`);
       return;
     }
     try {
       setSubmitting(true);
-      // ✅ Gọi đúng endpoint POST /api/reviews (review.routes.ts)
       const results = await Promise.allSettled(
-        items.map((item, i) =>
+        reviewableItems.map((item, i) =>
           api.post('/reviews', {
             productId:     item.productId    ?? item.product_id,
             orderId:       orderId,
@@ -108,8 +144,10 @@ const ReviewModal = ({
 
       const failed = results.filter(r => r.status === 'rejected');
       if (failed.length === results.length) {
-        // Tất cả đều thất bại
-        toast.error('Không thể gửi đánh giá, vui lòng thử lại');
+        // Lấy lỗi cụ thể từ backend
+        const firstErr = (failed[0] as PromiseRejectedResult).reason;
+        const msg = firstErr?.response?.data?.message || 'Không thể gửi đánh giá, vui lòng thử lại';
+        toast.error(msg);
       } else if (failed.length > 0) {
         toast.success(`Đã gửi ${results.length - failed.length}/${results.length} đánh giá`);
         onSubmitted();
@@ -130,15 +168,21 @@ const ReviewModal = ({
         <div className="sticky top-0 bg-white flex items-center justify-between px-6 py-4 border-b border-slate-100 rounded-t-3xl z-10">
           <div>
             <h3 className="text-base font-bold text-slate-800">⭐ Đánh giá sản phẩm</h3>
-            <p className="text-xs text-slate-400 mt-0.5">{items.length} sản phẩm cần đánh giá</p>
+            <p className="text-xs text-slate-400 mt-0.5">{reviewableItems.length} sản phẩm cần đánh giá</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
             <X size={17} className="text-slate-400" />
           </button>
         </div>
 
+        {checking ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-yellow-400 border-t-transparent" />
+            <span className="ml-2 text-sm text-slate-500">Đang kiểm tra...</span>
+          </div>
+        ) : (
         <div className="px-6 py-5 space-y-8">
-          {items.map((item, i) => {
+          {reviewableItems.map((item, i) => {
             const name = item.productName ?? item.product_name ?? `Sản phẩm ${i + 1}`;
             const img  = item.productImage ?? item.product_image ?? item.image ?? '';
             const rating = ratings[i] ?? 0;
@@ -184,11 +228,12 @@ const ReviewModal = ({
                   className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:border-yellow-400 focus:outline-none resize-none transition-colors"
                 />
 
-                {i < items.length - 1 && <hr className="border-slate-100" />}
+                {i < reviewableItems.length - 1 && <hr className="border-slate-100" />}
               </div>
             );
           })}
         </div>
+        )}
 
         <div className="sticky bottom-0 bg-white flex gap-3 px-6 pb-6 pt-3 border-t border-slate-100 rounded-b-3xl">
           <button onClick={onClose}
@@ -217,11 +262,13 @@ const RETURN_REASONS = [
 
 const ReturnModal = ({
   items,
+  order, // <-- Thêm prop này
   orderId,
   onClose,
   onSubmitted,
 }: {
   items: any[];
+  order: any; // <-- Thêm prop này
   orderId: number;
   onClose: () => void;
   onSubmitted: () => void;
@@ -235,6 +282,10 @@ const ReturnModal = ({
   );
   const [submitting, setSubmitting] = useState(false);
 
+  // --- LOGIC TÀI CHÍNH ---
+  const subtotal = Number(order?.subtotal ?? 0); // Tổng tiền hàng (trước giảm)
+  const discountAmount = Number(order?.discountAmount ?? order?.discount_amount ?? 0); // Tổng tiền voucher
+
   const finalReason = reason === 'Khác' ? customReason : reason;
 
   const handleAddImages = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -243,15 +294,9 @@ const ReturnModal = ({
     e.target.value = '';
   };
 
-  const removeImage = (idx: number) => {
-    setEvidenceFiles(prev => prev.filter((_, i) => i !== idx));
-  };
-
-  const toggleItem = (id: number) =>
-    setSelected(p => ({ ...p, [id]: { ...p[id], checked: !p[id].checked } }));
-
-  const setQty = (id: number, qty: number) =>
-    setSelected(p => ({ ...p, [id]: { ...p[id], quantity: qty } }));
+  const removeImage = (idx: number) => setEvidenceFiles(prev => prev.filter((_, i) => i !== idx));
+  const toggleItem = (id: number) => setSelected(p => ({ ...p, [id]: { ...p[id], checked: !p[id].checked } }));
+  const setQty = (id: number, qty: number) => setSelected(p => ({ ...p, [id]: { ...p[id], quantity: qty } }));
 
   const canSubmit = finalReason.trim().length > 0 && evidenceFiles.length > 0 && !submitting;
 
@@ -279,6 +324,9 @@ const ReturnModal = ({
     }
   };
 
+  // Tính TỔNG TIỀN HOÀN DỰ KIẾN của cả phiếu trả
+  let totalEstimatedRefund = 0;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto">
@@ -298,36 +346,86 @@ const ReturnModal = ({
         <div className="px-6 py-5 space-y-5">
           {/* Chọn sản phẩm */}
           <div>
-            <p className="text-sm font-bold text-slate-700 mb-2">Sản phẩm cần hoàn trả</p>
-            <div className="space-y-2">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-bold text-slate-700">Sản phẩm cần hoàn trả</p>
+              {discountAmount > 0 && (
+                <span className="text-[10px] bg-orange-100 text-orange-600 px-2 py-0.5 rounded font-bold uppercase tracking-wide">
+                  Đơn hàng có Voucher
+                </span>
+              )}
+            </div>
+            <div className="space-y-3">
               {items.map(item => {
                 const id   = item.orderDetailId;
                 const name = item.productName ?? `Sản phẩm #${id}`;
                 const img  = item.productImage ?? '';
                 const maxQty = item.quantity ?? 1;
+                const price  = Number(item.price ?? 0); // Lấy giá 1 SP
                 const sel  = selected[id];
+
+                // --- TÍNH TOÁN TIỀN HOÀN CHO SẢN PHẨM NÀY ---
+                const selectedQty = sel?.checked ? sel.quantity : 0;
+                const itemBaseTotal = price * selectedQty; // Tổng giá trị gốc của SP đang chọn trả
+                
+                let itemRefund = itemBaseTotal;
+                let itemDiscountShare = 0;
+
+                // Nếu có mã giảm giá -> Bổ đôi giảm giá theo tỷ lệ
+                if (subtotal > 0 && discountAmount > 0 && sel?.checked) {
+                  const ratio = itemBaseTotal / subtotal;
+                  itemDiscountShare = ratio * discountAmount;
+                  itemRefund = itemBaseTotal - itemDiscountShare;
+                }
+
+                totalEstimatedRefund += itemRefund; // Cộng dồn vào tổng
+
                 return (
                   <label key={id}
-                    className={`flex items-center gap-3 p-3 rounded-2xl border-2 cursor-pointer transition-colors ${sel?.checked ? 'border-orange-400 bg-orange-50' : 'border-slate-100 bg-slate-50'}`}>
-                    <input type="checkbox" checked={sel?.checked ?? true}
-                      onChange={() => toggleItem(id)}
-                      className="w-4 h-4 accent-orange-500 flex-shrink-0" />
-                    <img src={img || '/placeholder.jpg'} alt={name}
-                      className="w-12 h-12 rounded-xl object-cover bg-white flex-shrink-0"
-                      onError={e => { const el = e.target as HTMLImageElement; el.onerror = null; el.src = '/placeholder.jpg'; }} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-800 truncate">{name}</p>
-                      {item.variantName && <p className="text-xs text-slate-500">{item.variantName}</p>}
+                    className={`flex items-start gap-3 p-3 rounded-2xl border-2 cursor-pointer transition-colors ${sel?.checked ? 'border-orange-400 bg-orange-50' : 'border-slate-100 bg-slate-50'}`}>
+                    <div className="pt-3">
+                      <input type="checkbox" checked={sel?.checked ?? true}
+                        onChange={() => toggleItem(id)}
+                        className="w-4 h-4 accent-orange-500 flex-shrink-0" />
                     </div>
-                    {sel?.checked && maxQty > 1 && (
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button type="button" onClick={e => { e.preventDefault(); setQty(id, Math.max(1, sel.quantity - 1)); }}
-                          className="w-6 h-6 rounded-lg bg-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-300">−</button>
-                        <span className="w-6 text-center text-sm font-bold text-slate-800">{sel.quantity}</span>
-                        <button type="button" onClick={e => { e.preventDefault(); setQty(id, Math.min(maxQty, sel.quantity + 1)); }}
-                          className="w-6 h-6 rounded-lg bg-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-300">+</button>
+                    
+                    <img src={img || '/placeholder.jpg'} alt={name}
+                      className="w-14 h-14 mt-1 rounded-xl object-cover bg-white flex-shrink-0 border border-slate-100"
+                      onError={e => { const el = e.target as HTMLImageElement; el.onerror = null; el.src = '/placeholder.jpg'; }} />
+                    
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-800 line-clamp-2">{name}</p>
+                      {item.variantName && <p className="text-xs text-slate-500 mt-0.5">{item.variantName}</p>}
+                      
+                      {/* Số lượng & Giá tiền */}
+                      <div className="mt-2 flex items-end justify-between">
+                        {/* Cột Số lượng */}
+                        {sel?.checked && maxQty > 1 ? (
+                          <div className="flex items-center gap-1">
+                            <button type="button" onClick={e => { e.preventDefault(); setQty(id, Math.max(1, sel.quantity - 1)); }}
+                              className="w-6 h-6 rounded border border-slate-300 bg-white text-slate-700 font-bold hover:bg-slate-100">−</button>
+                            <span className="w-6 text-center text-sm font-bold text-slate-800">{sel.quantity}</span>
+                            <button type="button" onClick={e => { e.preventDefault(); setQty(id, Math.min(maxQty, sel.quantity + 1)); }}
+                              className="w-6 h-6 rounded border border-slate-300 bg-white text-slate-700 font-bold hover:bg-slate-100">+</button>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-slate-500">Số lượng: {maxQty}</p>
+                        )}
+
+                        {/* Cột Giá tiền */}
+                        {sel?.checked && (
+                          <div className="text-right">
+                            {itemDiscountShare > 0 && (
+                              <p className="text-xs text-slate-400 line-through mb-0.5">
+                                {formatCurrency(itemBaseTotal)}
+                              </p>
+                            )}
+                            <p className="text-sm font-black text-orange-600">
+                              + {formatCurrency(itemRefund)}
+                            </p>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </label>
                 );
               })}
@@ -398,16 +496,26 @@ const ReturnModal = ({
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-white flex gap-3 px-6 pb-6 pt-3 border-t border-slate-100 rounded-b-3xl">
-          <button onClick={onClose}
-            className="flex-1 py-3 rounded-2xl border-2 border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-all">
-            Hủy
-          </button>
-          <button onClick={handleSubmit} disabled={!canSubmit}
-            className="flex-1 py-3 rounded-2xl bg-orange-500 text-white font-bold text-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
-            <RotateCcw size={15} />
-            {submitting ? 'Đang gửi...' : evidenceFiles.length === 0 ? 'Cần upload ảnh bằng chứng' : 'Gửi yêu cầu'}
-          </button>
+        <div className="sticky bottom-0 bg-white border-t border-slate-100 rounded-b-3xl">
+          {/* Box hiển thị Tổng tiền hoàn */}
+          <div className="px-6 py-3 bg-slate-50 flex items-center justify-between border-b border-slate-100">
+            <span className="text-sm font-semibold text-slate-600">Hoàn tiền dự kiến:</span>
+            <span className="text-lg font-black text-orange-600">
+              {formatCurrency(totalEstimatedRefund)}
+            </span>
+          </div>
+
+          <div className="flex gap-3 px-6 pb-6 pt-4">
+            <button onClick={onClose}
+              className="flex-1 py-3 rounded-2xl border-2 border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-all">
+              Hủy
+            </button>
+            <button onClick={handleSubmit} disabled={!canSubmit}
+              className="flex-1 py-3 rounded-2xl bg-orange-500 text-white font-bold text-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
+              <RotateCcw size={15} />
+              {submitting ? 'Đang gửi...' : evidenceFiles.length === 0 ? 'Cần upload ảnh bằng chứng' : 'Gửi yêu cầu'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -426,12 +534,29 @@ export const OrderDetailPage = () => {
   const [cancelReason, setCancelReason] = useState('');
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState(false);
+  const [allReviewed, setAllReviewed] = useState(false);
 
   const loadData = async () => {
     if (!Number.isFinite(orderId)) { setLoading(false); return; }
     try {
       setLoading(true);
-      setDetail(await orderService.getById(orderId));
+      const data = await orderService.getById(orderId);
+      setDetail(data);
+      // Kiểm tra đã review hết chưa
+      const orderItems = data.items ?? (data as any).orderDetails ?? [];
+      if (['delivered', 'completed'].includes(data.order?.status ?? (data as any).status)) {
+        try {
+          const checks = await Promise.all(
+            orderItems.map((item: any) => {
+              const pid = item.productId ?? item.product_id;
+              return reviewService.checkCanReview(pid).catch(() => ({ canReview: true }));
+            })
+          );
+          setAllReviewed(checks.every(c => !c.canReview));
+        } catch {
+          setAllReviewed(false);
+        }
+      }
     } catch {
       toast.error('Không thể tải chi tiết đơn hàng');
     } finally {
@@ -524,12 +649,13 @@ export const OrderDetailPage = () => {
 
   // ✅ Chỉ hủy được khi pending/confirmed — khóa từ shipping trở đi
   const canCancel          = ['pending', 'confirmed'].includes(status);
-  // ✅ User tự bấm "Đã nhận hàng" khi đơn đang giao (shipping) hoặc đã giao (delivered)
-  const canConfirmReceived = ['shipping', 'delivered'].includes(status);
+  // ✅ FIX: Chỉ hiện nút "Đã nhận hàng" khi đơn ở trạng thái 'delivered' (đã giao đến nơi)
+  //         KHÔNG hiện khi 'shipping' (đang trên đường giao)
+  const canConfirmReceived = status === 'delivered';
   // ✅ Chỉ hiện badge "Đã nhận hàng" khi user đã xác nhận (completed)
   const alreadyReceived    = status === 'completed';
-  // ✅ Chỉ cho đánh giá khi đã xác nhận nhận hàng (completed)
-  const canReview          = ['delivered', 'completed'].includes(status);
+  // ✅ Chỉ cho đánh giá khi đã nhận hàng VÀ chưa review hết
+  const canReview          = ['delivered', 'completed'].includes(status) && !allReviewed;
   // ✅ Hoàn hàng: dùng flag từ server, fallback về delivered/completed
   const canRequestReturn   = order.canRequestReturn ?? ['delivered', 'completed'].includes(status);
 
@@ -547,6 +673,7 @@ export const OrderDetailPage = () => {
       {showReturnModal && (
         <ReturnModal
           items={items}
+          order={order} 
           orderId={orderId}
           onClose={() => setShowReturnModal(false)}
           onSubmitted={() => { setShowReturnModal(false); void loadData(); }}
@@ -580,7 +707,9 @@ export const OrderDetailPage = () => {
             <p className="mt-1 text-sm text-gray-500">
               Đặt lúc {orderDate ? formatDateTime(orderDate) : '—'} ·{' '}
               {PAYMENT_METHOD_LABELS[payMethod] ?? payMethod} /{' '}
-              {PAYMENT_STATUS_LABELS[payStatus] ?? payStatus}
+              <span className={PAYMENT_STATUS_STYLES[payStatus] ?? ''}>
+                {PAYMENT_STATUS_LABELS[payStatus] ?? payStatus}
+              </span>
             </p>
           </div>
 
@@ -605,7 +734,7 @@ export const OrderDetailPage = () => {
               </div>
             )}
 
-            {/* Nút "Đã nhận hàng" — khi đang giao (shipping) hoặc đã giao (delivered) */}
+            {/* Nút "Đã nhận hàng" — CHỈ khi status = 'delivered' */}
             {canConfirmReceived && (
               <button onClick={handleConfirmDelivered}
                 disabled={submitting === 'confirm-delivered'}
@@ -702,6 +831,35 @@ export const OrderDetailPage = () => {
               </div>
             </section>
 
+            {/* ── Đánh giá sản phẩm ── */}
+            {canReview && (
+              <section className="rounded-2xl border-2 border-yellow-200 bg-yellow-50 p-6 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-black text-gray-900 uppercase italic flex items-center gap-2">
+                    <Star size={18} className="text-yellow-500 fill-yellow-500" /> Đánh giá sản phẩm
+                  </h3>
+                  <button onClick={() => setShowReviewModal(true)}
+                    className="inline-flex items-center gap-2 rounded-xl bg-yellow-400 px-5 py-2.5 text-sm font-bold text-slate-900 hover:bg-yellow-500 transition-colors shadow-sm">
+                    <Star size={15} className="fill-current" /> Viết đánh giá ngay
+                  </button>
+                </div>
+                <p className="text-sm text-gray-600 mt-2">
+                  Hãy chia sẻ trải nghiệm của bạn về sản phẩm để giúp những người mua khác!
+                </p>
+              </section>
+            )}
+
+            {allReviewed && ['delivered', 'completed'].includes(status) && (
+              <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={18} className="text-emerald-600" />
+                  <p className="text-sm font-semibold text-emerald-700">
+                    Bạn đã đánh giá tất cả sản phẩm trong đơn hàng này. Cảm ơn bạn!
+                  </p>
+                </div>
+              </section>
+            )}
+
             {/* ── Timeline ── */}
             {timeline.length > 0 && (
               <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -727,7 +885,7 @@ export const OrderDetailPage = () => {
               </section>
             )}
 
-            {/* ── Fix #7: Trạng thái hoàn trả (cho khách hàng) ── */}
+            {/* ── Trạng thái hoàn trả (cho khách hàng) ── */}
             {returns.length > 0 && (
               <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
                 <h3 className="text-base font-black text-gray-900 uppercase italic flex items-center gap-2 mb-5">
