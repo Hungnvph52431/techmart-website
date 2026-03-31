@@ -39,7 +39,7 @@ export const ProductListPage = () => {
           minPrice:     searchParams.get("minPrice")                || undefined,
           maxPrice:     searchParams.get("maxPrice")                || undefined,
           page,
-          limit: 12,
+          limit: 15,
         };
 
         const data = await productService.getAll(filters) as any;
@@ -100,7 +100,7 @@ export const ProductListPage = () => {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-12">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6 mb-12">
               {products.map((product) => (
                 <ProductCard key={product.productId} product={product} />
               ))}
