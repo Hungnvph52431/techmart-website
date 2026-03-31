@@ -75,6 +75,7 @@ export interface OrderListItem extends Order {
   customerPhone?: string;
   itemCount: number;
   openReturnCount: number;
+  allReviewed?: boolean;
 }
 
 export interface OrderDetail {
