@@ -8,6 +8,11 @@ import { ShoppingCart, Star, Truck, Shield, RefreshCw, ChevronRight, Check, Zap 
 import { useCartStore } from "@/store/cartStore";
 import toast from "react-hot-toast";
 import { ProductReviews } from '../components/ProductReviews';
+import {
+  CART_QUANTITY_EXCEEDED_MESSAGE,
+  getProductPurchaseStockLimit,
+  getRemainingProductQuantity,
+} from "@/features/cart/lib/cartQuantity";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const BACKEND_URL =
@@ -67,15 +72,16 @@ export const ProductDetailPage = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedImage, setSelectedImage] = useState<number>(0);
   const [quantity, setQuantity] = useState<number>(1);
+  const [quantityDraft, setQuantityDraft] = useState<string>('1');
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
 
   const { addItem, items } = useCartStore();
-  const currentCartItem = items.find(i => i.product.productId === product?.productId);
-  const cartQuantity = currentCartItem ? currentCartItem.quantity : 0;
 
   // Tìm variant đang chọn
   const variants = (product as any)?.variants ?? [];
-  const selectedVariant = variants.find((v: any) => v.variantId === selectedVariantId);
+  const selectedVariant = variants.find(
+    (v: any) => (v.variantId ?? v.id) === selectedVariantId
+  );
 
   // Tính giá hiển thị: giá gốc + chênh lệch variant
   const basePrice = Number(product?.salePrice || product?.price || 0);
@@ -86,24 +92,38 @@ export const ProductDetailPage = () => {
     : basePrice;
 
   // Tính stock: variant stock ưu tiên, fallback về product stock nếu variant = 0
-  const variantStock = selectedVariant
-    ? Number(selectedVariant.stockQuantity ?? selectedVariant.stock ?? 0)
+  const stockToUse = product
+    ? getProductPurchaseStockLimit(product, selectedVariant)
     : 0;
-  const productStock = Number(product?.stockQuantity ?? 0);
-  const stockToUse = selectedVariant
-    ? (variantStock > 0 ? variantStock : productStock)
-    : productStock;
-
-  const availableStock = stockToUse - cartQuantity;
+  const availableStock = product
+    ? getRemainingProductQuantity(items, product, selectedVariant)
+    : 0;
   const isOutOfStock = stockToUse <= 0;
   const isInactive = product?.status === 'inactive';
   const isMaxReached = !isOutOfStock && !isInactive && availableStock <= 0;
   const isDisabled = isOutOfStock || isInactive || isMaxReached;
 
   useEffect(() => {
-    if (availableStock > 0 && quantity < 1) setQuantity(1);
-    else if (availableStock > 0 && quantity > availableStock) setQuantity(availableStock);
+    setQuantity((currentQuantity) => {
+      if (availableStock <= 0) {
+        return 0;
+      }
+
+      if (currentQuantity < 1) {
+        return 1;
+      }
+
+      if (currentQuantity > availableStock) {
+        return availableStock;
+      }
+
+      return currentQuantity;
+    });
   }, [availableStock]);
+
+  useEffect(() => {
+    setQuantityDraft(String(quantity));
+  }, [quantity]);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -115,7 +135,7 @@ export const ProductDetailPage = () => {
         setSelectedImage(0);
         // Auto-chọn variant đầu tiên nếu có
         const firstVariant = (data as any)?.variants?.[0];
-        if (firstVariant) setSelectedVariantId(firstVariant.variantId);
+        if (firstVariant) setSelectedVariantId(firstVariant.variantId ?? firstVariant.id);
       } catch (error) {
         console.error("Lỗi khi tải chi tiết sản phẩm:", error);
         toast.error("Không thể tải thông tin sản phẩm");
@@ -126,28 +146,82 @@ export const ProductDetailPage = () => {
     fetchProduct();
   }, [slug]);
 
+  const increaseQty = () => { if (quantity < availableStock) setQuantity(p => p + 1); };
+  const decreaseQty = () => { if (quantity > 1) setQuantity(p => p - 1); };
+
+  const handleQuantityDraftChange = (rawValue: string) => {
+    if (!/^\d*$/.test(rawValue)) {
+      return;
+    }
+
+    if (rawValue !== '' && Number(rawValue) > availableStock) {
+      toast.error(CART_QUANTITY_EXCEEDED_MESSAGE);
+      return;
+    }
+
+    setQuantityDraft(rawValue);
+  };
+
+  const resolveQuantityDraft = () => {
+    const fallbackQuantity = availableStock > 0
+      ? Math.min(Math.max(quantity, 1), availableStock)
+      : 0;
+
+    if (quantityDraft === '') {
+      return fallbackQuantity;
+    }
+
+    const parsedQuantity = Number(quantityDraft);
+    if (!Number.isFinite(parsedQuantity) || parsedQuantity < 0) {
+      return fallbackQuantity;
+    }
+
+    if (parsedQuantity > availableStock) {
+      toast.error(CART_QUANTITY_EXCEEDED_MESSAGE);
+      return fallbackQuantity;
+    }
+
+    return availableStock > 0 ? Math.max(1, parsedQuantity) : 0;
+  };
+
+  const commitQuantityDraft = () => {
+    const nextQuantity = resolveQuantityDraft();
+    setQuantity(nextQuantity);
+    setQuantityDraft(String(nextQuantity));
+    return nextQuantity;
+  };
+
   const handleAddToCart = () => {
-    if (!product || quantity <= 0) return;
+    if (!product) return;
+    const nextQuantity = commitQuantityDraft();
+    if (nextQuantity <= 0) return;
     if (variants.length > 0 && !selectedVariantId) {
       toast.error('Vui lòng chọn phiên bản sản phẩm');
       return;
     }
-    addItem(product, quantity, selectedVariantId ?? undefined);
-    toast.success(`Đã thêm ${quantity} sản phẩm vào giỏ hàng!`);
+    if (nextQuantity > availableStock) {
+      toast.error(CART_QUANTITY_EXCEEDED_MESSAGE);
+      return;
+    }
+    addItem(product, nextQuantity, selectedVariantId ?? undefined);
+    toast.success(`Đã thêm ${nextQuantity} sản phẩm vào giỏ hàng!`);
   };
 
   const handleBuyNow = () => {
-    if (!product || quantity <= 0) return;
+    if (!product) return;
+    const nextQuantity = commitQuantityDraft();
+    if (nextQuantity <= 0) return;
     if (variants.length > 0 && !selectedVariantId) {
       toast.error('Vui lòng chọn phiên bản sản phẩm');
       return;
     }
-    addItem(product, quantity, selectedVariantId ?? undefined);
+    if (nextQuantity > availableStock) {
+      toast.error(CART_QUANTITY_EXCEEDED_MESSAGE);
+      return;
+    }
+    addItem(product, nextQuantity, selectedVariantId ?? undefined);
     navigate('/checkout');
   };
-
-  const increaseQty = () => { if (quantity < availableStock) setQuantity(p => p + 1); };
-  const decreaseQty = () => { if (quantity > 1) setQuantity(p => p - 1); };
 
   if (loading) return (
     <Layout>
@@ -222,12 +296,12 @@ export const ProductDetailPage = () => {
 
   const handleSelectColor = (color: string) => {
     const v = getVariantByAttrs(color, selectedStorage);
-    if (v) setSelectedVariantId(v.variantId);
+    if (v) setSelectedVariantId(v.variantId ?? v.id);
   };
 
   const handleSelectStorage = (storage: string) => {
     const v = getVariantByAttrs(selectedColor, storage);
-    if (v) setSelectedVariantId(v.variantId);
+    if (v) setSelectedVariantId(v.variantId ?? v.id);
   };
 
   return (
@@ -372,7 +446,21 @@ export const ProductDetailPage = () => {
                   <div className="flex items-center bg-white border-4 border-gray-100 rounded-[24px] p-1.5 shadow-sm">
                     <button onClick={decreaseQty} disabled={quantity <= 1 || isDisabled}
                       className="w-12 h-12 flex items-center justify-center font-black text-xl hover:bg-gray-50 rounded-2xl disabled:opacity-20">−</button>
-                    <span className="w-16 text-center font-black text-xl text-gray-800">{quantity}</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={quantityDraft}
+                      disabled={isDisabled}
+                      onChange={(event) => handleQuantityDraftChange(event.target.value)}
+                      onBlur={commitQuantityDraft}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.currentTarget.blur();
+                        }
+                      }}
+                      className="w-16 bg-transparent text-center font-black text-xl text-gray-800 outline-none disabled:text-gray-400"
+                      aria-label={`Số lượng mua ${product.name}`}
+                    />
                     <button onClick={increaseQty} disabled={quantity >= availableStock || isDisabled}
                       className="w-12 h-12 flex items-center justify-center font-black text-xl hover:bg-gray-50 rounded-2xl disabled:opacity-20">+</button>
                   </div>

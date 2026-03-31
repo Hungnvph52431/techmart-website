@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Product, CartItem } from '@/types';
+import {
+  clampCartItemQuantity,
+  getCartItemStockLimit,
+  getCartSelectionKey,
+  matchesCartSelection,
+} from '@/features/cart/lib/cartQuantity';
 
 interface CartState {
   items: CartItem[];
@@ -21,11 +27,6 @@ interface CartState {
   getSelectedItems: () => CartItem[];
   getSelectedTotalPrice: () => number;
 }
-
-// Helper: tạo composite key từ productId + variantId
-const getSelectionKey = (productId: number, variantId?: number): string => {
-  return variantId ? `${productId}-${variantId}` : `${productId}`;
-};
 
 // Helper: tính giá thực tế của item (ưu tiên giá variant đã lưu)
 const getItemPrice = (item: CartItem): number => {
@@ -49,11 +50,13 @@ export const useCartStore = create<CartState>()(
       selectedProductIds: [],
 
       addItem: (product, quantity = 1, selectedVariantId) => {
+        if (quantity <= 0) {
+          return;
+        }
+
         const items = get().items;
         const existingItem = items.find(
-          (item) =>
-            item.product.productId === product.productId &&
-            item.selectedVariantId === selectedVariantId
+          (item) => matchesCartSelection(item, product.productId, selectedVariantId)
         );
 
         // Lấy thông tin variant nếu có
@@ -67,32 +70,44 @@ export const useCartStore = create<CartState>()(
           ? Number((variant as any).price)
           : (variant?.priceAdjustment != null ? basePrice + Number(variant.priceAdjustment) : basePrice);
         const variantStock = variant ? Number(variant.stockQuantity ?? (variant as any)?.stock ?? 0) : 0;
-        const stockLimit = variant ? (variantStock > 0 ? variantStock : product.stockQuantity) : product.stockQuantity;
-
         if (existingItem) {
-          const newQuantity = existingItem.quantity + quantity;
-          const finalQuantity = newQuantity > stockLimit ? stockLimit : newQuantity;
+          const finalQuantity = clampCartItemQuantity(
+            existingItem,
+            existingItem.quantity + quantity
+          );
 
           set({
             items: items.map((item) =>
-              item.product.productId === product.productId &&
-              item.selectedVariantId === selectedVariantId
+              matchesCartSelection(item, product.productId, selectedVariantId)
                 ? { ...item, quantity: finalQuantity }
                 : item
             ),
           });
         } else {
-          const finalQuantity = quantity > stockLimit ? stockLimit : quantity;
+          const selectedVariantStock =
+            variant && variantStock > 0 ? variantStock : undefined;
+          const nextCartItem: CartItem = {
+            product,
+            quantity,
+            selectedVariantId,
+            selectedVariantName: vName,
+            selectedVariantPrice: variant ? vPrice : undefined,
+            selectedVariantStock,
+          };
+          const finalQuantity = clampCartItemQuantity(nextCartItem, quantity);
+          if (finalQuantity <= 0) {
+            return;
+          }
           const newCartItem = {
             product,
             quantity: finalQuantity,
             selectedVariantId,
             selectedVariantName: vName,
             selectedVariantPrice: variant ? vPrice : undefined,
-            selectedVariantStock: variant ? stockLimit : undefined,
+            selectedVariantStock,
           };
           const newItems = [...items, newCartItem];
-          const selectionKey = getSelectionKey(product.productId, selectedVariantId);
+          const selectionKey = getCartSelectionKey(product.productId, selectedVariantId);
           set({
             items: newItems,
             // Tự động chọn sản phẩm mới thêm (với variant key)
@@ -104,9 +119,7 @@ export const useCartStore = create<CartState>()(
       removeItem: (productId, selectedVariantId) => {
         set((state) => {
           const filtered = state.items.filter(
-            (item) =>
-              !(item.product.productId === productId &&
-              item.selectedVariantId === selectedVariantId)
+            (item) => !matchesCartSelection(item, productId, selectedVariantId)
           );
           // Nếu xóa hết items của product này (tất cả variants), xóa khỏi selectedProductIds
           const hasProductLeft = filtered.some((item) => item.product.productId === productId);
@@ -125,23 +138,17 @@ export const useCartStore = create<CartState>()(
 
       updateQuantity: (productId, quantity, selectedVariantId) => {
         const item = get().items.find(
-          (i) =>
-            i.product.productId === productId &&
-            i.selectedVariantId === selectedVariantId
+          (i) => matchesCartSelection(i, productId, selectedVariantId)
         );
         if (!item) return;
 
         if (quantity <= 0) {
           get().removeItem(productId, selectedVariantId);
         } else {
-          const finalQuantity =
-            quantity > item.product.stockQuantity
-              ? item.product.stockQuantity
-              : quantity;
+          const finalQuantity = clampCartItemQuantity(item, quantity);
           set({
             items: get().items.map((item) =>
-              item.product.productId === productId &&
-              item.selectedVariantId === selectedVariantId
+              matchesCartSelection(item, productId, selectedVariantId)
                 ? { ...item, quantity: finalQuantity }
                 : item
             ),
@@ -155,7 +162,7 @@ export const useCartStore = create<CartState>()(
 
       toggleSelect: (productId, variantId) => {
         set((state) => {
-          const selectionKey = getSelectionKey(productId, variantId);
+          const selectionKey = getCartSelectionKey(productId, variantId);
           const isSelected = state.selectedProductIds.includes(selectionKey);
           return {
             selectedProductIds: isSelected
@@ -167,7 +174,7 @@ export const useCartStore = create<CartState>()(
 
       selectAll: () => {
         const allKeys = get().items.map((item) =>
-          getSelectionKey(item.product.productId, item.selectedVariantId)
+          getCartSelectionKey(item.product.productId, item.selectedVariantId)
         );
         set({ selectedProductIds: allKeys });
       },
@@ -189,7 +196,10 @@ export const useCartStore = create<CartState>()(
       getSelectedItems: () => {
         const { items, selectedProductIds } = get();
         return items.filter((item) => {
-          const selectionKey = getSelectionKey(item.product.productId, item.selectedVariantId);
+          const selectionKey = getCartSelectionKey(
+            item.product.productId,
+            item.selectedVariantId
+          );
           return selectedProductIds.includes(selectionKey);
         });
       },
@@ -212,7 +222,9 @@ export const useCartStore = create<CartState>()(
           const oldIds = state.selectedProductIds as any as number[];
           state.selectedProductIds = state.items
             .filter((item) => oldIds.includes(item.product.productId))
-            .map((item) => getSelectionKey(item.product.productId, item.selectedVariantId));
+            .map((item) =>
+              getCartSelectionKey(item.product.productId, item.selectedVariantId)
+            );
         }
 
         // Migration 2: backfill variant info cho cart items cũ chưa có selectedVariantName
@@ -232,7 +244,7 @@ export const useCartStore = create<CartState>()(
                 ...item,
                 selectedVariantName: vName,
                 selectedVariantPrice: vPrice,
-                selectedVariantStock: vStock > 0 ? vStock : item.product.stockQuantity,
+                selectedVariantStock: vStock > 0 ? vStock : getCartItemStockLimit(item),
               };
             }
           }
@@ -242,7 +254,7 @@ export const useCartStore = create<CartState>()(
         // Auto-select nếu rỗng
         if (state.items.length > 0 && state.selectedProductIds.length === 0) {
           state.selectedProductIds = state.items.map((i) =>
-            getSelectionKey(i.product.productId, i.selectedVariantId)
+            getCartSelectionKey(i.product.productId, i.selectedVariantId)
           );
         }
       },
