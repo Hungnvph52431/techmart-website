@@ -80,7 +80,7 @@ export const ProductsFilter = () => {
       .then(data => setBrands((data || []).filter((b: Brand) => b.isActive)))
       .catch(() => {});
     categoryService.getAll()
-      .then(data => setChildCategories((data || []).filter((c: Category) => c.parentId && c.isActive !== false)))
+      .then(data => setChildCategories((data || []).filter((c: Category) => !c.parentId && c.isActive !== false)))
       .catch(() => {});
   }, []);
 

@@ -257,6 +257,14 @@ export const HomePage = () => {
                   ))}
                 </div>
               )}
+
+              {/* Xem tất cả sản phẩm */}
+              <div className="flex justify-center pt-4 border-t border-gray-50">
+                <Link to="/products"
+                  className="text-blue-600 font-semibold text-sm flex items-center gap-0.5 hover:underline">
+                  Xem tất cả sản phẩm <ChevronRight size={16} />
+                </Link>
+              </div>
             </div>
           </div>
         </section>
