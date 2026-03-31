@@ -16,13 +16,15 @@ import {
   RETURN_DEADLINE_DAYS,
 } from '../policies/OrderLifecycle';
 import { sendPaymentSuccessEmail, sendOrderCreatedEmail } from '../services/EmailService';
+import { VietnamAdministrativeService } from '../services/VietnamAdministrativeService';
 import pool from '../../infrastructure/database/connection';
 import { RowDataPacket } from 'mysql2';
 
 export class OrderUseCase {
   constructor(
     private orderRepository: IOrderRepository,
-    private productRepository: IProductRepository
+    private productRepository: IProductRepository,
+    private vietnamAdministrativeService: VietnamAdministrativeService
   ) {}
 
   // --- TRUY VẤN DÀNH CHO ADMIN ---
@@ -194,6 +196,16 @@ export class OrderUseCase {
     if (!orderData.items.length) {
       throw new Error('Đơn hàng phải có ít nhất một sản phẩm');
     }
+
+    const validatedLocation =
+      this.vietnamAdministrativeService.validateCurrentSelection({
+        city: orderData.shippingCity,
+        ward: orderData.shippingWard,
+      });
+
+    orderData.shippingCity = validatedLocation.province.name;
+    orderData.shippingWard = validatedLocation.ward.name;
+    orderData.shippingDistrict = orderData.shippingDistrict?.trim() || undefined;
 
     // Kiểm tra tồn kho trước khi đặt hàng
     for (const item of orderData.items) {
