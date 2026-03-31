@@ -39,7 +39,7 @@ export interface ProductVariant {
 }
 
 export interface Product {
-  productId: number; // Chốt: Dùng productId kiểu number cho toàn hệ thống
+  productId: number;
   name: string;
   slug: string;
   sku: string;
@@ -51,7 +51,7 @@ export interface Product {
   brandSlug?: string;
   price: number;
   salePrice?: number;
-  costPrice?: number; // Thêm trường giá vốn từ bản Tuấn Anh
+  costPrice?: number;
   description?: string;
   specifications?: Record<string, any>;
   mainImage?: string;
@@ -66,7 +66,6 @@ export interface Product {
   isNew: boolean;
   isBestseller: boolean;
   status: ProductStatus | string;
-  // Các trường SEO từ bản Tuấn Anh
   metaTitle?: string;
   metaDescription?: string;
   metaKeywords?: string;
@@ -117,6 +116,10 @@ export interface User {
 export interface CartItem {
   product: Product;
   quantity: number;
+  selectedVariantId?: number; // Variant được chọn (nếu có)
+  selectedVariantName?: string; // Tên variant (vd: "iPhone 14 Pro 256GB - Tím")
+  selectedVariantPrice?: number; // Giá đã tính variant adjustment
+  selectedVariantStock?: number; // Tồn kho của variant
 }
 
 // --- 5. ĐƠN HÀNG ---
@@ -162,17 +165,26 @@ export interface ProductStats {
   inactiveProducts: number;
   outOfStockCount: number;
   lowStockCount: number;
+  totalStockUnits: number;
+  totalInventoryValue: number;
+  totalSoldUnits: number;
   topSellingProducts: Array<{
     productId: number;
     name: string;
     soldQuantity: number;
     stockQuantity: number;
     mainImage: string | null;
+    price: number;
   }>;
   lowStockProducts: Array<{
     productId: number;
     name: string;
     stockQuantity: number;
+  }>;
+  categoryBreakdown: Array<{
+    categoryName: string;
+    productCount: number;
+    totalSold: number;
   }>;
 }
 
@@ -187,9 +199,31 @@ export interface OrderStats {
   totalOrders: number;
   totalRevenue: number;
   revenueThisMonth: number;
+  revenueLastMonth: number;
+  revenueToday: number;
+  revenueYesterday: number;
+  ordersToday: number;
+  ordersThisMonth: number;
+  ordersLastMonth: number;
   avgOrderValue: number;
+  completionRate: number;
+  cancellationRate: number;
   ordersByStatus: Record<string, number>;
-  recentOrders: Array<Partial<Order>>;
+  paymentMethodStats: Record<string, number>;
+  paymentMethodRevenue: Record<string, number>;
+  recentOrders: Array<any>;
+  revenueByDay: Array<{ date: string; revenue: number; orderCount: number }>;
+  returnStats: {
+    total: number;
+    pending: number;
+    refunded: number;
+  };
+  topCustomers: Array<{
+    name: string;
+    email: string;
+    orderCount: number;
+    totalSpent: number;
+  }>;
 }
 
 export interface ProductFilter {
@@ -199,6 +233,9 @@ export interface ProductFilter {
   brandSlug?: string;
   status?: string;
   isFeatured?: boolean;
+  isNew?: boolean;
+  isBestseller?: boolean;
+  onSale?: boolean;
   sort?: string;
   page?: number;
   limit?: number;

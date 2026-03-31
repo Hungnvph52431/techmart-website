@@ -9,6 +9,13 @@ import { addressService, type Address } from "@/services/address.service";
 import api from "@/services/api";
 import toast from "react-hot-toast";
 
+const BACKEND_URL = (import.meta.env.VITE_API_URL as string)?.replace('/api', '') || 'http://localhost:5001';
+const getImageUrl = (url?: string | null) => {
+  if (!url) return '/placeholder.jpg';
+  if (url.startsWith('http')) return url;
+  return `${BACKEND_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
 // ─── Voucher Popup ──────────────────────────────────────────────────────────
 interface CouponItem {
   couponId: number;
@@ -163,7 +170,7 @@ export const CheckoutPage = () => {
     walletService.getBalance().then((balance) => updateUser({ walletBalance: balance })).catch(() => {});
   }, []);
 
-  const [paymentMethod, setPaymentMethod] = useState<"cod" | "bank_transfer" | "vnpay" | "wallet">("cod");
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "vnpay" | "wallet">("cod");
   const [loading, setLoading] = useState(false);
 
   // Voucher states
@@ -204,8 +211,9 @@ export const CheckoutPage = () => {
   }, []);
 
   // Chỉ thanh toán các sản phẩm đang được chọn trong giỏ.
-  // Nếu người dùng chưa chọn gì thì getSelectedItems() sẽ trả về toàn bộ items.
-  const checkoutItems = getSelectedItems();
+  const selectedItems = getSelectedItems();
+  // Fallback: nếu không có sản phẩm nào được chọn (vd: localStorage cũ), dùng tất cả
+  const checkoutItems = selectedItems.length > 0 ? selectedItems : items;
 
   // Nếu vào checkout mà giỏ hàng trống (vd: bấm Back sau khi đã đặt) → redirect
   useEffect(() => {
@@ -278,11 +286,21 @@ export const CheckoutPage = () => {
       setLoading(true);
 
       const orderData = {
-        items: checkoutItems.map((item) => ({
-          productId: item.product.productId,
-          quantity: item.quantity,
-          price: item.product.salePrice || item.product.price,
-        })),
+        items: checkoutItems.map((item) => {
+          const basePrice = Number(item.product.salePrice || item.product.price);
+          const variant = item.selectedVariantId && item.product.variants
+            ? item.product.variants.find(v => v.variantId === item.selectedVariantId)
+            : undefined;
+          const price = variant?.priceAdjustment != null
+            ? basePrice + Number(variant.priceAdjustment)
+            : basePrice;
+          return {
+            productId: item.product.productId,
+            quantity: item.quantity,
+            price,
+            variantId: item.selectedVariantId,
+          };
+        }),
         shippingName: form.shippingName,
         shippingPhone: form.shippingPhone,
         shippingAddress: form.shippingAddress,
@@ -304,12 +322,6 @@ export const CheckoutPage = () => {
           orderId: result.orderId,
         });
         window.location.href = data.paymentUrl;
-        return;
-      }
-
-      if (paymentMethod === 'bank_transfer') {
-        clearCart();
-        navigate(`/payment/bank-transfer/${result.orderId}`);
         return;
       }
 
@@ -567,25 +579,6 @@ export const CheckoutPage = () => {
                   )}
                 </button>
 
-                {/* QR Banking */}
-                <button
-                  onClick={() => setPaymentMethod("bank_transfer")}
-                  className={`flex items-center gap-4 p-5 rounded-2xl border-2 transition-all ${
-                    paymentMethod === "bank_transfer"
-                      ? "border-blue-600 bg-blue-50"
-                      : "border-gray-100 hover:border-gray-300"
-                  }`}
-                >
-                  <span className="text-3xl">📱</span>
-                  <div className="text-left">
-                    <p className="font-black text-sm uppercase tracking-widest">Chuyển khoản QR</p>
-                    <p className="text-xs text-gray-400 font-bold">VietQR - Tất cả ngân hàng</p>
-                  </div>
-                  {paymentMethod === "bank_transfer" && (
-                    <span className="ml-auto text-blue-600 font-black text-lg">✓</span>
-                  )}
-                </button>
-
                 {/* Ví TechMart */}
                 <button
                   onClick={() => setPaymentMethod("wallet")}
@@ -635,15 +628,6 @@ export const CheckoutPage = () => {
                 </button>
               </div>
 
-              {/* Thông báo khi chọn chuyển khoản */}
-              {paymentMethod === "bank_transfer" && (
-                <div className="mt-6 flex items-center gap-3 bg-blue-50 rounded-2xl p-4 border border-blue-200">
-                  <span className="text-2xl">📱</span>
-                  <p className="text-xs font-bold text-blue-700">
-                    Sau khi đặt hàng, bạn sẽ được chuyển đến trang mã QR để thanh toán qua ngân hàng.
-                  </p>
-                </div>
-              )}
             </div>
           </div>
 
@@ -659,7 +643,7 @@ export const CheckoutPage = () => {
                 {checkoutItems.map((item) => (
                   <div key={item.product.productId} className="flex gap-3">
                     <img
-                      src={item.product.mainImage || "/placeholder.jpg"}
+                      src={getImageUrl(item.product.mainImage)}
                       alt={item.product.name}
                       className="w-16 h-16 object-contain rounded-2xl bg-gray-50 border border-gray-100"
                     />

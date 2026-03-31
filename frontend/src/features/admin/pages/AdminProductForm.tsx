@@ -264,11 +264,32 @@ export const AdminProductForm = () => {
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             >
                                 <option value="">-- Chọn danh mục --</option>
-                                {categories.map((cat) => (
-                                    <option key={cat.categoryId} value={cat.categoryId}>
-                                        {cat.name}
-                                    </option>
-                                ))}
+                                {(() => {
+                                    const parentCats = categories.filter(c => !c.parentId);
+                                    const childCats = categories.filter(c => c.parentId);
+                                    return parentCats.map(parent => {
+                                        const children = childCats.filter(c => c.parentId === parent.categoryId);
+                                        if (children.length === 0) {
+                                            // Danh mục cha chưa có con -> hiển thị nhóm với thông báo
+                                            return (
+                                                <optgroup key={parent.categoryId} label={`📁 ${parent.name}`}>
+                                                    <option disabled style={{ color: '#999', fontStyle: 'italic' }}>
+                                                        -- Chưa có danh mục con --
+                                                    </option>
+                                                </optgroup>
+                                            );
+                                        }
+                                        return (
+                                            <optgroup key={parent.categoryId} label={`📁 ${parent.name}`}>
+                                                {children.map(child => (
+                                                    <option key={child.categoryId} value={child.categoryId}>
+                                                        {child.name}
+                                                    </option>
+                                                ))}
+                                            </optgroup>
+                                        );
+                                    });
+                                })()}
                             </select>
                         </div>
                     </div>

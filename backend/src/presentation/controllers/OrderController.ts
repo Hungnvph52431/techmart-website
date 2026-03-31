@@ -257,12 +257,13 @@ getReturns = async (req: AuthRequest, res: Response) => {
 };  
 
   /** Lấy thống kê đơn hàng cho Dashboard */
-  getStats = async (_req: Request, res: Response) => {
+  getStats = async (req: Request, res: Response) => {
     try {
-      const stats = await this.orderUseCase.getOrderStats();
+      const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
+      const stats = await this.orderUseCase.getOrderStats(startDate, endDate);
       res.json({ success: true, data: stats });
     } catch (error: any) {
-      console.error('[getStats ERROR]', error);
+      console.error("[getStats ERROR]", error);
       res.status(500).json({ success: false, message: error.message });
     }
   };

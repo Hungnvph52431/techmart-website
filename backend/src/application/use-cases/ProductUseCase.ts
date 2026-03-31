@@ -65,7 +65,29 @@ export class ProductUseCase {
   }
 
   async deleteProduct(id: number) {
-    return this.productRepository.delete(id);
+    // Lấy thông tin sản phẩm để kiểm tra trạng thái
+    const product = await this.productRepository.findById(id);
+    if (!product) throw new Error('Không tìm thấy sản phẩm');
+
+    // Nếu đang active → chuyển sang inactive (ngừng bán)
+    if (product.status !== 'inactive') {
+      // Kiểm tra sản phẩm đang được sử dụng
+      const usage = await this.productRepository.checkProductInUse(id);
+      if (usage.inCart > 0 || usage.inPendingOrders > 0) {
+        const reasons: string[] = [];
+        if (usage.inCart > 0) reasons.push(`đang nằm trong giỏ hàng của ${usage.inCart} khách`);
+        if (usage.inPendingOrders > 0) reasons.push(`đang có ${usage.inPendingOrders} đơn hàng chờ xử lý`);
+        throw new Error(
+          `Không thể xóa sản phẩm vì ${reasons.join(' và ')}. Sản phẩm sẽ được chuyển sang trạng thái "Ngừng bán".`
+        );
+      }
+      await this.productRepository.delete(id);
+      return { action: 'deactivated' };
+    }
+
+    // Đã inactive → xóa hẳn khỏi database
+    await this.productRepository.hardDelete(id);
+    return { action: 'deleted' };
   }
 
   async archiveProduct(id: number) {
@@ -98,7 +120,6 @@ export class ProductUseCase {
   }
 
   async getProductVariants(productId: number) {
-    // Thêm các hàm chi tiết từ Tuấn Anh để Admin quản lý dễ hơn
     return this.productRepository.findVariants(productId);
   }
 

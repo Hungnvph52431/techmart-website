@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { bannerService } from '@/services/banner.service';
-import { Banner, BannerPosition } from '@/types/banner';
+import { Banner, BannerPosition } from '@/types/banner.type';
 import { 
   Plus, Pencil, Trash2, ToggleLeft, ToggleRight, 
   ImageIcon, X, Save, Loader2, GripVertical
@@ -347,7 +347,7 @@ export const AdminBanners = () => {
                 </div>
 
                 <div className="space-y-3">
-                  {items.map(banner => (
+                  {items.map((banner: Banner) => (
                     <div
                       key={banner.bannerId}
                       className={`bg-white rounded-3xl border p-4 flex items-center gap-5 transition-all hover:shadow-md ${

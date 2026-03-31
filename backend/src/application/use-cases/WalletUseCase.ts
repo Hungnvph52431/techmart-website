@@ -1,6 +1,7 @@
 import pool from '../../infrastructure/database/connection';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { createPaymentUrl } from '../services/VNPayService';
+import { sendWalletTopupEmail } from '../services/EmailService';
 
 export interface WalletTopupRequest {
   requestId: number;
@@ -89,11 +90,12 @@ export class WalletUseCase {
 
     const referenceCode = generateReferenceCode();
     const now = new Date();
+    const expiresAt = new Date(now.getTime() + 15 * 60 * 1000); // 15 phút
 
     const [result] = await pool.execute<ResultSetHeader>(
-      `INSERT INTO wallet_topup_requests (user_id, amount, payment_method, status, reference_code, created_at, updated_at)
+      `INSERT INTO wallet_topup_requests (user_id, amount, payment_method, status, reference_code, created_at, expires_at)
        VALUES (?, ?, 'vnpay', 'pending', ?, ?, ?)`,
-      [userId, amount, referenceCode, now, now]
+      [userId, amount, referenceCode, now, expiresAt]
     );
 
     const paymentUrl = createPaymentUrl({
@@ -122,11 +124,31 @@ export class WalletUseCase {
       const req = mapTopup(rows[0]);
       await this._creditWallet(connection, req.userId, req.amount, 'topup', 'topup_request', req.requestId, `Nạp ví VNPay - ${req.referenceCode}`);
       await connection.execute(
-        "UPDATE wallet_topup_requests SET status = 'completed', vnpay_txn_ref = ?, completed_at = ?, updated_at = ? WHERE request_id = ?",
-        [txnNo, new Date(), new Date(), req.requestId]
+        "UPDATE wallet_topup_requests SET status = 'completed', vnpay_txn_ref = ?, completed_at = ? WHERE request_id = ?",
+        [txnNo, new Date(), req.requestId]
       );
 
       await connection.commit();
+
+      // Gửi email thông báo nạp ví thành công (fire-and-forget)
+      try {
+        const [userRows] = await pool.execute<RowDataPacket[]>(
+          'SELECT name, email, wallet_balance FROM users WHERE user_id = ?',
+          [req.userId]
+        );
+        const u = (userRows as RowDataPacket[])[0];
+        if (u?.email) {
+          sendWalletTopupEmail({
+            customerName: u.name || 'Khách hàng',
+            customerEmail: u.email,
+            referenceCode: req.referenceCode,
+            amount: req.amount,
+            newBalance: Number(u.wallet_balance),
+          }).catch((err) => console.error('[WalletUseCase] Lỗi gửi email nạp ví:', err));
+        }
+      } catch (emailErr) {
+        console.error('[WalletUseCase] Lỗi query user cho email:', emailErr);
+      }
     } catch (e) {
       await connection.rollback();
       throw e;
@@ -138,8 +160,8 @@ export class WalletUseCase {
   // Mark as failed (VNPay cancelled/failed)
   async failVNPayTopup(referenceCode: string): Promise<void> {
     await pool.execute(
-      "UPDATE wallet_topup_requests SET status = 'failed', updated_at = ? WHERE reference_code = ? AND status = 'pending'",
-      [new Date(), referenceCode]
+      "UPDATE wallet_topup_requests SET status = 'failed' WHERE reference_code = ? AND status = 'pending'",
+      [referenceCode]
     );
   }
 

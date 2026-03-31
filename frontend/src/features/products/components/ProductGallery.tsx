@@ -1,5 +1,12 @@
 import { useState } from "react";
 
+const BACKEND_URL = (import.meta.env.VITE_API_URL as string)?.replace('/api', '') || 'http://localhost:5001';
+const getImageUrl = (url?: string | null) => {
+  if (!url) return '/placeholder.jpg';
+  if (url.startsWith('http')) return url;
+  return `${BACKEND_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
 interface Props {
   images: string[];
 }
@@ -11,7 +18,7 @@ export const ProductGallery = ({ images }: Props) => {
     <div>
 
       <img
-        src={mainImage}
+        src={getImageUrl(mainImage)}
         className="w-full h-[400px] object-cover rounded-lg"
       />
 
@@ -20,7 +27,7 @@ export const ProductGallery = ({ images }: Props) => {
         {images.map((img, index) => (
           <img
             key={index}
-            src={img}
+            src={getImageUrl(img)}
             onClick={() => setMainImage(img)}
             className="w-20 h-20 object-cover rounded cursor-pointer border"
           />
