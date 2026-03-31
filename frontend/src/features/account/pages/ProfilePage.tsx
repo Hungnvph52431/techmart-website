@@ -740,12 +740,27 @@ export const ProfilePage = () => {
   };
 
   const handleSaveAddress = async (data: AddressFormData) => {
+    const others = editingAddress
+      ? addresses.filter(a => a.addressId !== editingAddress.addressId)
+      : addresses;
+
+    const nameInput = data.fullName.trim().toLowerCase();
+    const phoneInput = data.phone.trim();
+    const dupName = others.some(a => a.fullName.trim().toLowerCase() === nameInput);
+    const dupPhone = others.some(a => a.phone.trim() === phoneInput);
+
+    if (dupName) toast.error('Tên người nhận đã tồn tại');
+    if (dupPhone) toast.error('Số điện thoại đã tồn tại');
+    if (dupName || dupPhone) return;
+
     try {
       if (editingAddress) { await addressService.update(editingAddress.addressId, data); toast.success('Đã cập nhật địa chỉ'); }
       else { await addressService.create(data); toast.success('Đã thêm địa chỉ mới'); }
       setShowModal(false); setEditingAddress(undefined);
       setAddresses(await addressService.getMyAddresses());
-    } catch { toast.error('Không thể lưu địa chỉ'); }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Không thể lưu địa chỉ');
+    }
   };
 
   const handleDeleteAddress = async (id: number) => {
