@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart, User, Search, Wallet, X, Flame, UserCircle, Package, LogOut, Shield } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useCartStore } from '@/store/cartStore';
+import { useCheckoutSessionStore } from '@/store/checkoutSessionStore';
 import { productService } from '@/services/product.service';
 import { categoryService, type Category } from '@/services/category.service';
 import type { Product } from '@/types';
@@ -21,6 +22,7 @@ export const Header = () => {
 
   // Lấy dữ liệu từ Cart Store (Tích hợp thêm Mini Cart của Tuấn Anh)
   const { getTotalItems, items, getTotalPrice } = useCartStore();
+  const { clearDirectCheckout } = useCheckoutSessionStore();
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
@@ -300,7 +302,7 @@ export const Header = () => {
                         <button onClick={() => navigate('/cart')} className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-blue-600 bg-white border-2 border-blue-600 hover:bg-blue-50 rounded-xl transition-all">
                           Giỏ hàng
                         </button>
-                        <button onClick={() => navigate('/checkout')} className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-100 rounded-xl transition-all">
+                        <button onClick={() => { clearDirectCheckout(); navigate('/checkout'); }} className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-100 rounded-xl transition-all">
                           Thanh toán
                         </button>
                       </div>

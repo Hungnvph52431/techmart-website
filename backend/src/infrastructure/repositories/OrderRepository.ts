@@ -192,11 +192,29 @@ export class OrderRepository implements IOrderRepository {
       const orderId = orderResult.insertId;
 
       for (const item of orderData.items) {
-        const product = await this.getProductSnapshot(connection, item.productId);
+        const product = await this.getProductSnapshot(
+          connection,
+          item.productId,
+          item.variantId
+        );
         await connection.execute(
-          `INSERT INTO order_details (order_id, product_id, variant_id, product_name, price, quantity, subtotal, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [orderId, item.productId, item.variantId || null, product.name, item.price, item.quantity, item.price * item.quantity, now]
+          `INSERT INTO order_details (
+            order_id, product_id, variant_id, product_name, variant_name, sku,
+            price, quantity, subtotal, created_at
+          )
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            orderId,
+            item.productId,
+            item.variantId || null,
+            product.name,
+            product.variantName || null,
+            product.sku || null,
+            item.price,
+            item.quantity,
+            item.price * item.quantity,
+            now,
+          ]
         );
       }
 
@@ -582,9 +600,18 @@ export class OrderRepository implements IOrderRepository {
     const orderReturn = this.mapRowToOrderReturn(rows[0]);
 
     const [itemRows] = await pool.execute<RowDataPacket[]>(
-      `SELECT ori.*, od.product_id, od.variant_id, od.product_name, od.price
+      `SELECT
+          ori.*,
+          od.product_id,
+          od.variant_id,
+          od.product_name,
+          od.price,
+          COALESCE(od.variant_name, pv.variant_name) AS resolved_variant_name,
+          COALESCE(od.sku, pv.sku, p.sku) AS resolved_sku
        FROM order_return_items ori
        JOIN order_details od ON od.order_detail_id = ori.order_detail_id
+       LEFT JOIN product_variants pv ON od.variant_id = pv.variant_id
+       LEFT JOIN products p ON od.product_id = p.product_id
        WHERE ori.order_return_id = ?`,
       [orderReturnId]
     );
@@ -893,9 +920,29 @@ export class OrderRepository implements IOrderRepository {
   }
 
   // --- PRIVATE DB HELPERS ---
-  private async getProductSnapshot(executor: SqlExecutor, id: number) {
-    const [rows] = await executor.execute<RowDataPacket[]>('SELECT name FROM products WHERE product_id = ?', [id]);
-    return rows[0];
+  private async getProductSnapshot(
+    executor: SqlExecutor,
+    id: number,
+    variantId?: number
+  ) {
+    const [rows] = await executor.execute<RowDataPacket[]>(
+      `SELECT
+          p.name,
+          p.sku AS product_sku,
+          pv.variant_name,
+          pv.sku AS variant_sku
+       FROM products p
+       LEFT JOIN product_variants pv
+         ON pv.variant_id = ? AND pv.product_id = p.product_id
+       WHERE p.product_id = ?`,
+      [variantId ?? null, id]
+    );
+    const row = rows[0] || {};
+    return {
+      name: row.name,
+      variantName: row.variant_name ?? null,
+      sku: row.variant_sku ?? row.product_sku ?? null,
+    };
   }
 
   private async exportInventory(
@@ -1031,9 +1078,14 @@ export class OrderRepository implements IOrderRepository {
 
   private async getOrderDetailsWithExecutor(executor: SqlExecutor, id: number): Promise<OrderDetail[]> {
     const [rows] = await executor.execute<RowDataPacket[]>(
-      `SELECT od.*, p.main_image AS product_image
+      `SELECT
+          od.*,
+          p.main_image AS product_image,
+          COALESCE(od.variant_name, pv.variant_name) AS resolved_variant_name,
+          COALESCE(od.sku, pv.sku, p.sku) AS resolved_sku
        FROM order_details od
        LEFT JOIN products p ON od.product_id = p.product_id
+       LEFT JOIN product_variants pv ON od.variant_id = pv.variant_id
        WHERE od.order_id = ?`,
       [id]
     );
@@ -1078,7 +1130,10 @@ export class OrderRepository implements IOrderRepository {
     return {
       orderDetailId: row.order_detail_id, orderId: row.order_id, productId: row.product_id,
       variantId: row.variant_id ?? undefined,
-      productName: row.product_name, variantName: row.variant_name || '', productImage: row.product_image || '',
+      productName: row.product_name,
+      variantName: row.resolved_variant_name || row.variant_name || '',
+      sku: row.resolved_sku || row.sku || undefined,
+      productImage: row.product_image || '',
       price: Number(row.price), quantity: Number(row.quantity),
       subtotal: Number(row.subtotal), createdAt: row.created_at
     };
@@ -1125,6 +1180,8 @@ export class OrderRepository implements IOrderRepository {
       productId:         row.product_id,
       variantId:         row.variant_id ?? undefined,
       productName:       row.product_name ?? undefined,
+      variantName:       row.resolved_variant_name || row.variant_name || undefined,
+      sku:               row.resolved_sku || row.sku || undefined,
       quantity:          Number(row.quantity),
       reason:            row.reason ?? undefined,
       restockAction:     row.restock_action ?? 'inspect',

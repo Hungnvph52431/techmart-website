@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { useCartStore } from '@/store/cartStore';
+import { useCheckoutSessionStore } from '@/store/checkoutSessionStore';
 import { productService } from '@/services/product.service';
 import toast from 'react-hot-toast';
 import { Trash2, Plus, Minus, ShoppingCart } from 'lucide-react';
@@ -20,6 +21,7 @@ const getImageUrl = (url?: string | null) => {
 };
 
 export const CartPage = () => {
+  const { clearDirectCheckout } = useCheckoutSessionStore();
   const {
     items,
     removeItem,
@@ -423,6 +425,7 @@ export const CartPage = () => {
               ) : (
                 <Link
                   to="/checkout"
+                  onClick={clearDirectCheckout}
                   className="block w-full bg-primary-600 text-white text-center py-3 rounded-lg hover:bg-primary-700 transition-colors"
                 >
                   Tiến hành thanh toán
