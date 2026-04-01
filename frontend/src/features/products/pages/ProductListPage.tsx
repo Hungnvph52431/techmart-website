@@ -28,7 +28,10 @@ export const ProductListPage = () => {
           categorySlug: searchParams.get("category")?.toLowerCase() || undefined,
           brandSlug:    searchParams.get("brand")?.toLowerCase()    || undefined,
           search:       searchParams.get("search")                  || undefined,
-          isFeatured:   searchParams.get("featured") === "true" ? true : undefined,
+          isFeatured:   searchParams.get("isFeatured") === "true" || searchParams.get("featured") === "true" ? true : undefined,
+          isBestseller: searchParams.get("isBestseller") === "true" ? true : undefined,
+          isNew:        searchParams.get("isNew") === "true" ? true : undefined,
+          onSale:       searchParams.get("onSale") === "true" ? true : undefined,
           sort:         searchParams.get("sort")                    || undefined,
           // ✅ Thêm spec filters
           ram:          searchParams.get("ram")                     || undefined,
