@@ -12,6 +12,7 @@ import {
   canRequestReturn,
   getAllowedNextPaymentStatuses,
   getAllowedNextOrderStatuses,
+  RETURN_DEADLINE_DAYS,
 } from '../policies/OrderLifecycle';
 
 const formatAddress = (order: Order) =>
@@ -100,11 +101,47 @@ const toReturn = (item: OrderReturn, actor: 'admin' | 'customer') => ({
   })),
 });
 
-const toLifecycleFlags = (status: OrderStatus, actorRole: 'admin' | 'customer') => ({
-  canCancel: canCancelOrder(status, actorRole),
-  canRequestReturn: actorRole === 'customer' ? canRequestReturn(status) : canRequestReturn(status),
-  allowedNextStatuses: actorRole === 'admin' ? getAllowedNextOrderStatuses(status) : [],
-});
+const getReturnWindowMeta = (order: Order | OrderListItem) => {
+  const deliveredAt = order.deliveredAt ? new Date(order.deliveredAt) : undefined;
+  if (!deliveredAt) {
+    return {
+      returnDeadlineAt: undefined,
+      returnWindowDays: RETURN_DEADLINE_DAYS,
+      returnWindowExpired: false,
+    };
+  }
+
+  const returnDeadlineAt = new Date(deliveredAt);
+  returnDeadlineAt.setDate(returnDeadlineAt.getDate() + RETURN_DEADLINE_DAYS);
+
+  return {
+    returnDeadlineAt,
+    returnWindowDays: RETURN_DEADLINE_DAYS,
+    returnWindowExpired: new Date() > returnDeadlineAt,
+  };
+};
+
+const toLifecycleFlags = (
+  order: Order | OrderListItem,
+  actorRole: 'admin' | 'customer'
+) => {
+  const returnWindow = getReturnWindowMeta(order);
+  const withinReturnWindow =
+    !returnWindow.returnWindowExpired || !returnWindow.returnDeadlineAt;
+
+  return {
+    canCancel: canCancelOrder(order.status, actorRole),
+    canRequestReturn:
+      actorRole === 'customer'
+        ? canRequestReturn(order.status) && withinReturnWindow
+        : canRequestReturn(order.status),
+    returnDeadlineAt: returnWindow.returnDeadlineAt,
+    returnWindowDays: returnWindow.returnWindowDays,
+    returnWindowExpired: returnWindow.returnWindowExpired,
+    allowedNextStatuses:
+      actorRole === 'admin' ? getAllowedNextOrderStatuses(order.status) : [],
+  };
+};
 
 export const toOrderListItem = (
   order: OrderListItem,
@@ -125,7 +162,7 @@ export const toOrderListItem = (
   openReturnCount: order.openReturnCount,
   customer: toCustomer(order),
   shipping: toShipping(order),
-  ...toLifecycleFlags(order.status, actorRole),
+  ...toLifecycleFlags(order, actorRole),
   allowedNextPaymentStatuses:
     actorRole === 'admin' ? getAllowedNextPaymentStatuses(order.paymentStatus) : [],
 });
