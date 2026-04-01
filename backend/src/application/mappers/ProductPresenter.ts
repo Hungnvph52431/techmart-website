@@ -28,6 +28,10 @@ export const toStorefrontProduct = (product: Product) => {
     productId: product.productId,
     name: product.name,
     slug: product.slug,
+    sku: product.sku,
+    categoryId: product.categoryId,
+    categoryName: product.categoryName || '',
+    brandId: product.brandId,
     description: product.description || '',
     price: product.salePrice ?? product.price,
     originalPrice: product.price,
@@ -38,10 +42,21 @@ export const toStorefrontProduct = (product: Product) => {
     category: product.categoryName || '',
     stock: product.stockQuantity,
     stockQuantity: product.stockQuantity,  // ✅ thêm
+    soldQuantity: product.soldQuantity || 0,
+    viewCount: product.viewCount || 0,
     ratingAvg: product.ratingAvg,          // ✅ thêm
     reviewCount: product.reviewCount,      // ✅ thêm
+    hasVariants:
+      product.hasVariants ??
+      ((product.variants || []).filter((variant) => variant.isActive).length > 0),
+    variantCount:
+      product.variantCount ??
+      (product.variants || []).filter((variant) => variant.isActive).length,
     images,
     specifications: toValueMap(product.specifications),
+    isFeatured: product.isFeatured,
+    isNew: product.isNew,
+    isBestseller: product.isBestseller,
     featured: product.isFeatured,
     rating: product.ratingAvg,
     status: product.status,
