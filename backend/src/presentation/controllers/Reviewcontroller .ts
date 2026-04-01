@@ -4,6 +4,7 @@ import { Request, Response } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import pool from '../../infrastructure/database/connection';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { ReviewUseCase } from '../../application/use-cases/ReviewUseCase';
 
 const REVIEWABLE_ORDER_STATUSES = ['delivered', 'completed'] as const;
 
@@ -14,6 +15,8 @@ const EMPTY_STATS = {
 };
 
 export class ReviewController {
+  constructor(private reviewUseCase?: ReviewUseCase) {}
+
   private getPositiveInteger(
     rawValue: unknown,
     defaultValue: number,
@@ -210,6 +213,51 @@ export class ReviewController {
     return rows.length > 0 ? Number(rows[0].product_id) : null;
   }
 
+  private resolveCustomerErrorStatus(message: string) {
+    if (
+      message.includes('không tồn tại') ||
+      message.includes('not found') ||
+      message.includes('không có quyền')
+    ) {
+      return 404;
+    }
+
+    if (
+      message.includes('không thể') ||
+      message.includes('cần') ||
+      message.includes('đã') ||
+      message.includes('chỉ có thể') ||
+      message.includes('Rating') ||
+      message.includes('thiếu')
+    ) {
+      return 400;
+    }
+
+    return 500;
+  }
+
+  private mapReviewEntity(review: any) {
+    return {
+      reviewId: review.reviewId,
+      productId: review.productId,
+      userId: review.userId,
+      orderId: review.orderId,
+      orderDetailId: review.orderDetailId,
+      rating: review.rating,
+      title: review.title,
+      comment: review.comment,
+      images: review.images || [],
+      isVerifiedPurchase: Boolean(review.isVerifiedPurchase),
+      helpfulCount: Number(review.helpfulCount || 0),
+      status: review.status,
+      editCount: Number(review.editCount || 0),
+      editedAfterReturnAt: review.editedAfterReturnAt,
+      editedAfterReturnOrderReturnId: review.editedAfterReturnOrderReturnId,
+      createdAt: review.createdAt,
+      updatedAt: review.updatedAt,
+    };
+  }
+
   // ── CUSTOMER: Lấy reviews theo sản phẩm (chỉ approved) ───────────────────
   getByProduct = async (req: Request, res: Response) => {
     try {
@@ -289,6 +337,34 @@ export class ReviewController {
     }
   };
 
+  getMyOrderSummary = async (req: AuthRequest, res: Response) => {
+    try {
+      const orderId = Number(req.params.orderId);
+      if (!Number.isInteger(orderId) || orderId <= 0) {
+        return res.status(400).json({ message: 'orderId không hợp lệ' });
+      }
+
+      if (!this.reviewUseCase) {
+        return res.status(500).json({ message: 'ReviewUseCase chưa được khởi tạo' });
+      }
+
+      const summary = await this.reviewUseCase.getMyOrderReviewSummary(
+        orderId,
+        req.user.userId
+      );
+
+      if (!summary) {
+        return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
+      }
+
+      return res.json(summary);
+    } catch (error: any) {
+      return res
+        .status(this.resolveCustomerErrorStatus(error.message || 'Unknown error'))
+        .json({ message: error.message });
+    }
+  };
+
   // ── CUSTOMER: Kiểm tra xem user đã mua sản phẩm này chưa ─────────────────
   // GET /api/reviews/can-review/:productId
   checkCanReview = async (req: AuthRequest, res: Response) => {
@@ -333,11 +409,41 @@ export class ReviewController {
   // ── CUSTOMER: Tạo review mới (CHỈ CHO PHÉP NẾU ĐÃ MUA HÀNG) ─────────────
   create = async (req: AuthRequest, res: Response) => {
     try {
-      const { productId, rating, title, comment } = req.body;
+      const {
+        productId,
+        orderId: orderIdInput,
+        orderDetailId: orderDetailIdInput,
+        rating,
+        title,
+        comment,
+      } = req.body;
       const userId = req.user.userId;
 
       if (!productId || !rating || rating < 1 || rating > 5) {
         return res.status(400).json({ message: 'Thiếu thông tin hoặc rating không hợp lệ (1-5)' });
+      }
+
+      if (orderIdInput && orderDetailIdInput) {
+        if (!this.reviewUseCase) {
+          return res.status(500).json({ message: 'ReviewUseCase chưa được khởi tạo' });
+        }
+
+        const review = await this.reviewUseCase.submitProductReview(
+          Number(orderIdInput),
+          Number(orderDetailIdInput),
+          userId,
+          {
+            rating: Number(rating),
+            title,
+            comment,
+          }
+        );
+
+        if (!review) {
+          return res.status(404).json({ message: 'Không tìm thấy đơn hàng hoặc sản phẩm trong đơn' });
+        }
+
+        return res.status(201).json(this.mapReviewEntity(review));
       }
 
       // ✅ BẮT BUỘC: Kiểm tra đã mua hàng và user đã xác nhận nhận hàng (completed)
@@ -376,7 +482,45 @@ export class ReviewController {
 
       res.status(201).json({ reviewId: result.insertId, message: 'Đánh giá thành công!' });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res
+        .status(this.resolveCustomerErrorStatus(error.message || 'Unknown error'))
+        .json({ message: error.message });
+    }
+  };
+
+  updateMine = async (req: AuthRequest, res: Response) => {
+    try {
+      const reviewId = Number(req.params.reviewId);
+      const userId = req.user.userId;
+      const { rating, title, comment } = req.body;
+
+      if (!Number.isInteger(reviewId) || reviewId <= 0) {
+        return res.status(400).json({ message: 'reviewId không hợp lệ' });
+      }
+
+      if (!this.reviewUseCase) {
+        return res.status(500).json({ message: 'ReviewUseCase chưa được khởi tạo' });
+      }
+
+      const review = await this.reviewUseCase.updateProductReviewAfterReturn(
+        reviewId,
+        userId,
+        {
+          rating: Number(rating),
+          title,
+          comment,
+        }
+      );
+
+      if (!review) {
+        return res.status(404).json({ message: 'Không tìm thấy đánh giá cần sửa' });
+      }
+
+      return res.json(this.mapReviewEntity(review));
+    } catch (error: any) {
+      return res
+        .status(this.resolveCustomerErrorStatus(error.message || 'Unknown error'))
+        .json({ message: error.message });
     }
   };
 
@@ -474,6 +618,12 @@ export class ReviewController {
       isVerifiedPurchase: Boolean(row.is_verified_purchase),
       helpfulCount: Number(row.helpful_count || 0),
       status: row.status,
+      editCount: Number(row.edit_count || 0),
+      editedAfterReturnAt: row.edited_after_return_at,
+      editedAfterReturnOrderReturnId:
+        row.edited_after_return_order_return_id != null
+          ? Number(row.edited_after_return_order_return_id)
+          : undefined,
       createdAt: row.created_at,
     };
   }

@@ -238,7 +238,10 @@ CREATE TABLE reviews (
     images JSON,
     is_verified_purchase BOOLEAN DEFAULT FALSE,
     helpful_count INT DEFAULT 0,
+    edit_count INT DEFAULT 0,
     status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    edited_after_return_at TIMESTAMP NULL,
+    edited_after_return_order_return_id INT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE,
@@ -249,7 +252,8 @@ CREATE TABLE reviews (
     INDEX idx_order (order_id),
     INDEX idx_order_detail (order_detail_id),
     INDEX idx_status (status),
-    INDEX idx_rating (rating)
+    INDEX idx_rating (rating),
+    INDEX idx_review_return_edit (edited_after_return_order_return_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================

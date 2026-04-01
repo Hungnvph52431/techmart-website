@@ -18,9 +18,11 @@ export const createReviewRoutes = (reviewController: ReviewController) => {
   // ── AUTH: Kiểm tra quyền review ──────────────────────────────────────────
   // Frontend gọi: GET /api/reviews/can-review/:productId
   router.get('/can-review/:productId', authMiddleware, reviewController.checkCanReview);
+  router.get('/orders/:orderId/summary', authMiddleware, reviewController.getMyOrderSummary);
 
   // ── AUTH: Tạo review mới ─────────────────────────────────────────────────
   router.post('/', authMiddleware, reviewController.create);
+  router.patch('/:reviewId', authMiddleware, reviewController.updateMine);
 
   return router;
 };

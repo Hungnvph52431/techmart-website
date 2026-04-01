@@ -16,6 +16,9 @@ export interface Review {
   isVerifiedPurchase: boolean;
   helpfulCount: number;
   status: 'pending' | 'approved' | 'rejected';
+  editCount?: number;
+  editedAfterReturnAt?: string;
+  editedAfterReturnOrderReturnId?: number;
   createdAt: string;
 }
 
@@ -49,6 +52,45 @@ export interface CreateReviewPayload {
   comment?: string;
 }
 
+export interface UpdateReviewPayload {
+  rating: number;
+  title?: string;
+  comment?: string;
+}
+
+export interface OrderReviewItemSummary {
+  orderDetailId: number;
+  productId: number;
+  productName: string;
+  variantName?: string;
+  sku?: string;
+  productImage?: string;
+  quantity: number;
+  canReview: boolean;
+  canCreateReview: boolean;
+  canEditReview: boolean;
+  hasUsedReturnEdit: boolean;
+  remainingEditCount: number;
+  reviewEditLimit: number;
+  linkedReturnId?: number;
+  review?: Review;
+}
+
+export interface OrderReviewSummary {
+  orderId: number;
+  orderStatus: string;
+  canReviewOrder: boolean;
+  orderFeedback?: {
+    orderFeedbackId: number;
+    rating: number;
+    title?: string;
+    comment?: string;
+    createdAt: string;
+  };
+  hasPendingReviewActions: boolean;
+  items: OrderReviewItemSummary[];
+}
+
 export const reviewService = {
   // ── CUSTOMER ──────────────────────────────────────────────────────────────
 
@@ -68,6 +110,16 @@ export const reviewService = {
   // Tạo review mới
   create: async (payload: CreateReviewPayload): Promise<Review> => {
     const res = await api.post('/reviews', payload);
+    return res.data;
+  },
+
+  update: async (reviewId: number, payload: UpdateReviewPayload): Promise<Review> => {
+    const res = await api.patch(`/reviews/${reviewId}`, payload);
+    return res.data;
+  },
+
+  getOrderSummary: async (orderId: number): Promise<OrderReviewSummary> => {
+    const res = await api.get(`/reviews/orders/${orderId}/summary`);
     return res.data;
   },
 

@@ -56,6 +56,9 @@ export interface OrderListItemView {
   shipping: OrderShippingInfo;
   canCancel: boolean;
   canRequestReturn: boolean;
+  returnDeadlineAt?: string;
+  returnWindowDays?: number;
+  returnWindowExpired?: boolean;
   allowedNextStatuses: OrderStatus[];
   allowedNextPaymentStatuses: PaymentStatus[];
 }
