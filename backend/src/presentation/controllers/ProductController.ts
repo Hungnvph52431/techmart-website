@@ -55,6 +55,7 @@ getAll = async (req: Request, res: Response) => {
       isFeatured: req.query.featured === 'true' || req.query.isFeatured === 'true',
       isNew: req.query.isNew === 'true',
       isBestseller: req.query.isBestseller === 'true',
+      onSale: req.query.onSale === 'true',
       status: req.query.status as string || undefined,
       ram:      req.query.ram      as string || undefined,
       storage:  req.query.storage  as string || undefined,
