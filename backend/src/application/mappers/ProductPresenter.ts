@@ -46,6 +46,12 @@ export const toStorefrontProduct = (product: Product) => {
     viewCount: product.viewCount || 0,
     ratingAvg: product.ratingAvg,          // ✅ thêm
     reviewCount: product.reviewCount,      // ✅ thêm
+    hasVariants:
+      product.hasVariants ??
+      ((product.variants || []).filter((variant) => variant.isActive).length > 0),
+    variantCount:
+      product.variantCount ??
+      (product.variants || []).filter((variant) => variant.isActive).length,
     images,
     specifications: toValueMap(product.specifications),
     isFeatured: product.isFeatured,
