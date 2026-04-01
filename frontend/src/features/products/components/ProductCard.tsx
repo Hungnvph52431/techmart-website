@@ -59,7 +59,6 @@ export const ProductCard = ({ product }: ProductCardProps) => {
     if (!hasVariants) {
       addItem(product);
       toast.success(`Đã thêm ${product.name} vào giỏ hàng!`);
-      navigate("/cart");
       return;
     }
 
@@ -85,7 +84,6 @@ export const ProductCard = ({ product }: ProductCardProps) => {
       if (!detailHasVariants) {
         addItem(detail);
         toast.success(`Đã thêm ${product.name} vào giỏ hàng!`);
-        navigate("/cart");
         return;
       }
 
