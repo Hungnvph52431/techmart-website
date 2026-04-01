@@ -20,14 +20,12 @@ interface VariantPickerModalProps {
   product: Product;
   open: boolean;
   onClose: () => void;
-  onAddedToCart?: () => void;
 }
 
 export const VariantPickerModal = ({
   product,
   open,
   onClose,
-  onAddedToCart,
 }: VariantPickerModalProps) => {
   const { addItem, items } = useCartStore();
   const variants = product.variants ?? [];
@@ -192,7 +190,6 @@ export const VariantPickerModal = ({
     addItem(product, nextQuantity, selectedVariantId);
     toast.success(`Đã thêm ${product.name} vào giỏ hàng!`);
     onClose();
-    onAddedToCart?.();
   };
 
   return (
