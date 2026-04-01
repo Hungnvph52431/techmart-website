@@ -23,6 +23,7 @@ export const CartPage = () => {
   const {
     items,
     removeItem,
+    removeSelectedItems,
     updateQuantity,
     getTotalItems,
     selectedProductIds,
@@ -157,6 +158,24 @@ export const CartPage = () => {
     }
   };
 
+  const handleRemoveSelectedItems = () => {
+    if (selectedCount === 0) {
+      return;
+    }
+
+    const productLabel = selectedCount === 1 ? 'sản phẩm đã chọn này' : `${selectedCount} sản phẩm đã chọn`;
+    if (!window.confirm(`Bạn có muốn xóa ${productLabel} khỏi giỏ hàng không?`)) {
+      return;
+    }
+
+    removeSelectedItems();
+    toast.success(
+      selectedCount === 1
+        ? 'Đã xóa sản phẩm đã chọn khỏi giỏ hàng!'
+        : `Đã xóa ${selectedCount} sản phẩm khỏi giỏ hàng!`
+    );
+  };
+
   if (items.length === 0) {
     return (
       <Layout>
@@ -199,7 +218,7 @@ export const CartPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50">
+              <div className="flex flex-col gap-3 border-b border-gray-100 bg-gray-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -212,6 +231,19 @@ export const CartPage = () => {
                     Chọn tất cả ({selectedCount}/{items.length})
                   </span>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleRemoveSelectedItems}
+                  disabled={selectedCount === 0}
+                  className={`inline-flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:w-auto ${
+                    selectedCount === 0
+                      ? 'cursor-not-allowed bg-gray-200 text-gray-400'
+                      : 'bg-red-50 text-red-600 hover:bg-red-100'
+                  }`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Xóa đã chọn {selectedCount > 0 ? `(${selectedCount})` : ''}
+                </button>
               </div>
               <AnimatePresence>
                 {items.map((item) => {
