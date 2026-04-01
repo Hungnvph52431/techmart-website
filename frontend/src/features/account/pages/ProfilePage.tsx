@@ -356,6 +356,29 @@ const AddressModal = ({ editing, onSave, onClose }: {
             matchedProvince = await searchProvince(candidate);
             if (matchedProvince) break;
           }
+
+          // Fallback: dùng ISO3166-2 code nếu không match được từ text
+          if (!matchedProvince && addr['ISO3166-2-lvl4']) {
+            const isoMap: Record<string, string> = {
+              'VN-01':'01','VN-02':'68','VN-03':'75','VN-04':'77','VN-05':'89','VN-06':'26',
+              'VN-07':'27','VN-09':'95','VN-11':'56','VN-12':'58','VN-13':'22','VN-14':'30',
+              'VN-15':'04','VN-17':'06','VN-18':'10','VN-19':'08','VN-20':'24','VN-21':'35',
+              'VN-22':'37','VN-23':'38','VN-24':'40','VN-25':'42','VN-26':'44','VN-27':'45',
+              'VN-28':'46','VN-29':'48','VN-30':'51','VN-31':'49','VN-32':'52','VN-33':'54',
+              'VN-34':'60','VN-35':'62','VN-36':'64','VN-37':'66','VN-38':'67','VN-39':'70',
+              'VN-40':'72','VN-41':'74','VN-42':'79','VN-43':'80','VN-44':'82','VN-45':'83',
+              'VN-46':'84','VN-47':'86','VN-49':'87','VN-50':'89','VN-51':'91','VN-52':'93',
+              'VN-53':'94','VN-54':'96','VN-55':'15','VN-56':'17','VN-57':'19','VN-58':'25',
+              'VN-59':'20','VN-60':'33','VN-61':'34','VN-62':'36','VN-63':'14',
+              'VN-CT':'92','VN-DN':'48','VN-HN':'01','VN-HP':'31','VN-SG':'79',
+            };
+            const isoCode = addr['ISO3166-2-lvl4'];
+            const provinceCode = isoMap[isoCode];
+            if (provinceCode) {
+              matchedProvince = provinces.find(p => p.code === provinceCode);
+            }
+          }
+
           console.log('✅ Province:', matchedProvince);
 
           if (!matchedProvince) {
@@ -379,18 +402,25 @@ const AddressModal = ({ editing, onSave, onClose }: {
             setDistricts(distList);
             setWards([]);
 
-            // Thử match quận từ các field Nominatim
+            // Thử match quận từ các field Nominatim (thêm suburb, city để cover nhiều vùng hơn)
             let matchedDistrict = await searchDistrict(
               distList,
               allFields.county, allFields.district, allFields.city_district,
-              allFields.town, allFields.municipality
+              allFields.town, allFields.municipality, allFields.suburb,
+              // city có thể chứa tên quận (Nominatim VN hay làm vậy), nhưng bỏ qua nếu trùng tỉnh
+              ...(matchedProvince && normalize(allFields.city) !== normalize(matchedProvince.name) ? [allFields.city] : [])
             );
 
             // ── Nếu không match được quận → tìm ngược từ phường ──
             // Nominatim VN hay bỏ cấp quận, chỉ trả city = "Phường X"
             // => Load depth=3 toàn tỉnh, tìm phường nằm trong quận nào
             if (!matchedDistrict) {
-              const wardHint = allFields.city || allFields.suburb || allFields.quarter || allFields.neighbourhood || allFields.village || '';
+              // Thử nhiều field, loại city nếu trùng tỉnh
+              const wardCandidates = [allFields.suburb, allFields.quarter, allFields.neighbourhood, allFields.village, allFields.hamlet, allFields.town];
+              if (allFields.city && matchedProvince && normalize(allFields.city) !== normalize(matchedProvince.name)) {
+                wardCandidates.unshift(allFields.city);
+              }
+              const wardHint = wardCandidates.find(v => v) || '';
               if (wardHint) {
                 console.log('🔍 Quận không tìm thấy, thử tìm ngược từ phường:', wardHint);
                 try {
@@ -402,7 +432,10 @@ const AddressModal = ({ editing, onSave, onClose }: {
                     const foundWard = (dist.wards || []).find((w: any) =>
                       normalize(w.name) === normalize(wardHint) ||
                       normalize(w.name) === normalize(cleanedHint) ||
-                      normalize(stripPrefix(w.name)) === normalize(cleanedHint)
+                      normalize(stripPrefix(w.name)) === normalize(cleanedHint) ||
+                      // Partial match: tên phường chứa hint hoặc ngược lại
+                      normalize(w.name).includes(normalize(cleanedHint)) ||
+                      normalize(cleanedHint).includes(normalize(stripPrefix(w.name)))
                     );
                     if (foundWard) {
                       matchedDistrict = { code: String(dist.code), name: dist.name };
@@ -424,6 +457,45 @@ const AddressModal = ({ editing, onSave, onClose }: {
                 } catch (e) { console.warn('depth=3 search failed:', e); }
               }
 
+              // Fallback: dùng provinces.open-api.vn ward search API
+              // Nominatim VN đôi khi trả tên phường không chính xác, search API có thể tìm đúng hơn
+              try {
+                const allHints = [wardHint, allFields.hamlet, allFields.city, allFields.suburb, allFields.quarter, allFields.village].filter(Boolean);
+                for (const hint of allHints) {
+                  const searchQ = stripPrefix(hint);
+                  if (!searchQ) continue;
+                  const wSearchRes = await fetch(`https://provinces.open-api.vn/api/w/search/?q=${encodeURIComponent(searchQ)}&p=${matchedProvince.code}`);
+                  const wSearchData = await wSearchRes.json();
+                  if (Array.isArray(wSearchData) && wSearchData.length > 0) {
+                    // Tìm ward match chính xác nhất
+                    const bestWard = wSearchData.find((w: any) =>
+                      normalize(w.name) === normalize(hint) ||
+                      normalize(w.name) === normalize(searchQ) ||
+                      normalize(stripPrefix(w.name)) === normalize(searchQ)
+                    ) || wSearchData[0];
+
+                    // Tra ngược quận từ depth=3 data
+                    const deepRes2 = await fetch(`https://provinces.open-api.vn/api/p/${matchedProvince.code}?depth=3`);
+                    const deepData2 = await deepRes2.json();
+                    for (const dist of (deepData2.districts || [])) {
+                      const fw = (dist.wards || []).find((w: any) => String(w.code) === String(bestWard.code));
+                      if (fw) {
+                        matchedDistrict = { code: String(dist.code), name: dist.name };
+                        const wList: VNUnit[] = (dist.wards || []).map((w: any) => ({ code: String(w.code), name: w.name }));
+                        setDistricts(distList);
+                        setWards(wList);
+                        setSelectedDistrict(matchedDistrict);
+                        setSelectedWard({ code: String(fw.code), name: fw.name });
+                        setForm(prev => ({ ...prev, district: matchedDistrict!.name, ward: fw.name }));
+                        console.log('✅ Found via ward search API — District:', matchedDistrict.name, 'Ward:', fw.name);
+                        toast.success('Đã tự động điền đầy đủ địa chỉ từ GPS');
+                        return;
+                      }
+                    }
+                  }
+                }
+              } catch (e) { console.warn('Ward search API fallback failed:', e); }
+
               // Nếu vẫn không tìm được
               setForm(prev => ({ ...prev, district: allFields.county || allFields.district || stripPrefix(allFields.city), ward: allFields.suburb || allFields.quarter || '' }));
               toast('Đã điền tỉnh/thành từ GPS, vui lòng chọn quận/huyện', { icon: '⚠️' });
@@ -440,11 +512,12 @@ const AddressModal = ({ editing, onSave, onClose }: {
             const wardList: VNUnit[] = (wardData.wards || []).map((w: any) => ({ code: String(w.code), name: w.name }));
             setWards(wardList);
 
-            // Thử match phường — thử cả allFields.city vì Nominatim hay cho phường vào field city
+            // Thử match phường — thử nhiều field, city chỉ khi không trùng tỉnh
             const matchedWard = searchWard(
               wardList,
               allFields.quarter, allFields.suburb, allFields.neighbourhood,
-              allFields.village, allFields.hamlet, allFields.city
+              allFields.village, allFields.hamlet, allFields.town,
+              ...(matchedProvince && normalize(allFields.city) !== normalize(matchedProvince.name) ? [allFields.city] : [])
             );
             console.log('✅ Ward:', matchedWard);
 
