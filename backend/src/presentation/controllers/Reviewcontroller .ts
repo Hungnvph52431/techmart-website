@@ -5,57 +5,288 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 import pool from '../../infrastructure/database/connection';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
+const REVIEWABLE_ORDER_STATUSES = ['delivered', 'completed'] as const;
+
+const EMPTY_STATS = {
+  average: 0,
+  total: 0,
+  distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+};
+
 export class ReviewController {
+  private getPositiveInteger(
+    rawValue: unknown,
+    defaultValue: number,
+    options?: { max?: number }
+  ) {
+    const value = Number(rawValue);
+    if (!Number.isFinite(value) || value < 1) {
+      return defaultValue;
+    }
+
+    const normalized = Math.trunc(value);
+    if (options?.max) {
+      return Math.min(normalized, options.max);
+    }
+
+    return normalized;
+  }
+
+  private getValidRatingFilter(rawValue: unknown) {
+    if (rawValue == null) {
+      return undefined;
+    }
+
+    const value = Number(rawValue);
+    if (!Number.isFinite(value) || value < 1 || value > 5) {
+      return undefined;
+    }
+
+    return value;
+  }
+
+  private async productExists(productId: number) {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      'SELECT product_id FROM products WHERE product_id = ? LIMIT 1',
+      [productId]
+    );
+
+    return rows.length > 0;
+  }
+
+  private mapStats(row?: any) {
+    if (!row) {
+      return EMPTY_STATS;
+    }
+
+    return {
+      average: parseFloat(row.average) || 0,
+      total: Number(row.total || 0),
+      distribution: {
+        1: Number(row.s1 || 0),
+        2: Number(row.s2 || 0),
+        3: Number(row.s3 || 0),
+        4: Number(row.s4 || 0),
+        5: Number(row.s5 || 0),
+      },
+    };
+  }
+
+  private async getProductStats(productId: number) {
+    const [statsRows] = await pool.execute<RowDataPacket[]>(
+      `SELECT COUNT(*) AS total, ROUND(COALESCE(AVG(rating), 0), 1) AS average,
+          SUM(rating = 1) AS s1, SUM(rating = 2) AS s2, SUM(rating = 3) AS s3,
+          SUM(rating = 4) AS s4, SUM(rating = 5) AS s5
+       FROM reviews
+       WHERE product_id = ? AND status = 'approved'`,
+      [productId]
+    );
+
+    return this.mapStats(statsRows[0]);
+  }
+
+  private async getFallbackStats(excludedProductId: number) {
+    const [statsRows] = await pool.execute<RowDataPacket[]>(
+      `SELECT COUNT(*) AS total, ROUND(COALESCE(AVG(rating), 0), 1) AS average,
+          SUM(rating = 1) AS s1, SUM(rating = 2) AS s2, SUM(rating = 3) AS s3,
+          SUM(rating = 4) AS s4, SUM(rating = 5) AS s5
+       FROM reviews
+       WHERE product_id <> ? AND status = 'approved' AND rating = 5`,
+      [excludedProductId]
+    );
+
+    return this.mapStats(statsRows[0]);
+  }
+
+  private async getProductReviewRows(
+    productId: number,
+    rating: number | undefined,
+    limit: number,
+    offset: number
+  ) {
+    let query = `
+      SELECT r.*, u.name AS user_name, NULL AS user_avatar, p.name AS product_name
+      FROM reviews r
+      LEFT JOIN users u ON u.user_id = r.user_id
+      LEFT JOIN products p ON p.product_id = r.product_id
+      WHERE r.product_id = ? AND r.status = 'approved'
+    `;
+    const params: any[] = [productId];
+
+    if (rating) {
+      query += ' AND r.rating = ?';
+      params.push(rating);
+    }
+
+    query += ' ORDER BY r.is_verified_purchase DESC, r.helpful_count DESC, r.created_at DESC';
+    query += ` LIMIT ${limit} OFFSET ${offset}`;
+
+    const [rows] = await pool.execute<RowDataPacket[]>(query, params);
+
+    let countQuery =
+      "SELECT COUNT(*) AS total FROM reviews WHERE product_id = ? AND status = 'approved'";
+    const countParams: any[] = [productId];
+    if (rating) {
+      countQuery += ' AND rating = ?';
+      countParams.push(rating);
+    }
+
+    const [countRows] = await pool.execute<RowDataPacket[]>(countQuery, countParams);
+
+    return {
+      reviews: rows.map((row) => this.mapReview(row)),
+      total: Number(countRows[0]?.total || 0),
+    };
+  }
+
+  private async getFallbackReviewRows(
+    excludedProductId: number,
+    rating: number | undefined,
+    limit: number,
+    offset: number
+  ) {
+    if (rating && rating !== 5) {
+      return {
+        reviews: [],
+        total: 0,
+      };
+    }
+
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT r.*, u.name AS user_name, NULL AS user_avatar, p.name AS product_name
+       FROM reviews r
+       LEFT JOIN users u ON u.user_id = r.user_id
+       LEFT JOIN products p ON p.product_id = r.product_id
+       WHERE r.product_id <> ?
+         AND r.status = 'approved'
+         AND r.rating = 5
+       ORDER BY r.is_verified_purchase DESC, r.helpful_count DESC, r.created_at DESC
+       LIMIT ${limit} OFFSET ${offset}`,
+      [excludedProductId]
+    );
+
+    const [countRows] = await pool.execute<RowDataPacket[]>(
+      `SELECT COUNT(*) AS total
+       FROM reviews
+       WHERE product_id <> ?
+         AND status = 'approved'
+         AND rating = 5`,
+      [excludedProductId]
+    );
+
+    return {
+      reviews: rows.map((row) => this.mapReview(row)),
+      total: Number(countRows[0]?.total || 0),
+    };
+  }
+
+  private async updateProductMetrics(productId: number) {
+    await pool.execute(
+      `UPDATE products
+       SET rating_avg = (
+             SELECT COALESCE(AVG(rating), 0)
+             FROM reviews
+             WHERE product_id = ?
+               AND status = 'approved'
+           ),
+           review_count = (
+             SELECT COUNT(*)
+             FROM reviews
+             WHERE product_id = ?
+               AND status = 'approved'
+           ),
+           updated_at = NOW()
+       WHERE product_id = ?`,
+      [productId, productId, productId]
+    );
+  }
+
+  private async getReviewProductId(reviewId: number) {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      'SELECT product_id FROM reviews WHERE review_id = ? LIMIT 1',
+      [reviewId]
+    );
+
+    return rows.length > 0 ? Number(rows[0].product_id) : null;
+  }
 
   // ── CUSTOMER: Lấy reviews theo sản phẩm (chỉ approved) ───────────────────
   getByProduct = async (req: Request, res: Response) => {
     try {
       const productId = Number(req.params.productId);
-      const rating = req.query.rating ? Number(req.query.rating) : undefined;
-      const page = Math.max(Number(req.query.page || 1), 1);
-      const limit = Math.min(Number(req.query.limit || 5), 20);
+      if (!Number.isInteger(productId) || productId <= 0) {
+        return res.status(400).json({ message: 'productId không hợp lệ' });
+      }
+
+      const hasProduct = await this.productExists(productId);
+      if (!hasProduct) {
+        return res.status(404).json({ message: 'Sản phẩm không tồn tại' });
+      }
+
+      const rating = this.getValidRatingFilter(req.query.rating);
+      const page = this.getPositiveInteger(req.query.page, 1);
+      const limit = this.getPositiveInteger(req.query.limit, 5, { max: 20 });
       const offset = (page - 1) * limit;
+      const productStats = await this.getProductStats(productId);
 
+      if (productStats.total > 0) {
+        const { reviews, total } = await this.getProductReviewRows(
+          productId,
+          rating,
+          limit,
+          offset
+        );
 
-      const [statsRows] = await pool.execute<RowDataPacket[]>(
-        `SELECT COUNT(*) AS total, ROUND(AVG(rating),1) AS average,
-          SUM(rating=1) AS s1, SUM(rating=2) AS s2, SUM(rating=3) AS s3,
-          SUM(rating=4) AS s4, SUM(rating=5) AS s5
-         FROM reviews WHERE product_id = ? AND status = 'approved'`,
-        [productId]
-        
+        return res.json({
+          reviewSource: 'product',
+          hasOwnReviews: true,
+          productStats,
+          stats: productStats,
+          reviews,
+          total,
+          page,
+          totalPages: Math.ceil(total / limit),
+        });
+      }
+
+      const fallbackStats = await this.getFallbackStats(productId);
+      if (fallbackStats.total === 0) {
+        return res.json({
+          reviewSource: 'empty',
+          hasOwnReviews: false,
+          productStats,
+          stats: EMPTY_STATS,
+          reviews: [],
+          total: 0,
+          page,
+          totalPages: 0,
+        });
+      }
+
+      const { reviews, total } = await this.getFallbackReviewRows(
+        productId,
+        rating,
+        limit,
+        offset
       );
-          console.log('>>> statsRows:', statsRows);
 
-      const s = statsRows[0];
-      const stats = {
-        average: parseFloat(s.average) || 0,
-        total: Number(s.total),
-        distribution: { 1: Number(s.s1), 2: Number(s.s2), 3: Number(s.s3), 4: Number(s.s4), 5: Number(s.s5) },
-      };
-
-      let query = `
-        SELECT r.*, u.name AS user_name, u.name AS user_name, NULL AS user_avatar
-        FROM reviews r LEFT JOIN users u ON u.user_id = r.user_id
-        WHERE r.product_id = ? AND r.status = 'approved'
-      `;
-      const params: any[] = [productId];
-      if (rating) { query += ' AND r.rating = ?'; params.push(rating); }
-      query += ' ORDER BY r.is_verified_purchase DESC, r.helpful_count DESC, r.created_at DESC';
-      query += ` LIMIT ${limit} OFFSET ${offset}`;
-      const [rows] = await pool.execute<RowDataPacket[]>(query, params);
-
-      let countQuery = `SELECT COUNT(*) AS total FROM reviews WHERE product_id = ? AND status = 'approved'`;
-      const countParams: any[] = [productId];
-      if (rating) { countQuery += ' AND rating = ?'; countParams.push(rating); }
-      const [countRows] = await pool.execute<RowDataPacket[]>(countQuery, countParams);
-      const total = Number(countRows[0].total);
-
-      res.json({ stats, reviews: rows.map(this.mapReview), total, page, totalPages: Math.ceil(total / limit) });
-     } catch (error: any) {
-    console.error('❌ getByProduct ERROR:', error.message, error.stack);
-    res.status(500).json({ message: error.message });
-  }
+      res.json({
+        reviewSource: 'system_fallback',
+        hasOwnReviews: false,
+        productStats,
+        stats: fallbackStats,
+        reviews,
+        total,
+        page,
+        totalPages: Math.ceil(total / limit),
+        fallbackLabel: 'Tổng hợp đánh giá 5 sao từ khách hàng trên hệ thống',
+        fallbackDescription:
+          'Sản phẩm này chưa có đánh giá riêng. Dưới đây là các đánh giá 5 sao từ những sản phẩm khác để bạn tham khảo.',
+      });
+    } catch (error: any) {
+      console.error('❌ getByProduct ERROR:', error.message, error.stack);
+      res.status(500).json({ message: error.message });
+    }
   };
 
   // ── CUSTOMER: Kiểm tra xem user đã mua sản phẩm này chưa ─────────────────
@@ -71,9 +302,9 @@ export class ReviewController {
         `SELECT od.order_detail_id, od.order_id
          FROM order_details od
          JOIN orders o ON o.order_id = od.order_id
-         WHERE o.user_id = ? AND od.product_id = ? AND o.status IN ('delivered', 'completed')
+         WHERE o.user_id = ? AND od.product_id = ? AND o.status IN (?, ?)
          LIMIT 1`,
-        [userId, productId]
+        [userId, productId, ...REVIEWABLE_ORDER_STATUSES]
       );
 
       if ((orderRows as any[]).length === 0) {
@@ -114,9 +345,9 @@ export class ReviewController {
         `SELECT od.order_detail_id, od.order_id
          FROM order_details od
          JOIN orders o ON o.order_id = od.order_id
-         WHERE o.user_id = ? AND od.product_id = ? AND o.status IN ('delivered', 'completed')
+         WHERE o.user_id = ? AND od.product_id = ? AND o.status IN (?, ?)
          LIMIT 1`,
-        [userId, productId]
+        [userId, productId, ...REVIEWABLE_ORDER_STATUSES]
       );
 
       if ((orderRows as any[]).length === 0) {
@@ -140,6 +371,8 @@ export class ReviewController {
          VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'approved')`,
         [productId, userId, orderId, orderDetailId, rating, title || null, comment || null]
       );
+
+      await this.updateProductMetrics(Number(productId));
 
       res.status(201).json({ reviewId: result.insertId, message: 'Đánh giá thành công!' });
     } catch (error: any) {
@@ -213,7 +446,11 @@ export class ReviewController {
       if (!['approved', 'rejected'].includes(status)) {
         return res.status(400).json({ message: 'Trạng thái không hợp lệ' });
       }
+      const productId = await this.getReviewProductId(Number(req.params.reviewId));
       await pool.execute('UPDATE reviews SET status = ?, updated_at = NOW() WHERE review_id = ?', [status, req.params.reviewId]);
+      if (productId) {
+        await this.updateProductMetrics(productId);
+      }
       res.json({ success: true, message: status === 'approved' ? 'Đã hiện review' : 'Đã ẩn review' });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

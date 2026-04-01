@@ -25,6 +25,21 @@ export interface ReviewStats {
   distribution: Record<number, number>; // { 1: 5, 2: 3, 3: 10, 4: 25, 5: 57 }
 }
 
+export type ReviewSource = 'product' | 'system_fallback' | 'empty';
+
+export interface ProductReviewResponse {
+  reviewSource: ReviewSource;
+  hasOwnReviews: boolean;
+  productStats: ReviewStats;
+  stats: ReviewStats;
+  reviews: Review[];
+  total: number;
+  page: number;
+  totalPages: number;
+  fallbackLabel?: string;
+  fallbackDescription?: string;
+}
+
 export interface CreateReviewPayload {
   productId: number;
   orderId?: number;
@@ -41,7 +56,7 @@ export const reviewService = {
   getByProduct: async (
     productId: number,
     params?: { rating?: number; page?: number; limit?: number }
-  ): Promise<{ reviews: Review[]; stats: ReviewStats; total: number; page: number; totalPages: number }> => {
+  ): Promise<ProductReviewResponse> => {
     const query = new URLSearchParams();
     if (params?.rating) query.append('rating', String(params.rating));
     if (params?.page) query.append('page', String(params.page));

@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { Star, ThumbsUp, ShieldCheck, ChevronDown, Lock } from 'lucide-react';
-import { reviewService, Review, ReviewStats, CreateReviewPayload } from '@/services/review.service';
+import {
+  reviewService,
+  Review,
+  ReviewStats,
+  CreateReviewPayload,
+  ProductReviewResponse,
+} from '@/services/review.service';
 import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
@@ -32,7 +38,15 @@ const StarDisplay = ({ rating, size = 14 }: { rating: number; size?: number }) =
 );
 
 // ─── Review Card ─────────────────────────────────────────────────────────────
-const ReviewCard = ({ review, onHelpful }: { review: Review; onHelpful: (id: number) => void }) => (
+const ReviewCard = ({
+  review,
+  onHelpful,
+  showProductName,
+}: {
+  review: Review;
+  onHelpful: (id: number) => void;
+  showProductName?: boolean;
+}) => (
   <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-3 shadow-sm hover:shadow-md transition-shadow">
     <div className="flex items-start justify-between gap-3">
       <div className="flex items-center gap-3">
@@ -55,6 +69,11 @@ const ReviewCard = ({ review, onHelpful }: { review: Review; onHelpful: (id: num
         {new Date(review.createdAt).toLocaleDateString('vi-VN')}
       </span>
     </div>
+    {showProductName && review.productName && (
+      <p className="text-[11px] font-black uppercase tracking-wider text-blue-600">
+        Từ sản phẩm: {review.productName}
+      </p>
+    )}
     {review.title && <p className="text-sm font-bold text-gray-800">{review.title}</p>}
     {review.comment && <p className="text-sm text-gray-600 leading-relaxed">{review.comment}</p>}
     <button onClick={() => onHelpful(review.reviewId)}
@@ -78,7 +97,7 @@ const WriteReviewForm = ({ productId, onSuccess }: { productId: number; onSucces
       setSubmitting(true);
       const payload: CreateReviewPayload = { productId, rating, title: title.trim() || undefined, comment: comment.trim() || undefined };
       await reviewService.create(payload);
-      toast.success('Cảm ơn bạn đã đánh giá! Review đang chờ duyệt.');
+      toast.success('Cảm ơn bạn đã đánh giá! Đánh giá của bạn đã được ghi nhận.');
       setRating(0); setTitle(''); setComment('');
       onSuccess();
     } catch (err: any) {
@@ -110,9 +129,15 @@ const WriteReviewForm = ({ productId, onSuccess }: { productId: number; onSucces
 };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export const ProductReviews = ({ productId }: { productId: number }) => {
+export const ProductReviews = ({
+  productId,
+  onProductStatsChange,
+}: {
+  productId: number;
+  onProductStatsChange?: (stats: ReviewStats) => void;
+}) => {
   const { user } = useAuthStore();
-  const [data, setData] = useState<{ reviews: Review[]; stats: ReviewStats; total: number; totalPages: number } | null>(null);
+  const [data, setData] = useState<ProductReviewResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [filterRating, setFilterRating] = useState<number | undefined>();
   const [page, setPage] = useState(1);
@@ -127,9 +152,17 @@ export const ProductReviews = ({ productId }: { productId: number }) => {
       setLoading(true);
       const res = await reviewService.getByProduct(productId, { rating: filterRating, page, limit: 5 });
       setData(res);
+      onProductStatsChange?.(res.productStats);
     } catch { /* silent */ }
     finally { setLoading(false); }
   };
+
+  useEffect(() => {
+    if (data?.reviewSource === 'system_fallback' && filterRating && filterRating !== 5) {
+      setFilterRating(undefined);
+      setPage(1);
+    }
+  }, [data?.reviewSource, filterRating]);
 
   // ✅ Kiểm tra quyền review khi user đăng nhập
   useEffect(() => {
@@ -156,23 +189,53 @@ export const ProductReviews = ({ productId }: { productId: number }) => {
   };
 
   const stats = data?.stats;
+  const reviewSource = data?.reviewSource ?? 'empty';
+  const showFallback = reviewSource === 'system_fallback';
+  const ratingRows = showFallback ? [5] : [5, 4, 3, 2, 1];
 
   return (
     <div className="mt-16 pt-12 border-t-4 border-gray-50 space-y-8">
       <h2 className="text-3xl font-black text-gray-800 uppercase italic tracking-tighter">Đánh giá từ khách hàng</h2>
 
+      {showFallback && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
+          <p className="text-sm font-black text-amber-800">
+            {data?.fallbackLabel || 'Tổng hợp đánh giá 5 sao từ khách hàng trên hệ thống'}
+          </p>
+          <p className="mt-1 text-sm text-amber-700">
+            {data?.fallbackDescription || 'Sản phẩm này chưa có đánh giá riêng. Dưới đây là các đánh giá 5 sao từ sản phẩm khác để bạn tham khảo.'}
+          </p>
+        </div>
+      )}
+
       {/* Stats */}
-      {stats && (
+      {stats && reviewSource !== 'empty' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white rounded-2xl border border-gray-100 p-6 text-center shadow-sm">
             <p className="text-6xl font-black text-gray-800">{stats.average.toFixed(1)}</p>
             <StarDisplay rating={stats.average} size={20} />
-            <p className="text-sm text-gray-400 mt-2 font-medium">{stats.total} đánh giá</p>
+            <p className="text-sm text-gray-400 mt-2 font-medium">
+              {showFallback ? `${stats.total} đánh giá 5 sao` : `${stats.total} đánh giá`}
+            </p>
           </div>
           <div className="md:col-span-2 bg-white rounded-2xl border border-gray-100 p-6 shadow-sm space-y-2">
-            {[5, 4, 3, 2, 1].map((star) => {
+            {ratingRows.map((star) => {
               const count = stats.distribution[star] || 0;
               const pct = stats.total > 0 ? Math.round((count / stats.total) * 100) : 0;
+
+              if (showFallback) {
+                return (
+                  <div key={star} className="flex items-center gap-3">
+                    <span className="text-xs font-bold text-gray-500 w-6 text-right">{star}</span>
+                    <Star size={12} className="text-yellow-400 fill-yellow-400 flex-shrink-0" />
+                    <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full bg-yellow-400" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-xs text-gray-400 w-8 text-right">{count}</span>
+                  </div>
+                );
+              }
+
               return (
                 <button key={star} onClick={() => { setFilterRating(filterRating === star ? undefined : star); setPage(1); }}
                   className={`w-full flex items-center gap-3 group transition-all ${filterRating === star ? 'opacity-100' : 'opacity-80 hover:opacity-100'}`}>
@@ -190,18 +253,28 @@ export const ProductReviews = ({ productId }: { productId: number }) => {
       )}
 
       {/* Filter chips */}
-      <div className="flex flex-wrap gap-2">
-        <button onClick={() => { setFilterRating(undefined); setPage(1); }}
-          className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${!filterRating ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-          Tất cả
-        </button>
-        {[5, 4, 3, 2, 1].map((s) => (
-          <button key={s} onClick={() => { setFilterRating(filterRating === s ? undefined : s); setPage(1); }}
-            className={`flex items-center gap-1 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${filterRating === s ? 'bg-yellow-400 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-            {s} <Star size={10} className="fill-current" />
+      {reviewSource === 'product' && (
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => { setFilterRating(undefined); setPage(1); }}
+            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${!filterRating ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            Tất cả
           </button>
-        ))}
-      </div>
+          {[5, 4, 3, 2, 1].map((s) => (
+            <button key={s} onClick={() => { setFilterRating(filterRating === s ? undefined : s); setPage(1); }}
+              className={`flex items-center gap-1 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${filterRating === s ? 'bg-yellow-400 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+              {s} <Star size={10} className="fill-current" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {showFallback && (
+        <div className="flex flex-wrap gap-2">
+          <span className="flex items-center gap-1 rounded-full bg-yellow-100 px-4 py-1.5 text-xs font-bold text-yellow-700">
+            5 <Star size={10} className="fill-current" /> tổng hợp
+          </span>
+        </div>
+      )}
 
       {/* ✅ LOGIC HIỂN THỊ NÚT ĐÁNH GIÁ */}
       {!user ? (
@@ -240,14 +313,31 @@ export const ProductReviews = ({ productId }: { productId: number }) => {
       {/* Reviews list */}
       {loading ? (
         <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-28 bg-gray-100 rounded-2xl animate-pulse" />)}</div>
+      ) : reviewSource === 'empty' ? (
+        <div className="text-center py-12 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-100">
+          <Star size={32} className="text-gray-200 mx-auto mb-3" />
+          <p className="text-sm font-bold text-gray-400">Sản phẩm này chưa có đánh giá nào</p>
+          <p className="mt-1 text-xs font-medium text-gray-400">
+            Hệ thống hiện cũng chưa có đánh giá 5 sao để tham khảo.
+          </p>
+        </div>
       ) : data?.reviews.length === 0 ? (
         <div className="text-center py-12 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-100">
           <Star size={32} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-sm font-bold text-gray-400">Chưa có đánh giá nào</p>
+          <p className="text-sm font-bold text-gray-400">
+            {showFallback ? 'Không có đánh giá 5 sao phù hợp' : 'Chưa có đánh giá nào'}
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
-          {data?.reviews.map((r) => <ReviewCard key={r.reviewId} review={r} onHelpful={handleHelpful} />)}
+          {data?.reviews.map((r) => (
+            <ReviewCard
+              key={r.reviewId}
+              review={r}
+              onHelpful={handleHelpful}
+              showProductName={showFallback}
+            />
+          ))}
         </div>
       )}
 
