@@ -89,18 +89,62 @@ INSERT INTO products (name, slug, sku, category_id, brand_id, price, sale_price,
 -- 6. PRODUCT_VARIANTS
 -- ==================================================
 INSERT INTO product_variants (product_id, variant_name, sku, attributes, price_adjustment, stock_quantity, is_active) VALUES
+-- 1. iPhone 15 Pro Max
 (1, 'iPhone 15 Pro Max 256GB - Titan Tự Nhiên', 'IP15PM-256-TN', '{"storage": "256GB", "color": "Titan Tự Nhiên"}', 0, 20, TRUE),
 (1, 'iPhone 15 Pro Max 512GB - Titan Tự Nhiên', 'IP15PM-512-TN', '{"storage": "512GB", "color": "Titan Tự Nhiên"}', 5000000, 15, TRUE),
 (1, 'iPhone 15 Pro Max 256GB - Titan Trắng', 'IP15PM-256-TT', '{"storage": "256GB", "color": "Titan Trắng"}', 0, 15, TRUE),
+-- 2. iPhone 14 Pro
 (2, 'iPhone 14 Pro 128GB - Tím', 'IP14P-128-T', '{"storage": "128GB", "color": "Tím"}', 0, 30, TRUE),
 (2, 'iPhone 14 Pro 256GB - Tím', 'IP14P-256-T', '{"storage": "256GB", "color": "Tím"}', 3000000, 25, TRUE),
 (2, 'iPhone 14 Pro 128GB - Đen', 'IP14P-128-D', '{"storage": "128GB", "color": "Đen"}', 0, 25, TRUE),
+-- 3. iPhone 13
+(3, 'iPhone 13 128GB - Xanh dương', 'IP13-128-XD', '{"storage": "128GB", "color": "Xanh dương"}', 0, 35, TRUE),
+(3, 'iPhone 13 256GB - Xanh dương', 'IP13-256-XD', '{"storage": "256GB", "color": "Xanh dương"}', 2000000, 30, TRUE),
+(3, 'iPhone 13 128GB - Hồng', 'IP13-128-H', '{"storage": "128GB", "color": "Hồng"}', 0, 35, TRUE),
+-- 4. Galaxy S24 Ultra
 (4, 'Galaxy S24 Ultra 256GB - Titan Xám', 'SS24U-256-TX', '{"storage": "256GB", "color": "Titan Xám"}', 0, 25, TRUE),
 (4, 'Galaxy S24 Ultra 512GB - Titan Xám', 'SS24U-512-TX', '{"storage": "512GB", "color": "Titan Xám"}', 4000000, 20, TRUE),
 (4, 'Galaxy S24 Ultra 256GB - Titan Tím', 'SS24U-256-TT', '{"storage": "256GB", "color": "Titan Tím"}', 0, 15, TRUE),
+-- 5. Galaxy A54 5G
+(5, 'Galaxy A54 5G 128GB - Đen', 'SSA54-128-D', '{"storage": "128GB", "color": "Đen"}', 0, 50, TRUE),
+(5, 'Galaxy A54 5G 256GB - Đen', 'SSA54-256-D', '{"storage": "256GB", "color": "Đen"}', 1000000, 50, TRUE),
+(5, 'Galaxy A54 5G 128GB - Tím', 'SSA54-128-T', '{"storage": "128GB", "color": "Tím"}', 0, 50, TRUE),
+-- 6. Galaxy Z Fold5
+(6, 'Galaxy Z Fold5 256GB - Kem', 'SSZF5-256-K', '{"storage": "256GB", "color": "Kem"}', 0, 10, TRUE),
+(6, 'Galaxy Z Fold5 512GB - Kem', 'SSZF5-512-K', '{"storage": "512GB", "color": "Kem"}', 5000000, 10, TRUE),
+(6, 'Galaxy Z Fold5 256GB - Xanh', 'SSZF5-256-X', '{"storage": "256GB", "color": "Xanh"}', 0, 10, TRUE),
+-- 7. Xiaomi 14 Pro
+(7, 'Xiaomi 14 Pro 256GB - Đen', 'XM14P-256-D', '{"storage": "256GB", "color": "Đen"}', 0, 35, TRUE),
+(7, 'Xiaomi 14 Pro 512GB - Đen', 'XM14P-512-D', '{"storage": "512GB", "color": "Đen"}', 3000000, 20, TRUE),
+(7, 'Xiaomi 14 Pro 256GB - Trắng', 'XM14P-256-TR', '{"storage": "256GB", "color": "Trắng"}', 0, 15, TRUE),
+-- 8. Redmi Note 13 Pro
+(8, 'Redmi Note 13 Pro 128GB - Xanh', 'RN13P-128-X', '{"storage": "128GB", "color": "Xanh"}', 0, 80, TRUE),
+(8, 'Redmi Note 13 Pro 256GB - Xanh', 'RN13P-256-X', '{"storage": "256GB", "color": "Xanh"}', 1000000, 60, TRUE),
+(8, 'Redmi Note 13 Pro 128GB - Tím', 'RN13P-128-T', '{"storage": "128GB", "color": "Tím"}', 0, 60, TRUE),
+-- 9. OPPO Find X6 Pro
+(9, 'OPPO Find X6 Pro 256GB - Đen', 'OPX6P-256-D', '{"storage": "256GB", "color": "Đen"}', 0, 25, TRUE),
+(9, 'OPPO Find X6 Pro 512GB - Đen', 'OPX6P-512-D', '{"storage": "512GB", "color": "Đen"}', 3000000, 15, TRUE),
+(9, 'OPPO Find X6 Pro 256GB - Xanh', 'OPX6P-256-X', '{"storage": "256GB", "color": "Xanh"}', 0, 10, TRUE),
+-- 10. OPPO Reno10 5G
+(10, 'OPPO Reno10 5G 256GB - Xanh', 'OPR10-256-X', '{"storage": "256GB", "color": "Xanh"}', 0, 60, TRUE),
+(10, 'OPPO Reno10 5G 256GB - Bạc', 'OPR10-256-B', '{"storage": "256GB", "color": "Bạc"}', 0, 60, TRUE),
+-- 11. MacBook Air M2
 (11, 'MacBook Air M2 256GB - Midnight', 'MBA-M2-256-MN', '{"storage": "256GB", "color": "Midnight"}', 0, 20, TRUE),
 (11, 'MacBook Air M2 512GB - Midnight', 'MBA-M2-512-MN', '{"storage": "512GB", "color": "Midnight"}', 3000000, 10, TRUE),
-(11, 'MacBook Air M2 256GB - Starlight', 'MBA-M2-256-ST', '{"storage": "256GB", "color": "Starlight"}', 0, 10, TRUE);
+(11, 'MacBook Air M2 256GB - Starlight', 'MBA-M2-256-ST', '{"storage": "256GB", "color": "Starlight"}', 0, 10, TRUE),
+-- 12. Dell XPS 13
+(12, 'Dell XPS 13 512GB - Bạc', 'DXP13-512-B', '{"storage": "512GB", "color": "Bạc"}', 0, 20, TRUE),
+(12, 'Dell XPS 13 1TB - Bạc', 'DXP13-1TB-B', '{"storage": "1TB", "color": "Bạc"}', 4000000, 15, TRUE),
+-- 13. AirPods Pro 2
+(13, 'AirPods Pro 2 - USB-C Trắng', 'APP2-USBC-W', '{"connection": "USB-C", "color": "Trắng"}', 0, 100, TRUE),
+(13, 'AirPods Pro 2 - Lightning Trắng', 'APP2-LTN-W', '{"connection": "Lightning", "color": "Trắng"}', -500000, 100, TRUE),
+-- 14. Galaxy Buds2 Pro
+(14, 'Galaxy Buds2 Pro - Đen', 'SGB2P-D', '{"color": "Đen"}', 0, 50, TRUE),
+(14, 'Galaxy Buds2 Pro - Trắng', 'SGB2P-TR', '{"color": "Trắng"}', 0, 50, TRUE),
+(14, 'Galaxy Buds2 Pro - Tím', 'SGB2P-T', '{"color": "Tím"}', 0, 50, TRUE),
+-- 15. Anker PowerBank
+(15, 'Anker PowerBank 20000mAh - Đen', 'ANK-PB20-D', '{"color": "Đen"}', 0, 150, TRUE),
+(15, 'Anker PowerBank 20000mAh - Trắng', 'ANK-PB20-TR', '{"color": "Trắng"}', 0, 150, TRUE);
 
 -- ==================================================
 -- 7. PRODUCT_IMAGES

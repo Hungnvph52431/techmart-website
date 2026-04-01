@@ -38,8 +38,6 @@ export const VariantPickerModal = ({ product, open, onClose }: VariantPickerModa
     }
   }, [open]);
 
-  if (!open) return null;
-
   const selectedVariant = variants.find(
     (v: any) => (v.variantId ?? v.id) === selectedVariantId
   );
@@ -172,6 +170,8 @@ export const VariantPickerModal = ({ product, open, onClose }: VariantPickerModa
     setQuantityDraft(String(nextQuantity));
     return nextQuantity;
   };
+
+  if (!open) return null;
 
   const handleAdd = () => {
     if (!selectedVariantId) {
