@@ -95,11 +95,12 @@ export const Header = () => {
   }, [allCategories]);
 
   const handleSearchSubmit = (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (!searchQuery.trim()) return;
-    setSearchOpen(false);
-    navigate(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
-  };
+  e?.preventDefault();
+  if (!searchQuery.trim()) return;
+  setSearchOpen(false);
+  // Sử dụng 'search' thay vì 'q' nếu bạn muốn đồng bộ theo hướng này
+  navigate(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
+};
 
   const handleSearchClear = () => {
     setSearchQuery('');

@@ -6,12 +6,13 @@ import { bannerService } from '@/services/banner.service';
 import { categoryService, type Category } from '@/services/category.service';
 import { brandService, type Brand } from '@/services/brand.service';
 import { Product } from '@/types';
-import { Banner } from '@/types/banner';
+
 import {
   ChevronRight, ChevronLeft,
   Zap, Award, Smartphone,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Banner } from '@/types/banner.type';
 
 const getImageUrl = (url: string) =>
   url?.startsWith('/') ? `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5001'}${url}` : url;
