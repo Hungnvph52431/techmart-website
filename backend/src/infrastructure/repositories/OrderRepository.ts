@@ -193,7 +193,6 @@ export class OrderRepository implements IOrderRepository {
 
       for (const item of orderData.items) {
         const product = await this.getProductSnapshot(connection, item.productId);
-        await this.decrementInventory(connection, item.productId, item.variantId, item.quantity);
         await connection.execute(
           `INSERT INTO order_details (order_id, product_id, variant_id, product_name, price, quantity, subtotal, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -280,10 +279,35 @@ export class OrderRepository implements IOrderRepository {
       if (!order || order.status !== input.currentStatus) { await connection.rollback(); return null; }
 
       const now = new Date();
-      await connection.execute('UPDATE orders SET status = ?, updated_at = ? WHERE order_id = ?', [input.nextStatus, now, input.orderId]);
+      if (input.nextStatus === 'delivered') {
+        await connection.execute(
+          'UPDATE orders SET status = ?, delivered_at = ?, updated_at = ? WHERE order_id = ?',
+          [input.nextStatus, now, now, input.orderId]
+        );
+      } else {
+        await connection.execute(
+          'UPDATE orders SET status = ?, updated_at = ? WHERE order_id = ?',
+          [input.nextStatus, now, input.orderId]
+        );
+      }
       await this.appendEventWithConnection(connection, {
         orderId: input.orderId, eventType: 'status_changed', fromStatus: input.currentStatus, toStatus: input.nextStatus, actorUserId: input.actorUserId, actorRole: input.actorRole, note: input.note
       });
+
+      if (input.nextStatus === 'delivered') {
+        const details = await this.getOrderDetailsWithExecutor(connection, input.orderId);
+        for (const detail of details) {
+          await this.exportInventory(
+            connection,
+            detail.productId,
+            detail.variantId,
+            detail.quantity,
+            input.orderId,
+            input.actorUserId,
+            input.note || 'Xuất kho khi đơn hàng giao thành công'
+          );
+        }
+      }
 
       // Cập nhật sold_quantity khi đơn hoàn thành
       if (input.nextStatus === 'completed') {
@@ -307,9 +331,6 @@ export class OrderRepository implements IOrderRepository {
       await connection.beginTransaction();
       const order = await this.findOrderForUpdate(connection, input.orderId);
       if (!order || order.status !== input.currentStatus) { await connection.rollback(); return null; }
-
-      const details = await this.getOrderDetailsWithExecutor(connection, input.orderId);
-      for (const detail of details) { await this.restoreInventory(connection, detail.productId, detail.variantId, detail.quantity); }
 
       const now = new Date();
 
@@ -561,7 +582,7 @@ export class OrderRepository implements IOrderRepository {
     const orderReturn = this.mapRowToOrderReturn(rows[0]);
 
     const [itemRows] = await pool.execute<RowDataPacket[]>(
-      `SELECT ori.*, od.product_id, od.product_name, od.price
+      `SELECT ori.*, od.product_id, od.variant_id, od.product_name, od.price
        FROM order_return_items ori
        JOIN order_details od ON od.order_detail_id = ori.order_detail_id
        WHERE ori.order_return_id = ?`,
@@ -655,12 +676,40 @@ export class OrderRepository implements IOrderRepository {
     try {
       await connection.beginTransaction();
       const now = new Date();
-
-      await connection.execute(
+      const [updateResult] = await connection.execute<ResultSetHeader>(
         `UPDATE order_returns SET status = 'received', received_at = ?, admin_note = ?, updated_at = ?
          WHERE order_return_id = ? AND order_id = ? AND status = 'approved'`,
         [now, input.adminNote || null, now, input.orderReturnId, input.orderId]
       );
+
+      if (updateResult.affectedRows === 0) {
+        await connection.rollback();
+        return null;
+      }
+
+      const [itemRows] = await connection.execute<RowDataPacket[]>(
+        `SELECT ori.quantity, ori.restock_action, od.product_id, od.variant_id
+         FROM order_return_items ori
+         JOIN order_details od ON od.order_detail_id = ori.order_detail_id
+         WHERE ori.order_return_id = ?`,
+        [input.orderReturnId]
+      );
+
+      for (const row of itemRows) {
+        if (!['restock', 'inspect'].includes(String(row.restock_action))) {
+          continue;
+        }
+
+        await this.restockInventory(
+          connection,
+          Number(row.product_id),
+          row.variant_id != null ? Number(row.variant_id) : undefined,
+          Number(row.quantity),
+          input.orderReturnId,
+          input.actorUserId,
+          input.adminNote || 'Nhập kho khi nhận lại hàng hoàn'
+        );
+      }
 
       await this.appendEventWithConnection(connection, {
         orderId: input.orderId,
@@ -740,28 +789,16 @@ export class OrderRepository implements IOrderRepository {
         refundNote = `Đơn ${paymentMethod?.toUpperCase()} chưa thanh toán — không hoàn tiền vào ví`;
       }
 
-      // Fix #5: Hoàn kho theo restockAction
-      for (const row of itemRows as RowDataPacket[]) {
-        if (row.restock_action === 'restock' || row.restock_action === 'inspect') {
-          if (row.variant_id) {
-            await connection.execute(
-              'UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE variant_id = ?',
-              [row.quantity, row.variant_id]
-            );
-          }
-          await connection.execute(
-            'UPDATE products SET stock_quantity = stock_quantity + ? WHERE product_id = ?',
-            [row.quantity, row.product_id]
-          );
-        }
-        // 'discard' → không cộng lại kho
-      }
-
-      await connection.execute(
+      const [updateResult] = await connection.execute<ResultSetHeader>(
         `UPDATE order_returns SET status = 'refunded', refunded_at = ?, admin_note = ?, updated_at = ?
          WHERE order_return_id = ? AND order_id = ? AND status = 'received'`,
         [now, input.adminNote || null, now, input.orderReturnId, input.orderId]
       );
+
+      if (updateResult.affectedRows === 0) {
+        await connection.rollback();
+        return null;
+      }
 
       // Cập nhật trạng thái đơn hàng → returned
       const newPaymentStatus = paymentStatus === 'paid' ? 'refunded' : paymentStatus;
@@ -861,12 +898,110 @@ export class OrderRepository implements IOrderRepository {
     return rows[0];
   }
 
-  private async decrementInventory(executor: SqlExecutor, pid: number, vid: number | undefined, qty: number) {
-    await executor.execute('UPDATE products SET stock_quantity = stock_quantity - ? WHERE product_id = ? AND stock_quantity >= ?', [qty, pid, qty]);
+  private async exportInventory(
+    executor: SqlExecutor,
+    productId: number,
+    variantId: number | undefined,
+    quantity: number,
+    orderId: number,
+    actorUserId: number | null,
+    notes?: string
+  ) {
+    if (variantId) {
+      const [variantResult] = await executor.execute<ResultSetHeader>(
+        'UPDATE product_variants SET stock_quantity = stock_quantity - ? WHERE variant_id = ? AND stock_quantity >= ?',
+        [quantity, variantId, quantity]
+      );
+
+      if (variantResult.affectedRows === 0) {
+        throw new Error(`Không đủ tồn kho cho biến thể ${variantId} để giao hàng`);
+      }
+    }
+
+    const [productResult] = await executor.execute<ResultSetHeader>(
+      'UPDATE products SET stock_quantity = stock_quantity - ? WHERE product_id = ? AND stock_quantity >= ?',
+      [quantity, productId, quantity]
+    );
+
+    if (productResult.affectedRows === 0) {
+      throw new Error(`Không đủ tồn kho cho sản phẩm ${productId} để giao hàng`);
+    }
+
+    await this.appendInventoryTransaction(executor, {
+      productId,
+      variantId,
+      transactionType: 'export',
+      quantity,
+      referenceType: 'order',
+      referenceId: orderId,
+      notes,
+      createdBy: actorUserId,
+    });
   }
 
-  private async restoreInventory(executor: SqlExecutor, pid: number, vid: number | undefined, qty: number) {
-    await executor.execute('UPDATE products SET stock_quantity = stock_quantity + ? WHERE product_id = ?', [qty, pid]);
+  private async restockInventory(
+    executor: SqlExecutor,
+    productId: number,
+    variantId: number | undefined,
+    quantity: number,
+    orderReturnId: number,
+    actorUserId: number | null,
+    notes?: string
+  ) {
+    if (variantId) {
+      await executor.execute(
+        'UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE variant_id = ?',
+        [quantity, variantId]
+      );
+    }
+
+    await executor.execute(
+      'UPDATE products SET stock_quantity = stock_quantity + ? WHERE product_id = ?',
+      [quantity, productId]
+    );
+
+    await this.appendInventoryTransaction(executor, {
+      productId,
+      variantId,
+      transactionType: 'return',
+      quantity,
+      referenceType: 'order_return',
+      referenceId: orderReturnId,
+      notes,
+      createdBy: actorUserId,
+    });
+  }
+
+  private async appendInventoryTransaction(
+    executor: SqlExecutor,
+    input: {
+      productId: number;
+      variantId?: number;
+      transactionType: 'export' | 'return';
+      quantity: number;
+      referenceType: string;
+      referenceId: number;
+      notes?: string;
+      createdBy: number | null;
+    }
+  ) {
+    await executor.execute(
+      `INSERT INTO inventory_transactions (
+        product_id, variant_id, transaction_type, quantity,
+        reference_type, reference_id, notes, created_by, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        input.productId,
+        input.variantId ?? null,
+        input.transactionType,
+        input.quantity,
+        input.referenceType,
+        input.referenceId,
+        input.notes || null,
+        input.createdBy,
+        new Date(),
+      ]
+    );
   }
 
   private async findOrderForUpdate(connection: PoolConnection, id: number) {
@@ -942,6 +1077,7 @@ export class OrderRepository implements IOrderRepository {
   private mapRowToOrderDetail(row: any): OrderDetail {
     return {
       orderDetailId: row.order_detail_id, orderId: row.order_id, productId: row.product_id,
+      variantId: row.variant_id ?? undefined,
       productName: row.product_name, variantName: row.variant_name || '', productImage: row.product_image || '',
       price: Number(row.price), quantity: Number(row.quantity),
       subtotal: Number(row.subtotal), createdAt: row.created_at

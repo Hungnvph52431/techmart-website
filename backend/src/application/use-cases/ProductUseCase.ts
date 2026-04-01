@@ -31,6 +31,14 @@ export class ProductUseCase {
     return this.productRepository.findBySlug(slug);
   }
 
+  async getAvailableProductStock(productId: number) {
+    return this.productRepository.getAvailableProductStock(productId);
+  }
+
+  async getAvailableVariantStock(variantId: number) {
+    return this.productRepository.getAvailableVariantStock(variantId);
+  }
+
   // --- 2. CÁC PHƯƠNG THỨC QUẢN TRỊ (ADMIN) ---
 
   async getAdminProducts(filters?: {

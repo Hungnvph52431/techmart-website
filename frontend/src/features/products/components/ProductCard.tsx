@@ -39,9 +39,16 @@ export const ProductCard = ({ product }: ProductCardProps) => {
   // Logic kiểm tra tồn kho
   const currentCartItem = items.find(item => item.product.productId === product.productId);
   const cartQuantity = currentCartItem ? currentCartItem.quantity : 0;
-  const isOutOfStock = product.stockQuantity <= 0;
+  const availableStockQuantity = Number(
+    product.availableStockQuantity ?? product.stockQuantity ?? 0
+  );
+  const isOutOfStock = availableStockQuantity <= 0;
   const isInactive = product.status === 'inactive';
-  const isMaxReached = !isOutOfStock && !isInactive && !hasVariants && cartQuantity >= product.stockQuantity;
+  const isMaxReached =
+    !isOutOfStock &&
+    !isInactive &&
+    !hasVariants &&
+    cartQuantity >= availableStockQuantity;
   const isDisabled = isOutOfStock || isInactive || isMaxReached;
 
   const handleAddToCart = async () => {

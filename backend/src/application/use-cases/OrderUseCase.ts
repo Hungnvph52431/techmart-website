@@ -220,15 +220,23 @@ export class OrderUseCase {
         if (!variant || variant.productId !== item.productId || !variant.isActive) {
           throw new Error(`Phiên bản sản phẩm ${item.variantId} không khả dụng`);
         }
-        if (variant.stockQuantity < item.quantity) {
-          throw new Error(`Kho không đủ máy ${variant.variantName} (Còn ${variant.stockQuantity})`);
+        const availableVariantStock = await this.productRepository.getAvailableVariantStock(item.variantId);
+        if (availableVariantStock < item.quantity) {
+          throw new Error(`Kho không đủ máy ${variant.variantName} (Còn ${availableVariantStock})`);
         }
-      } else if (product.stockQuantity < item.quantity) {
-        throw new Error(`Sản phẩm ${product.name} đã hết hàng hoặc không đủ số lượng`);
+        const availableProductStock = await this.productRepository.getAvailableProductStock(item.productId);
+        if (availableProductStock < item.quantity) {
+          throw new Error(`Sản phẩm ${product.name} đã hết hàng hoặc không đủ số lượng`);
+        }
+      } else {
+        const availableProductStock = await this.productRepository.getAvailableProductStock(item.productId);
+        if (availableProductStock < item.quantity) {
+          throw new Error(`Sản phẩm ${product.name} đã hết hàng hoặc không đủ số lượng`);
+        }
       }
     }
 
-    // Repository sẽ tự động thực hiện trừ kho trong Transaction
+    // Tạo đơn chỉ giữ reserved stock qua trạng thái đơn, chưa trừ kho vật lý ngay tại đây
     const newOrder = await this.orderRepository.create(orderData);
 
     // Gửi email thông báo đặt hàng thành công (fire-and-forget, mọi phương thức)

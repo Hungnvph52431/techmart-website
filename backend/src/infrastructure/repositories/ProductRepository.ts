@@ -12,6 +12,8 @@ import { CreateProductVariantDTO, UpdateProductVariantDTO } from '../../domain/e
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import pool from '../database/connection';
 
+const RESERVED_ORDER_STATUSES_SQL = `'pending', 'confirmed', 'processing', 'shipping'`;
+
 export class ProductRepository implements IProductRepository {
   private pool = pool; // Khai báo pool để thực thi SQL
   // --- 1. TRUY VẤN DANH SÁCH (FRONTEND & ADMIN) ---
@@ -59,14 +61,23 @@ export class ProductRepository implements IProductRepository {
   // --- 2. TÌM CHI TIẾT (ID & SLUG) ---
 
   async findById(id: number): Promise<Product | null> {
-    const [rows]: any = await this.pool.execute('SELECT * FROM products WHERE product_id = ? AND deleted_at IS NULL', [id]);
-    return rows.length > 0 ? rows[0] : null;
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT p.*, c.name as categoryName, b.name as brandName,
+        ${this.availableProductStockSql('p.product_id', 'p.stock_quantity')} AS available_stock_quantity
+       FROM products p
+       LEFT JOIN categories c ON p.category_id = c.category_id
+       LEFT JOIN brands b ON p.brand_id = b.brand_id
+       WHERE p.product_id = ? AND p.deleted_at IS NULL`,
+      [id]
+    );
+    return rows.length > 0 ? this.mapRowToProduct(rows[0]) : null;
   }
 
   async findAdminById(productId: number): Promise<Product | null> {
   // 1. Lấy thông tin sản phẩm + category + brand
   const [rows] = await this.pool.execute<RowDataPacket[]>(
     `SELECT p.*,
+      ${this.availableProductStockSql('p.product_id', 'p.stock_quantity')} AS available_stock_quantity,
       c.name as categoryName, c.slug as categorySlug,
       b.name as brandName, b.slug as brandSlug
      FROM products p
@@ -87,7 +98,10 @@ export class ProductRepository implements IProductRepository {
 
   // 3. Load biến thể (bao gồm cả inactive để admin thấy đủ)
   const [variants] = await this.pool.execute<RowDataPacket[]>(
-    'SELECT * FROM product_variants WHERE product_id = ? ORDER BY variant_id ASC',
+    `SELECT pv.*,
+      ${this.availableVariantStockSql('pv.variant_id', 'pv.stock_quantity')} AS available_stock_quantity
+     FROM product_variants pv
+     WHERE pv.product_id = ? ORDER BY pv.variant_id ASC`,
     [productId]
   );
 
@@ -117,6 +131,7 @@ export class ProductRepository implements IProductRepository {
       })(),
       priceAdjustment: parseFloat(v.price_adjustment) || 0,
       stockQuantity: v.stock_quantity || 0,
+      availableStockQuantity: Number(v.available_stock_quantity ?? v.stock_quantity ?? 0),
       imageUrl: v.image_url || '',
       isActive: Boolean(v.is_active),
       createdAt: v.created_at,
@@ -134,7 +149,8 @@ export class ProductRepository implements IProductRepository {
 
   async findBySlug(slug: string): Promise<Product | null> {
   const [rows] = await this.pool.execute<RowDataPacket[]>(
-    `SELECT p.*, c.name as categoryName, b.name as brandName
+    `SELECT p.*, c.name as categoryName, b.name as brandName,
+      ${this.availableProductStockSql('p.product_id', 'p.stock_quantity')} AS available_stock_quantity
      FROM products p
      LEFT JOIN categories c ON p.category_id = c.category_id
      LEFT JOIN brands b ON p.brand_id = b.brand_id
@@ -153,7 +169,10 @@ export class ProductRepository implements IProductRepository {
   );
 
   const [variants] = await this.pool.execute<RowDataPacket[]>(
-    'SELECT * FROM product_variants WHERE product_id = ? AND is_active = 1',
+    `SELECT pv.*,
+      ${this.availableVariantStockSql('pv.variant_id', 'pv.stock_quantity')} AS available_stock_quantity
+     FROM product_variants pv
+     WHERE pv.product_id = ? AND pv.is_active = 1`,
     [product.productId]
   );
 
@@ -186,6 +205,7 @@ export class ProductRepository implements IProductRepository {
       })(),
       priceAdjustment: parseFloat(v.price_adjustment) || 0,
       stockQuantity:   v.stock_quantity || 0,
+      availableStockQuantity: Number(v.available_stock_quantity ?? v.stock_quantity ?? 0),
       imageUrl:        v.image_url || '',
       isActive:        Boolean(v.is_active),
     })),
@@ -210,14 +230,45 @@ export class ProductRepository implements IProductRepository {
 
   async findVariants(productId: number): Promise<ProductVariant[]> {
     const [rows] = await pool.execute<RowDataPacket[]>(
-      'SELECT * FROM product_variants WHERE product_id = ? AND is_active = 1', [productId]
+      `SELECT pv.*,
+        ${this.availableVariantStockSql('pv.variant_id', 'pv.stock_quantity')} AS available_stock_quantity
+       FROM product_variants pv
+       WHERE pv.product_id = ? AND pv.is_active = 1`,
+      [productId]
     );
     return rows.map(this.mapRowToProductVariant);
   }
 
   async findVariantById(id: number): Promise<ProductVariant | null> {
-    const [rows] = await pool.execute<RowDataPacket[]>('SELECT * FROM product_variants WHERE variant_id = ?', [id]);
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT pv.*,
+        ${this.availableVariantStockSql('pv.variant_id', 'pv.stock_quantity')} AS available_stock_quantity
+       FROM product_variants pv
+       WHERE pv.variant_id = ?`,
+      [id]
+    );
     return rows.length > 0 ? this.mapRowToProductVariant(rows[0]) : null;
+  }
+
+  async getAvailableProductStock(productId: number): Promise<number> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT ${this.availableProductStockSql('p.product_id', 'p.stock_quantity')} AS available_stock_quantity
+       FROM products p
+       WHERE p.product_id = ? AND p.deleted_at IS NULL`,
+      [productId]
+    );
+    return Number(rows[0]?.available_stock_quantity ?? 0);
+  }
+
+  async getAvailableVariantStock(variantId: number): Promise<number> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT ${this.availableVariantStockSql('pv.variant_id', 'pv.stock_quantity')} AS available_stock_quantity
+       FROM product_variants pv
+       JOIN products p ON p.product_id = pv.product_id
+       WHERE pv.variant_id = ? AND p.deleted_at IS NULL`,
+      [variantId]
+    );
+    return Number(rows[0]?.available_stock_quantity ?? 0);
   }
 
   async addVariant(v: CreateProductVariantDTO): Promise<ProductVariant> {
@@ -542,6 +593,7 @@ async delete(id: number): Promise<boolean> {
 
   private storefrontListSelect() {
     return `SELECT p.*, c.name as categoryName, b.name as brandName,
+            ${this.availableProductStockSql('p.product_id', 'p.stock_quantity')} AS available_stock_quantity,
             EXISTS(
               SELECT 1
               FROM product_variants pv
@@ -568,6 +620,7 @@ async delete(id: number): Promise<boolean> {
     salePrice: row.sale_price ? parseFloat(row.sale_price) : undefined,
     costPrice: row.cost_price ? parseFloat(row.cost_price) : undefined,
     stockQuantity: row.stock_quantity || 0,
+    availableStockQuantity: Number(row.available_stock_quantity ?? row.stock_quantity ?? 0),
     soldQuantity: row.sold_quantity || 0,
     viewCount: row.view_count || 0,
     ratingAvg: row.rating_avg ? parseFloat(row.rating_avg) : 0,
@@ -611,6 +664,7 @@ async delete(id: number): Promise<boolean> {
       })(),
       priceAdjustment: parseFloat(row.price_adjustment) || 0,
       stockQuantity:   row.stock_quantity || 0,
+      availableStockQuantity: Number(row.available_stock_quantity ?? row.stock_quantity ?? 0),
       imageUrl:        row.image_url || '',
       isActive:        Boolean(row.is_active ?? 1),
     } as any;
@@ -623,7 +677,13 @@ async delete(id: number): Promise<boolean> {
 
     let variants: RowDataPacket[] = [];
     if (options.includeVariants) {
-      [variants] = await pool.query<RowDataPacket[]>('SELECT * FROM product_variants WHERE product_id IN (?)', [productIds]);
+      [variants] = await pool.query<RowDataPacket[]>(
+        `SELECT pv.*,
+          ${this.availableVariantStockSql('pv.variant_id', 'pv.stock_quantity')} AS available_stock_quantity
+         FROM product_variants pv
+         WHERE pv.product_id IN (?)`,
+        [productIds]
+      );
     }
 
     return products.map((p) => ({
@@ -733,5 +793,35 @@ async delete(id: number): Promise<boolean> {
 
   return { query, params };
 }
+
+  private availableProductStockSql(productIdSql: string, stockQuantitySql: string) {
+    return `GREATEST(${stockQuantitySql} - ${this.reservedProductQuantitySql(productIdSql)}, 0)`;
+  }
+
+  private availableVariantStockSql(variantIdSql: string, stockQuantitySql: string) {
+    return `GREATEST(${stockQuantitySql} - ${this.reservedVariantQuantitySql(variantIdSql)}, 0)`;
+  }
+
+  private reservedProductQuantitySql(productIdSql: string) {
+    return `COALESCE((
+      SELECT SUM(od.quantity)
+      FROM order_details od
+      JOIN orders o ON o.order_id = od.order_id
+      WHERE od.product_id = ${productIdSql}
+        AND o.deleted_at IS NULL
+        AND o.status IN (${RESERVED_ORDER_STATUSES_SQL})
+    ), 0)`;
+  }
+
+  private reservedVariantQuantitySql(variantIdSql: string) {
+    return `COALESCE((
+      SELECT SUM(od.quantity)
+      FROM order_details od
+      JOIN orders o ON o.order_id = od.order_id
+      WHERE od.variant_id = ${variantIdSql}
+        AND o.deleted_at IS NULL
+        AND o.status IN (${RESERVED_ORDER_STATUSES_SQL})
+    ), 0)`;
+  }
 
 }
