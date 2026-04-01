@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { ShoppingCart, Star } from "lucide-react";
 import { Product } from "@/types";
 import { useCartStore } from "@/store/cartStore";
@@ -20,7 +20,6 @@ interface ProductCardProps {
 }
 
 export const ProductCard = ({ product }: ProductCardProps) => {
-  const navigate = useNavigate();
   const { addItem, items } = useCartStore();
   const [showVariantPicker, setShowVariantPicker] = useState(false);
   const [fullProduct, setFullProduct] = useState<Product | null>(null);
@@ -59,7 +58,6 @@ export const ProductCard = ({ product }: ProductCardProps) => {
     if (!hasVariants) {
       addItem(product);
       toast.success(`Đã thêm ${product.name} vào giỏ hàng!`);
-      navigate("/cart");
       return;
     }
 
@@ -85,7 +83,6 @@ export const ProductCard = ({ product }: ProductCardProps) => {
       if (!detailHasVariants) {
         addItem(detail);
         toast.success(`Đã thêm ${product.name} vào giỏ hàng!`);
-        navigate("/cart");
         return;
       }
 
@@ -234,7 +231,6 @@ export const ProductCard = ({ product }: ProductCardProps) => {
           product={fullProduct}
           open={showVariantPicker}
           onClose={() => setShowVariantPicker(false)}
-          onAddedToCart={() => navigate("/cart")}
         />
       )}
     </>
