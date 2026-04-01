@@ -74,6 +74,7 @@ export const ProductDetailPage = () => {
   const [quantity, setQuantity] = useState<number>(1);
   const [quantityDraft, setQuantityDraft] = useState<string>('1');
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
+  const [reviewSummary, setReviewSummary] = useState({ average: 0, total: 0 });
 
   const { addItem, items } = useCartStore();
 
@@ -124,6 +125,13 @@ export const ProductDetailPage = () => {
   useEffect(() => {
     setQuantityDraft(String(quantity));
   }, [quantity]);
+
+  useEffect(() => {
+    setReviewSummary({
+      average: Number(product?.ratingAvg ?? 0),
+      total: Number(product?.reviewCount ?? 0),
+    });
+  }, [product?.productId, product?.ratingAvg, product?.reviewCount]);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -244,6 +252,8 @@ export const ProductDetailPage = () => {
   const fallbackImage = getImageUrl((product as any).mainImage || (product as any).imageUrl);
   const displayImages = imageUrls.length > 0 ? imageUrls : [fallbackImage];
   const currentImageSrc = displayImages[selectedImage] ?? displayImages[0] ?? '/placeholder.jpg';
+  const headerRatingAverage = reviewSummary.total > 0 ? reviewSummary.average : 0;
+  const headerRatingText = headerRatingAverage.toFixed(1);
 
   // Parse specs
   const specs = parseSpecs((product as any).specifications);
@@ -345,10 +355,10 @@ export const ProductDetailPage = () => {
             <div className="flex items-center gap-6 mb-6">
               <div className="flex items-center bg-yellow-400 px-3 py-1 rounded-full">
                 <Star className="h-4 w-4 text-white fill-current" />
-                <span className="ml-1.5 text-xs font-black text-white">{product.ratingAvg || "5.0"}</span>
+                <span className="ml-1.5 text-xs font-black text-white">{headerRatingText}</span>
               </div>
               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                {product.reviewCount || 0} đánh giá
+                {reviewSummary.total} đánh giá
               </span>
               <span className="text-gray-200">|</span>
               <span className={`text-[10px] font-black uppercase tracking-widest ${stockToUse > 0 ? "text-green-600" : "text-red-500"}`}>
@@ -549,7 +559,15 @@ export const ProductDetailPage = () => {
           </div>
         </div>
 
-        <ProductReviews productId={product.productId} />
+        <ProductReviews
+          productId={product.productId}
+          onProductStatsChange={(stats) =>
+            setReviewSummary({
+              average: Number(stats.average || 0),
+              total: Number(stats.total || 0),
+            })
+          }
+        />
       </div>
     </Layout>
   );
