@@ -2,12 +2,14 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { useCartStore } from "@/store/cartStore";
+import { useCheckoutSessionStore } from "@/store/checkoutSessionStore";
 import { useAuthStore } from "@/store/authStore";
 import { orderService } from "@/services/order.service";
 import { walletService } from "@/services/wallet.service";
 import { type Address } from "@/services/address.service";
 import api from "@/services/api";
 import toast from "react-hot-toast";
+import { getCartSelectionKey } from "@/features/cart/lib/cartQuantity";
 
 // Sửa đường dẫn import: Đi lùi 1 cấp (../) để ra khỏi thư mục pages/, rồi vào components/ và hooks/
 import { useCheckoutAddress } from "../hooks/useCheckoutAddress";
@@ -102,7 +104,8 @@ const VoucherPopup = ({ open, onClose, onSelect, subtotal }: { open: boolean; on
 // ─── Main Checkout Page ──────────────────────────────────────────────────────────
 export const CheckoutPage = () => {
   const navigate = useNavigate();
-  const { items, clearCart, getSelectedItems } = useCartStore();
+  const { items, clearCart, getSelectedItems, removeItemsBySelectionKeys } = useCartStore();
+  const { directItems, clearDirectCheckout } = useCheckoutSessionStore();
   const { user, updateUser } = useAuthStore();
 
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "vnpay" | "wallet">("cod");
@@ -129,13 +132,56 @@ export const CheckoutPage = () => {
   }, []);
 
   const selectedItems = getSelectedItems();
-  const checkoutItems = selectedItems.length > 0 ? selectedItems : items;
+  const checkoutSource = directItems.length > 0
+    ? 'direct'
+    : selectedItems.length > 0
+      ? 'selected_cart'
+      : items.length > 0
+        ? 'cart'
+        : 'empty';
+  const checkoutItems = checkoutSource === 'direct'
+    ? directItems
+    : checkoutSource === 'selected_cart'
+      ? selectedItems
+      : items;
+
+  const getCheckoutItemUnitPrice = (item: typeof checkoutItems[number]) => {
+    if (item.selectedVariantPrice != null) {
+      return Number(item.selectedVariantPrice);
+    }
+
+    const basePrice = Number(item.product.salePrice || item.product.price);
+    if (!item.selectedVariantId || !item.product.variants) {
+      return basePrice;
+    }
+
+    const variant = item.product.variants.find(
+      (productVariant) =>
+        productVariant.variantId === item.selectedVariantId ||
+        (productVariant as any).id === item.selectedVariantId
+    );
+
+    if ((variant as any)?.price != null) {
+      return Number((variant as any).price);
+    }
+
+    if (variant?.priceAdjustment != null) {
+      return basePrice + Number(variant.priceAdjustment);
+    }
+
+    return basePrice;
+  };
 
   useEffect(() => {
-    if (items.length === 0) navigate('/cart', { replace: true });
-  }, []);
+    if (checkoutItems.length === 0) {
+      navigate('/cart', { replace: true });
+    }
+  }, [checkoutItems.length, navigate]);
 
-  const subtotal = checkoutItems.reduce((sum, item) => sum + (item.product.salePrice || item.product.price) * item.quantity, 0);
+  const subtotal = checkoutItems.reduce(
+    (sum, item) => sum + getCheckoutItemUnitPrice(item) * item.quantity,
+    0
+  );
   const shippingFee = 0;
   const discountAmount = voucher ? (voucher.discountType === "percentage" ? Math.min(Math.round((subtotal * voucher.discountValue) / 100), voucher.maxDiscountAmount || Infinity) : voucher.discountValue) : 0;
   const total = subtotal + shippingFee - discountAmount;
@@ -156,11 +202,8 @@ export const CheckoutPage = () => {
     if (!isLocationSelected) {
       toast.error("Vui lòng chọn khu vực giao hàng hợp lệ!"); return;
     }
-    if (items.length === 0) {
-      toast.error("Giỏ hàng trống!"); return;
-    }
     if (checkoutItems.length === 0) {
-      toast.error("Vui lòng chọn ít nhất 1 sản phẩm!"); return;
+      toast.error("Không có sản phẩm để thanh toán!"); return;
     }
     if (paymentMethod === "wallet" && (user?.walletBalance ?? 0) < total) {
       toast.error("Số dư ví không đủ để thanh toán!"); return;
@@ -170,9 +213,7 @@ export const CheckoutPage = () => {
       setLoading(true);
       const orderData = {
         items: checkoutItems.map((item) => {
-          const basePrice = Number(item.product.salePrice || item.product.price);
-          const variant = item.selectedVariantId && item.product.variants ? item.product.variants.find(v => v.variantId === item.selectedVariantId) : undefined;
-          const price = variant?.priceAdjustment != null ? basePrice + Number(variant.priceAdjustment) : basePrice;
+          const price = getCheckoutItemUnitPrice(item);
           return { productId: item.product.productId, quantity: item.quantity, price, variantId: item.selectedVariantId };
         }),
         ...deliveryForm, // Trải data từ Hook Form vào đây
@@ -189,7 +230,20 @@ export const CheckoutPage = () => {
         return;
       }
 
-      clearCart();
+      if (checkoutSource === 'direct') {
+        clearDirectCheckout();
+      } else if (checkoutSource === 'selected_cart') {
+        removeItemsBySelectionKeys(
+          checkoutItems.map((item) =>
+            getCartSelectionKey(item.product.productId, item.selectedVariantId)
+          )
+        );
+        clearDirectCheckout();
+      } else {
+        clearCart();
+        clearDirectCheckout();
+      }
+
       toast.success("Đặt hàng thành công!");
       navigate(`/orders/${result.orderId}`);
     } catch (error) {
@@ -278,13 +332,23 @@ export const CheckoutPage = () => {
               <h2 className="text-lg font-black uppercase tracking-widest text-gray-700 mb-6">Đơn hàng ({checkoutItems.length} sản phẩm)</h2>
               <div className="space-y-4 mb-6">
                 {checkoutItems.map((item) => (
-                  <div key={item.product.productId} className="flex gap-3">
+                  <div
+                    key={getCartSelectionKey(item.product.productId, item.selectedVariantId)}
+                    className="flex gap-3"
+                  >
                     <img src={getImageUrl(item.product.mainImage)} alt={item.product.name} className="w-16 h-16 object-contain rounded-2xl bg-gray-50 border border-gray-100" />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-black text-gray-700 line-clamp-2">{item.product.name}</p>
+                      {item.selectedVariantName && (
+                        <p className="text-[11px] text-gray-500 font-semibold mt-1 line-clamp-2">
+                          {item.selectedVariantName}
+                        </p>
+                      )}
                       <p className="text-xs text-gray-400 font-bold mt-1">x{item.quantity}</p>
                     </div>
-                    <p className="text-xs font-black text-red-600 whitespace-nowrap">{((item.product.salePrice || item.product.price) * item.quantity).toLocaleString("vi-VN")}₫</p>
+                    <p className="text-xs font-black text-red-600 whitespace-nowrap">
+                      {(getCheckoutItemUnitPrice(item) * item.quantity).toLocaleString("vi-VN")}₫
+                    </p>
                   </div>
                 ))}
               </div>

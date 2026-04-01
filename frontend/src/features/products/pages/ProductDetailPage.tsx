@@ -6,6 +6,7 @@ import { Product } from "@/types";
 import { useNavigate } from "react-router-dom";
 import { ShoppingCart, Star, Truck, Shield, RefreshCw, ChevronRight, Check, Zap } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
+import { useCheckoutSessionStore } from "@/store/checkoutSessionStore";
 import toast from "react-hot-toast";
 import { ProductReviews } from '../components/ProductReviews';
 import {
@@ -77,6 +78,7 @@ export const ProductDetailPage = () => {
   const [reviewSummary, setReviewSummary] = useState({ average: 0, total: 0 });
 
   const { addItem, items } = useCartStore();
+  const { startDirectCheckout } = useCheckoutSessionStore();
 
   // Tìm variant đang chọn
   const variants = (product as any)?.variants ?? [];
@@ -227,7 +229,7 @@ export const ProductDetailPage = () => {
       toast.error(CART_QUANTITY_EXCEEDED_MESSAGE);
       return;
     }
-    addItem(product, nextQuantity, selectedVariantId ?? undefined);
+    startDirectCheckout(product, nextQuantity, selectedVariantId ?? undefined);
     navigate('/checkout');
   };
 

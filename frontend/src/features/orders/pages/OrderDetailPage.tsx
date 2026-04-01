@@ -33,6 +33,29 @@ const formatDateTime = (dateStr: string) =>
     hour: '2-digit', minute: '2-digit',
   });
 
+const formatOrderItemVariantSummary = (item: {
+  variantName?: string;
+  variant_name?: string;
+  sku?: string;
+}) => {
+  const variantName = item.variantName ?? item.variant_name ?? '';
+  const sku = item.sku ?? '';
+
+  if (variantName && sku) {
+    return `${variantName} • SKU: ${sku}`;
+  }
+
+  if (variantName) {
+    return variantName;
+  }
+
+  if (sku) {
+    return `SKU: ${sku}`;
+  }
+
+  return '';
+};
+
 const ORDER_STATUS_LABELS: Record<string, string> = {
   pending:   'Chờ xử lý',
   confirmed: 'Đã xác nhận',
@@ -179,6 +202,7 @@ const ReviewModal = ({
             const name = item.productName ?? `Sản phẩm ${index + 1}`;
             const img = item.productImage ?? '';
             const rating = ratings[item.orderDetailId] ?? 0;
+            const variantSummary = formatOrderItemVariantSummary(item);
             return (
               <div key={item.orderDetailId} className="space-y-3">
                 <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl">
@@ -187,8 +211,8 @@ const ReviewModal = ({
                     onError={e => { const el = e.target as HTMLImageElement; el.onerror = null; el.src = '/placeholder.jpg'; }} />
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm text-slate-800 truncate">{name}</p>
-                    {item.variantName && (
-                      <p className="text-xs text-slate-500 mt-0.5">{item.variantName}</p>
+                    {variantSummary && (
+                      <p className="text-xs text-slate-500 mt-0.5">{variantSummary}</p>
                     )}
                     <div className="mt-2 flex flex-wrap gap-2">
                       {item.canCreateReview && (
@@ -372,6 +396,7 @@ const ReturnModal = ({
                 const id   = item.orderDetailId;
                 const name = item.productName ?? `Sản phẩm #${id}`;
                 const img  = item.productImage ?? '';
+                const variantSummary = formatOrderItemVariantSummary(item);
                 const maxQty = item.quantity ?? 1;
                 const price  = Number(item.price ?? 0); // Lấy giá 1 SP
                 const sel  = selected[id];
@@ -407,7 +432,7 @@ const ReturnModal = ({
                     
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-slate-800 line-clamp-2">{name}</p>
-                      {item.variantName && <p className="text-xs text-slate-500 mt-0.5">{item.variantName}</p>}
+                      {variantSummary && <p className="text-xs text-slate-500 mt-0.5">{variantSummary}</p>}
                       
                       {/* Số lượng & Giá tiền */}
                       <div className="mt-2 flex items-end justify-between">
@@ -828,7 +853,7 @@ export const OrderDetailPage = () => {
                   <p className="text-sm text-gray-400 italic">Không có sản phẩm</p>
                 ) : items.map((item: any, idx: number) => {
                   const name    = item.productName ?? item.product_name ?? `Sản phẩm #${idx + 1}`;
-                  const variant = item.variantName ?? item.variant_name ?? '';
+                  const variant = formatOrderItemVariantSummary(item);
                   const qty     = item.quantity ?? 1;
                   const price   = Number(item.price ?? 0);
                   const sub     = Number(item.subtotal ?? price * qty);
@@ -963,12 +988,18 @@ export const OrderDetailPage = () => {
                         {/* Sản phẩm trong phiếu trả */}
                         {ret.items?.length > 0 && (
                           <div className="space-y-1.5">
-                            {ret.items.map((item) => (
-                              <div key={item.orderReturnItemId} className="text-xs text-gray-600 bg-gray-50 rounded-xl px-3 py-2">
-                                <span className="font-bold">{item.productName || `SP #${item.productId}`}</span>
-                                {' '} — SL: {item.quantity}
-                              </div>
-                            ))}
+                            {ret.items.map((item) => {
+                              const variantSummary = formatOrderItemVariantSummary(item);
+                              return (
+                                <div key={item.orderReturnItemId} className="text-xs text-gray-600 bg-gray-50 rounded-xl px-3 py-2">
+                                  <span className="font-bold">{item.productName || `SP #${item.productId}`}</span>
+                                  {variantSummary && (
+                                    <span className="text-gray-500"> • {variantSummary}</span>
+                                  )}
+                                  {' '} — SL: {item.quantity}
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                         {/* Timeline nhỏ */}

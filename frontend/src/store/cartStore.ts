@@ -15,6 +15,7 @@ interface CartState {
   hasInitializedSelection: boolean;
   addItem: (product: Product, quantity?: number, selectedVariantId?: number) => void;
   removeItem: (productId: number, selectedVariantId?: number) => void;
+  removeItemsBySelectionKeys: (selectionKeys: string[]) => void;
   removeSelectedItems: () => void;
   updateQuantity: (productId: number, quantity: number, selectedVariantId?: number) => void;
   clearCart: () => void;
@@ -143,6 +144,31 @@ export const useCartStore = create<CartState>()(
             items: filtered,
             selectedProductIds: state.selectedProductIds.filter((key) =>
               remainingSelectionKeys.has(key)
+            ),
+            hasInitializedSelection: true,
+          };
+        });
+      },
+
+      removeItemsBySelectionKeys: (selectionKeys) => {
+        set((state) => {
+          if (selectionKeys.length === 0) {
+            return {};
+          }
+
+          const selectedKeySet = new Set(selectionKeys);
+          const filtered = state.items.filter((item) => {
+            const selectionKey = getCartSelectionKey(
+              item.product.productId,
+              item.selectedVariantId
+            );
+            return !selectedKeySet.has(selectionKey);
+          });
+
+          return {
+            items: filtered,
+            selectedProductIds: state.selectedProductIds.filter(
+              (key) => !selectedKeySet.has(key)
             ),
             hasInitializedSelection: true,
           };
