@@ -177,9 +177,27 @@ getAll = async (req: Request, res: Response) => {
         productIds.map(async (id: number) => {
           const product = await this.productUseCase.getProductById(id);
           if (!product) return { productId: id, available: false, reason: 'not_found' };
+          const availableStockQuantity = await this.productUseCase.getAvailableProductStock(id);
           if (product.status === 'inactive') return { productId: id, available: false, reason: 'inactive', name: product.name };
-          if (product.stockQuantity <= 0) return { productId: id, available: false, reason: 'out_of_stock', name: product.name };
-          return { productId: id, available: true, status: product.status, stockQuantity: product.stockQuantity, price: product.price, salePrice: product.salePrice };
+          if (availableStockQuantity <= 0) {
+            return {
+              productId: id,
+              available: false,
+              reason: 'out_of_stock',
+              name: product.name,
+              stockQuantity: product.stockQuantity,
+              availableStockQuantity,
+            };
+          }
+          return {
+            productId: id,
+            available: true,
+            status: product.status,
+            stockQuantity: product.stockQuantity,
+            availableStockQuantity,
+            price: product.price,
+            salePrice: product.salePrice,
+          };
         })
       );
       res.json(results);

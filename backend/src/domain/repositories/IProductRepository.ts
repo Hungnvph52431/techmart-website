@@ -74,6 +74,8 @@ export interface IProductRepository {
   // Truy vấn chi tiết
   findById(productId: number): Promise<Product | null>;
   findBySlug(slug: string): Promise<Product | null>;
+  getAvailableProductStock(productId: number): Promise<number>;
+  getAvailableVariantStock(variantId: number): Promise<number>;
 
   // Thao tác cơ bản
   create(product: CreateProductDTO): Promise<Product>;

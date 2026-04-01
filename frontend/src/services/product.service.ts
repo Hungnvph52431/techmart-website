@@ -56,6 +56,7 @@ export const productService = {
       reason?: string;
       name?: string;
       stockQuantity?: number;
+      availableStockQuantity?: number;
       price?: number;
       salePrice?: number;
     }>;

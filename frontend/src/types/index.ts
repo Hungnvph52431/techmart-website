@@ -34,6 +34,7 @@ export interface ProductVariant {
   attributes: Record<string, any>;
   priceAdjustment: number;
   stockQuantity: number;
+  availableStockQuantity?: number;
   imageUrl?: string;
   isActive: boolean;
 }
@@ -58,6 +59,7 @@ export interface Product {
   images?: ProductImage[];
   variants?: ProductVariant[];
   stockQuantity: number;
+  availableStockQuantity?: number;
   soldQuantity: number;
   viewCount: number;
   ratingAvg: number;

@@ -72,7 +72,14 @@ export const useCartStore = create<CartState>()(
         const vPrice = (variant as any)?.price != null
           ? Number((variant as any).price)
           : (variant?.priceAdjustment != null ? basePrice + Number(variant.priceAdjustment) : basePrice);
-        const variantStock = variant ? Number(variant.stockQuantity ?? (variant as any)?.stock ?? 0) : 0;
+        const variantStock = variant
+          ? Number(
+              variant.availableStockQuantity ??
+                variant.stockQuantity ??
+                (variant as any)?.stock ??
+                0
+            )
+          : 0;
         if (existingItem) {
           const finalQuantity = clampCartItemQuantity(
             existingItem,
@@ -275,7 +282,12 @@ export const useCartStore = create<CartState>()(
               const vPrice = (variant as any).price != null
                 ? Number((variant as any).price)
                 : (variant.priceAdjustment != null ? basePrice + Number(variant.priceAdjustment) : basePrice);
-              const vStock = Number(variant.stockQuantity ?? (variant as any).stock ?? 0);
+              const vStock = Number(
+                variant.availableStockQuantity ??
+                  variant.stockQuantity ??
+                  (variant as any).stock ??
+                  0
+              );
               return {
                 ...item,
                 selectedVariantName: vName,
