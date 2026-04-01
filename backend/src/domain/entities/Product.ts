@@ -61,6 +61,8 @@ export interface Product {
   viewCount: number;
   ratingAvg: number;
   reviewCount: number;
+  hasVariants?: boolean;
+  variantCount?: number;
   isFeatured: boolean;
   isNew: boolean;
   isBestseller: boolean;

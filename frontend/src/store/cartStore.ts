@@ -12,8 +12,10 @@ interface CartState {
   items: CartItem[];
   /** Danh sách composite key (productId-variantId) đang được chọn để thanh toán */
   selectedProductIds: string[];
+  hasInitializedSelection: boolean;
   addItem: (product: Product, quantity?: number, selectedVariantId?: number) => void;
   removeItem: (productId: number, selectedVariantId?: number) => void;
+  removeSelectedItems: () => void;
   updateQuantity: (productId: number, quantity: number, selectedVariantId?: number) => void;
   clearCart: () => void;
   // Chọn/bỏ chọn sản phẩm (variant-aware)
@@ -48,6 +50,7 @@ export const useCartStore = create<CartState>()(
     (set, get) => ({
       items: [],
       selectedProductIds: [],
+      hasInitializedSelection: false,
 
       addItem: (product, quantity = 1, selectedVariantId) => {
         if (quantity <= 0) {
@@ -82,6 +85,7 @@ export const useCartStore = create<CartState>()(
                 ? { ...item, quantity: finalQuantity }
                 : item
             ),
+            hasInitializedSelection: true,
           });
         } else {
           const selectedVariantStock =
@@ -112,6 +116,7 @@ export const useCartStore = create<CartState>()(
             items: newItems,
             // Tự động chọn sản phẩm mới thêm (với variant key)
             selectedProductIds: [...get().selectedProductIds, selectionKey],
+            hasInitializedSelection: true,
           });
         }
       },
@@ -121,17 +126,41 @@ export const useCartStore = create<CartState>()(
           const filtered = state.items.filter(
             (item) => !matchesCartSelection(item, productId, selectedVariantId)
           );
-          // Nếu xóa hết items của product này (tất cả variants), xóa khỏi selectedProductIds
-          const hasProductLeft = filtered.some((item) => item.product.productId === productId);
+          const remainingSelectionKeys = new Set(
+            filtered.map((item) =>
+              getCartSelectionKey(item.product.productId, item.selectedVariantId)
+            )
+          );
+
           return {
             items: filtered,
-            selectedProductIds: hasProductLeft
-              ? state.selectedProductIds
-              : state.selectedProductIds.filter((key) => {
-                  // Xóa selection keys cho product này (ví dụ: "123" hoặc "123-456")
-                  const keyProductId = parseInt(key.split('-')[0]);
-                  return keyProductId !== productId;
-                }),
+            selectedProductIds: state.selectedProductIds.filter((key) =>
+              remainingSelectionKeys.has(key)
+            ),
+            hasInitializedSelection: true,
+          };
+        });
+      },
+
+      removeSelectedItems: () => {
+        set((state) => {
+          if (state.selectedProductIds.length === 0) {
+            return {};
+          }
+
+          const selectedKeySet = new Set(state.selectedProductIds);
+          const filtered = state.items.filter((item) => {
+            const selectionKey = getCartSelectionKey(
+              item.product.productId,
+              item.selectedVariantId
+            );
+            return !selectedKeySet.has(selectionKey);
+          });
+
+          return {
+            items: filtered,
+            selectedProductIds: [],
+            hasInitializedSelection: true,
           };
         });
       },
@@ -152,12 +181,13 @@ export const useCartStore = create<CartState>()(
                 ? { ...item, quantity: finalQuantity }
                 : item
             ),
+            hasInitializedSelection: true,
           });
         }
       },
 
       clearCart: () => {
-        set({ items: [], selectedProductIds: [] });
+        set({ items: [], selectedProductIds: [], hasInitializedSelection: false });
       },
 
       toggleSelect: (productId, variantId) => {
@@ -168,6 +198,7 @@ export const useCartStore = create<CartState>()(
             selectedProductIds: isSelected
               ? state.selectedProductIds.filter((id) => id !== selectionKey)
               : [...state.selectedProductIds, selectionKey],
+            hasInitializedSelection: true,
           };
         });
       },
@@ -176,11 +207,11 @@ export const useCartStore = create<CartState>()(
         const allKeys = get().items.map((item) =>
           getCartSelectionKey(item.product.productId, item.selectedVariantId)
         );
-        set({ selectedProductIds: allKeys });
+        set({ selectedProductIds: allKeys, hasInitializedSelection: true });
       },
 
       clearSelection: () => {
-        set({ selectedProductIds: [] });
+        set({ selectedProductIds: [], hasInitializedSelection: true });
       },
 
       getTotalItems: () => {
@@ -225,6 +256,11 @@ export const useCartStore = create<CartState>()(
             .map((item) =>
               getCartSelectionKey(item.product.productId, item.selectedVariantId)
             );
+          state.hasInitializedSelection = true;
+        }
+
+        if (state.selectedProductIds.length > 0 && !state.hasInitializedSelection) {
+          state.hasInitializedSelection = true;
         }
 
         // Migration 2: backfill variant info cho cart items cũ chưa có selectedVariantName
@@ -252,10 +288,11 @@ export const useCartStore = create<CartState>()(
         });
 
         // Auto-select nếu rỗng
-        if (state.items.length > 0 && state.selectedProductIds.length === 0) {
+        if (state.items.length > 0 && !state.hasInitializedSelection) {
           state.selectedProductIds = state.items.map((i) =>
             getCartSelectionKey(i.product.productId, i.selectedVariantId)
           );
+          state.hasInitializedSelection = true;
         }
       },
     }

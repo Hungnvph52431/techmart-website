@@ -18,7 +18,7 @@ export class ProductRepository implements IProductRepository {
 
  async findAll(filters?: any): Promise<Product[]> {
   const { query, params } = this.buildBaseListQuery(true, filters);
-  const fullSql = `SELECT p.*, c.name as categoryName, b.name as brandName ${query} ORDER BY p.created_at DESC`;
+  const fullSql = `${this.storefrontListSelect()} ${query} ORDER BY p.created_at DESC`;
   const [rows] = await this.pool.query<RowDataPacket[]>(fullSql, params);
   const products = rows.map(row => this.mapRowToProduct(row));
   return this.attachRelations(products, { includeVariants: false });
@@ -29,7 +29,7 @@ export class ProductRepository implements IProductRepository {
   const offset = (Number(page) - 1) * Number(limit);
   const { query, params } = this.buildBaseListQuery(true, filters);
 
-  const dataSql = `SELECT p.*, c.name as categoryName, b.name as brandName ${query} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`;
+  const dataSql = `${this.storefrontListSelect()} ${query} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`;
   const [rows] = await this.pool.query<RowDataPacket[]>(dataSql, [...params, Number(limit), Number(offset)]);
 
   const countSql = `SELECT COUNT(*) as total ${query}`;
@@ -167,6 +167,8 @@ export class ProductRepository implements IProductRepository {
 
   return {
     ...product,
+    hasVariants: variants.length > 0,
+    variantCount: variants.length,
     specifications: specs,
     images: images.map(this.mapRowToProductImage),
     variants: (variants as any[]).map(v => ({
@@ -538,6 +540,20 @@ async delete(id: number): Promise<boolean> {
             LEFT JOIN brands b ON p.brand_id = b.brand_id`;
   }
 
+  private storefrontListSelect() {
+    return `SELECT p.*, c.name as categoryName, b.name as brandName,
+            EXISTS(
+              SELECT 1
+              FROM product_variants pv
+              WHERE pv.product_id = p.product_id AND pv.is_active = 1
+            ) as hasVariants,
+            (
+              SELECT COUNT(*)
+              FROM product_variants pv
+              WHERE pv.product_id = p.product_id AND pv.is_active = 1
+            ) as variantCount`;
+  }
+
   private mapRowToProduct(row: any): Product {
   return {
     productId: row.product_id,
@@ -552,6 +568,12 @@ async delete(id: number): Promise<boolean> {
     salePrice: row.sale_price ? parseFloat(row.sale_price) : undefined,
     costPrice: row.cost_price ? parseFloat(row.cost_price) : undefined,
     stockQuantity: row.stock_quantity || 0,
+    soldQuantity: row.sold_quantity || 0,
+    viewCount: row.view_count || 0,
+    ratingAvg: row.rating_avg ? parseFloat(row.rating_avg) : 0,
+    reviewCount: row.review_count || 0,
+    hasVariants: Boolean(row.hasVariants),
+    variantCount: row.variantCount != null ? Number(row.variantCount) : 0,
     mainImage: row.main_image || '',
     description: row.description || '',
     status: row.status as ProductStatus,
