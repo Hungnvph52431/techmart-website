@@ -73,6 +73,11 @@ export const ProductCard = ({ product }: ProductCardProps) => {
   const discount = (product.salePrice && originalPrice > product.salePrice)
     ? Math.round(((originalPrice - product.salePrice) / originalPrice) * 100)
     : 0;
+  const ratingValue =
+    Number(product.reviewCount ?? 0) > 0
+      ? Number(product.ratingAvg ?? 0).toFixed(1)
+      : '0';
+  const soldQuantityText = Number(product.soldQuantity ?? 0).toLocaleString('vi-VN');
 
   return (
     <>
@@ -143,10 +148,10 @@ export const ProductCard = ({ product }: ProductCardProps) => {
           <div className="mb-3 flex items-center gap-2.5">
             <div className="flex items-center rounded-md bg-yellow-50 px-2 py-0.5">
               <Star className="h-3 w-3 fill-current text-yellow-500" />
-              <span className="ml-1 text-[11px] font-bold text-yellow-700">{product.ratingAvg || 0}</span>
+              <span className="ml-1 text-[11px] font-bold text-yellow-700">{ratingValue}</span>
             </div>
             <span className="text-[11px] font-medium text-gray-400">
-              Đã bán {product.soldQuantity || 0}
+              Đã bán {soldQuantityText}
             </span>
           </div>
 
