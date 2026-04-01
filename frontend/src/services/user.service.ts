@@ -116,6 +116,11 @@ export const userService = {
     return unwrapData<User>(response.data);
   },
 
+  updateMyProfile: async (payload: Partial<{ fullName: string; email: string; phone: string }>): Promise<any> => {
+    const response = await api.put('/users/me/profile', payload);
+    return response.data;
+  },
+
   deleteUser: async (userId: number): Promise<DeleteUserResponse> => {
     const response = await api.delete(`/users/${userId}`);
     return unwrapData<DeleteUserResponse>(response.data);

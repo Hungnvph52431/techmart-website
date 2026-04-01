@@ -791,8 +791,10 @@ export const ProfilePage = () => {
 
   const updateField = async (field: string, value: string) => {
     try {
-      const updated = await userService.updateUser(u.userId, { [field]: value } as UpdateUserPayload);
-      setAuth({ ...user, ...updated } as typeof user, useAuthStore.getState().token!);
+      const fieldMap: Record<string, string> = { name: 'fullName', email: 'email', phone: 'phone' };
+      const apiField = fieldMap[field] || field;
+      await userService.updateMyProfile({ [apiField]: value });
+      setAuth({ ...user, [field]: value } as typeof user, useAuthStore.getState().token!);
       toast.success('Cập nhật thành công');
     } catch { toast.error('Không thể cập nhật'); throw new Error('failed'); }
   };

@@ -197,14 +197,12 @@ export class OrderUseCase {
       throw new Error('Đơn hàng phải có ít nhất một sản phẩm');
     }
 
-    const validatedLocation =
-      this.vietnamAdministrativeService.validateCurrentSelection({
-        city: orderData.shippingCity,
-        ward: orderData.shippingWard,
-      });
-
-    orderData.shippingCity = validatedLocation.province.name;
-    orderData.shippingWard = validatedLocation.ward.name;
+    // Validate tỉnh/thành phố — ward chỉ validate ở frontend (backend data không đủ 11k+ phường/xã)
+    const province = this.vietnamAdministrativeService.resolveProvinceByName(orderData.shippingCity ?? '');
+    if (!province) {
+      throw new Error('Tỉnh/thành phố giao hàng không hợp lệ');
+    }
+    orderData.shippingCity = province.name;
     orderData.shippingDistrict = orderData.shippingDistrict?.trim() || undefined;
 
     // Kiểm tra tồn kho trước khi đặt hàng

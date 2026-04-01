@@ -32,6 +32,26 @@ export const createUserRoutes = (userController: UserController) => {
     }
   });
 
+  // ✅ Route tự cập nhật profile — chỉ cần đăng nhập
+  router.put('/me/profile', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user.userId;
+      // Chỉ cho phép sửa các field an toàn
+      const { fullName, email, phone } = req.body;
+      const updates: string[] = [];
+      const values: any[] = [];
+      if (fullName !== undefined) { updates.push('full_name = ?'); values.push(fullName); }
+      if (email !== undefined) { updates.push('email = ?'); values.push(email); }
+      if (phone !== undefined) { updates.push('phone = ?'); values.push(phone); }
+      if (updates.length === 0) return res.status(400).json({ message: 'Không có gì để cập nhật' });
+      values.push(userId);
+      await pool.execute(`UPDATE users SET ${updates.join(', ')} WHERE user_id = ?`, values);
+      return res.json({ success: true, message: 'Cập nhật thành công' });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   // ✅ Các route admin — áp dụng adminMiddleware từ đây trở xuống
   router.use(authMiddleware, adminMiddleware);
   router.get('/', userController.getAll);
