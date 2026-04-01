@@ -100,7 +100,7 @@ export const ProductListPage = () => {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-6 mb-12 md:grid-cols-3 lg:grid-cols-5">
+            <div className="grid grid-cols-4 gap-6 mb-12">
               {products.map((product) => (
                 <ProductCard key={product.productId} product={product} />
               ))}
