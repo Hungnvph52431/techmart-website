@@ -66,7 +66,7 @@ export const ProductListPage = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
           <h1 className="text-3xl font-black text-gray-800 uppercase italic tracking-tight">
-            Kho máy TechMart
+            Danh Sách Dản Phẩm
           </h1>
           <ProductsSort />
         </div>
