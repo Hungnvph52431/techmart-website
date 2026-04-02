@@ -31,7 +31,20 @@ export const RegisterPage = () => {
       toast.success('Đăng ký thành công! Vui lòng đăng nhập.');
       navigate('/login');
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Đăng ký thất bại');
+      let errorMessage = error.response?.data?.message || 'Đăng ký thất bại';
+      
+      // Dịch một số lỗi tiếng Anh phổ biến từ Backend sang Tiếng Việt
+      if (errorMessage.toLowerCase().includes('already exist') || errorMessage.toLowerCase().includes('duplicate entry')) {
+        if (errorMessage.toLowerCase().includes('email')) {
+            errorMessage = 'Email đã tồn tại';
+        } else if (errorMessage.toLowerCase().includes('phone')) {
+            errorMessage = 'Số điện thoại đã tồn tại';
+        } else {
+            errorMessage = 'Thông tin đã tồn tại';
+        }
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -46,7 +59,7 @@ export const RegisterPage = () => {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-2">
-                Họ và Tên
+                Họ và Tên <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -54,6 +67,8 @@ export const RegisterPage = () => {
                 value={formData.fullName}
                 onChange={handleChange}
                 required
+                onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Vui lòng nhập họ và tên')}
+                onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="Nguyễn Văn A"
               />
@@ -61,7 +76,7 @@ export const RegisterPage = () => {
 
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email
+                Email <span className="text-red-500">*</span>
               </label>
               <input
                 type="email"
@@ -69,6 +84,15 @@ export const RegisterPage = () => {
                 value={formData.email}
                 onChange={handleChange}
                 required
+                onInvalid={(e) => {
+                  const target = e.target as HTMLInputElement;
+                  if (target.validity.valueMissing) {
+                    target.setCustomValidity('Vui lòng nhập email');
+                  } else if (target.validity.typeMismatch) {
+                    target.setCustomValidity('Vui lòng nhập đúng định dạng email');
+                  }
+                }}
+                onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="example@email.com"
               />
@@ -76,7 +100,7 @@ export const RegisterPage = () => {
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Mật khẩu
+                Mật khẩu <span className="text-red-500">*</span>
               </label>
               <input
                 type="password"
@@ -85,6 +109,15 @@ export const RegisterPage = () => {
                 onChange={handleChange}
                 required
                 minLength={6}
+                onInvalid={(e) => {
+                  const target = e.target as HTMLInputElement;
+                  if (target.validity.valueMissing) {
+                    target.setCustomValidity('Vui lòng nhập mật khẩu');
+                  } else if (target.validity.tooShort) {
+                    target.setCustomValidity('Mật khẩu phải có ít nhất 6 ký tự');
+                  }
+                }}
+                onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="••••••••"
               />
@@ -92,7 +125,7 @@ export const RegisterPage = () => {
 
             <div>
               <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
-                Số điện thoại
+                Số điện thoại <span className="text-red-500">*</span>
               </label>
               <input
                 type="tel"
@@ -100,6 +133,8 @@ export const RegisterPage = () => {
                 value={formData.phone}
                 onChange={handleChange}
                 required
+                onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Vui lòng nhập số điện thoại')}
+                onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="09xx xxx xxx"
               />
