@@ -20,6 +20,7 @@ import { ReviewRepository } from './infrastructure/repositories/ReviewRepository
 import { BrandRepository } from './infrastructure/repositories/BrandRepository'; //
 import { CouponRepository } from './infrastructure/repositories/CouponRepository'; //
 import { BannerRepository } from './infrastructure/repositories/BannerRepository';
+import { WishlistRepository } from './infrastructure/repositories/WishlistRepository';
 
 // --- USE CASES ---
 import { AuthUseCase } from './application/use-cases/AuthUseCase';
@@ -33,6 +34,7 @@ import { ReviewUseCase } from './application/use-cases/ReviewUseCase';
 import { BrandUseCase } from './application/use-cases/BrandUseCase'; //
 import { CouponUseCase } from './application/use-cases/CouponUseCase'; //
 import { BannerUseCase } from './application/use-cases/BannerUseCase';
+import { WishlistUseCase } from './application/use-cases/WishlistUseCase';
 import { VietnamAdministrativeService } from './application/services/VietnamAdministrativeService';
 
 // --- CONTROLLERS ---
@@ -50,6 +52,7 @@ import { AttributeController } from './presentation/controllers/AttributeControl
 import { BrandController } from './presentation/controllers/BrandController'; //
 import { CouponController } from './presentation/controllers/CouponController'; //
 import { BannerController } from './presentation/controllers/BannerController';
+import { WishlistController } from './presentation/controllers/WishlistController';
 import { PaymentController } from './presentation/controllers/PaymentController';
 import { ReviewController } from './presentation/controllers/Reviewcontroller ';
 import { WalletUseCase } from './application/use-cases/WalletUseCase';
@@ -73,6 +76,7 @@ import { createCouponRoutes } from './presentation/routes/coupon.routes'; //
 import { createBannerRoutes, createAdminBannerRoutes } from './presentation/routes/banner.routes';
 import { createReviewRoutes, createAdminReviewRoutes } from './presentation/routes/review.routes';
 import { createLocationRoutes } from './presentation/routes/location.routes';
+import { createWishlistRoutes } from './presentation/routes/wishlist.routes';
 import path from 'path';
 
 dotenv.config();
@@ -111,6 +115,7 @@ const brandRepository = new BrandRepository(); //
 const couponRepository = new CouponRepository(); //
 const bannerRepository = new BannerRepository(); // db là pool MySQL của bạn
 const addressRepository = new AddressRepository();
+const wishlistRepository = new WishlistRepository();
 
 // Use Cases
 const vietnamAdministrativeService = new VietnamAdministrativeService();
@@ -129,6 +134,7 @@ const reviewUseCase = new ReviewUseCase(reviewRepository, orderRepository);
 const brandUseCase = new BrandUseCase(brandRepository); //
 const couponUseCase = new CouponUseCase(couponRepository); //
 const bannerUseCase = new BannerUseCase(bannerRepository);
+const wishlistUseCase = new WishlistUseCase(wishlistRepository);
 
 // Controllers
 const authController = new AuthController(authUseCase);
@@ -149,6 +155,7 @@ const walletUseCase = new WalletUseCase();
 const paymentController = new PaymentController(orderUseCase, walletUseCase);
 const addressController = new AddressController(addressRepository);
 const walletController = new WalletController(walletUseCase);
+const wishlistController = new WishlistController(wishlistUseCase);
 // --- ROUTES MOUNTING ---
 // Public & Customer Routes
 app.use('/api/auth', createAuthRoutes(authController));
@@ -165,6 +172,7 @@ app.use('/api/payment', createPaymentRoutes(paymentController));
 app.use('/api/reviews', createReviewRoutes(reviewController));
 app.use('/api/addresses', createAddressRoutes(addressController));
 app.use('/api/wallet', createWalletRoutes(walletController));
+app.use('/api/wishlist', createWishlistRoutes(wishlistController));
 
 // Admin Routes
 app.use('/api/admin/products', createAdminProductRoutes(adminProductController));

@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { useAuthStore } from '@/store/authStore';
+import { useWishlistStore } from '@/store/wishlistStore';
 import { useNavigate } from 'react-router-dom';
 import { userService, type UpdateUserPayload } from '@/services/user.service';
 import { addressService, type Address } from '@/services/address.service';
+import { FavoriteProductsSection } from '@/features/account/components/FavoriteProductsSection';
 import api from '@/services/api';
 import toast from 'react-hot-toast';
 import {
@@ -762,6 +764,7 @@ const EditableField = ({ label, value, icon, onSave, type = 'text', placeholder,
 // ─── Main ProfilePage ─────────────────────────────────────────────────────────
 export const ProfilePage = () => {
   const { user, setAuth, clearAuth } = useAuthStore();
+  const clearWishlist = useWishlistStore((state) => state.clearWishlist);
   const navigate = useNavigate();
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loadingAddresses, setLoadingAddresses] = useState(true);
@@ -851,6 +854,7 @@ export const ProfilePage = () => {
 
   const handleLogout = async () => {
     setLoggingOut(true); await new Promise(r => setTimeout(r, 400));
+    clearWishlist();
     clearAuth(); toast.success('Đã đăng xuất'); navigate('/login');
   };
 
@@ -920,6 +924,8 @@ export const ProfilePage = () => {
               <EditableField label="Vai trò" value={ROLE_LABELS[userRole] || 'Khách hàng'} icon={<Shield size={15} />} readOnly />
             </div>
           </div>
+
+          <FavoriteProductsSection userId={u.userId} />
 
           {/* ── Địa chỉ ── */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">

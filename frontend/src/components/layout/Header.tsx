@@ -4,6 +4,7 @@ import { ShoppingCart, User, Search, Wallet, X, Flame, UserCircle, Package, LogO
 import { useAuthStore } from '@/store/authStore';
 import { useCartStore } from '@/store/cartStore';
 import { useCheckoutSessionStore } from '@/store/checkoutSessionStore';
+import { useWishlistStore } from '@/store/wishlistStore';
 import { productService } from '@/services/product.service';
 import { categoryService, type Category } from '@/services/category.service';
 import type { Product } from '@/types';
@@ -19,6 +20,8 @@ export const Header = () => {
   const navigate = useNavigate();
   // Lấy dữ liệu từ Auth Store (Giữ logic của Khanh)
   const { user, isAuthenticated, clearAuth } = useAuthStore();
+  const hydrateWishlist = useWishlistStore((state) => state.hydrateWishlist);
+  const clearWishlist = useWishlistStore((state) => state.clearWishlist);
 
   // Lấy dữ liệu từ Cart Store (Tích hợp thêm Mini Cart của Tuấn Anh)
   const { getTotalItems, items, getTotalPrice } = useCartStore();
@@ -40,11 +43,21 @@ export const Header = () => {
 
   // SỬA LỖI 2339: Ưu tiên fullName
   const displayName = user?.fullName || user?.email || 'Tài khoản';
+  const authenticated = isAuthenticated();
 
   // Load categories 1 lần
   useEffect(() => {
     categoryService.getAll().then(setAllCategories).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (authenticated && user?.userId) {
+      hydrateWishlist(user.userId).catch(() => {});
+      return;
+    }
+
+    clearWishlist();
+  }, [authenticated, clearWishlist, hydrateWishlist, user?.userId]);
 
   // Logic đóng menu khi click ra ngoài
   useEffect(() => {
@@ -113,6 +126,7 @@ export const Header = () => {
 
   const handleLogout = () => {
     setIsUserMenuOpen(false);
+    clearWishlist();
     clearAuth();
     navigate('/');
   };
@@ -381,7 +395,7 @@ export const Header = () => {
                             className="flex items-center gap-3 px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                           >
                             <UserCircle className="h-4 w-4 text-gray-400" />
-                            Thông tin cá nhân
+                            Truy cập cá nhân
                           </Link>
                           <Link
                             to="/orders"
