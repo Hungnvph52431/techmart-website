@@ -337,3 +337,76 @@ export async function sendWalletTopupEmail(
   }
 }
 
+// ──────────────────────────────────────────────────────────────
+// Gửi OTP cho Quên mật khẩu
+// ──────────────────────────────────────────────────────────────
+interface ForgotPasswordOtpData {
+  customerName: string;
+  customerEmail: string;
+  otp: string;
+  expiresInMinutes: number;
+}
+
+export async function sendForgotPasswordOtpEmail(
+  data: ForgotPasswordOtpData,
+): Promise<void> {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn(
+      "[Email] SMTP_USER hoặc SMTP_PASS chưa được cấu hình — bỏ qua gửi OTP",
+    );
+    throw new Error(
+      "Cấu hình email chưa hoàn tất. Vui lòng kiểm tra biến môi trường.",
+    );
+  }
+
+  const fromName = process.env.SMTP_FROM_NAME || "TechMart";
+  const fromEmail = process.env.SMTP_USER;
+
+  const html = `
+  <div style="max-width:600px;margin:0 auto;font-family:'Segoe UI',Arial,sans-serif;color:#333;background:#f9fafb;padding:20px;">
+    <div style="background:#ef4444;padding:30px 24px;text-align:center;border-radius:12px 12px 0 0;">
+      <h1 style="color:#fff;margin:0;font-size:24px;font-weight:700;">Mã OTP đặt lại mật khẩu</h1>
+    </div>
+    
+    <div style="padding:30px 24px;background:#fff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;">
+      <p style="margin-bottom:16px;">Xin chào <strong>${data.customerName}</strong>,</p>
+      <p>Bạn đã yêu cầu đặt lại mật khẩu cho tài khoản TechMart.</p>
+      
+      <div style="background:#fef2f2;border:2px dashed #ef4444;border-radius:12px;padding:24px;margin:24px 0;text-align:center;">
+        <p style="margin:0 0 12px 0;color:#ef4444;font-size:13px;font-weight:600;letter-spacing:1px;">MÃ OTP CỦA BẠN</p>
+        <h2 style="margin:0;font-size:48px;letter-spacing:12px;color:#111827;font-weight:900;">${data.otp}</h2>
+        <p style="margin:16px 0 0 0;color:#6b7280;font-size:14px;">
+          Hiệu lực trong <strong>${data.expiresInMinutes} phút</strong>
+        </p>
+      </div>
+
+      <div style="background:#fff7ed;border-left:4px solid #f59e0b;padding:12px 16px;margin:20px 0;font-size:13px;color:#b45309;">
+        <strong>Lưu ý:</strong> Không chia sẻ mã này với bất kỳ ai. 
+        Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.
+      </div>
+
+      <hr style="margin:28px 0;border:none;border-top:1px solid #e5e7eb;">
+
+      <p style="font-size:13px;color:#6b7280;text-align:center;">
+        Cảm ơn bạn đã sử dụng dịch vụ của TechMart!<br>
+        Hotline hỗ trợ: <strong>1900 1234</strong>
+      </p>
+    </div>
+  </div>`;
+
+  try {
+    await getTransporter().sendMail({
+      from: `"${fromName}" <${fromEmail}>`,
+      to: data.customerEmail,
+      subject: `[TechMart] Mã OTP đặt lại mật khẩu - ${data.otp}`,
+      html,
+    });
+
+    console.log(`[Email] ✓ Đã gửi OTP thành công cho ${data.customerEmail}`);
+  } catch (error: any) {
+    console.error("[Email] ✗ Lỗi gửi OTP:", error.message || error);
+    throw new Error(
+      `Không thể gửi OTP qua email: ${error.message || "Lỗi không xác định"}`,
+    );
+  }
+}
