@@ -1,5 +1,5 @@
-import { Request, Response } from 'express';
-import { AuthUseCase } from '../../application/use-cases/AuthUseCase';
+import { Request, Response } from "express";
+import { AuthUseCase } from "../../application/use-cases/AuthUseCase";
 
 export class AuthController {
   constructor(private authUseCase: AuthUseCase) {}
@@ -8,9 +8,11 @@ export class AuthController {
     try {
       // req.body chứa email và password
       const result = await this.authUseCase.login(req.body);
-      
+
       if (!result) {
-        return res.status(401).json({ message: 'Email hoặc mật khẩu không chính xác' });
+        return res
+          .status(401)
+          .json({ message: "Email hoặc mật khẩu không chính xác" });
       }
 
       res.json(result);
@@ -37,18 +39,78 @@ export class AuthController {
       const authUser = (req as any).user;
 
       if (!authUser || !authUser.userId) {
-        return res.status(401).json({ message: 'Bạn chưa đăng nhập' });
+        return res.status(401).json({ message: "Bạn chưa đăng nhập" });
       }
 
       const user = await this.authUseCase.getProfile(authUser.userId);
 
       if (!user) {
-        return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+        return res.status(404).json({ message: "Không tìm thấy người dùng" });
       }
 
       res.json({ user });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  };
+
+  forgotPassword = async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Vui lòng nhập email" });
+      }
+
+      const result = await this.authUseCase.forgotPassword(email);
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  };
+
+  verifyOtp = async (req: Request, res: Response) => {
+    try {
+      const { tempToken, otp } = req.body;
+
+      if (!tempToken || !otp) {
+        return res
+          .status(400)
+          .json({ message: "Thiếu thông tin (tempToken hoặc OTP)" });
+      }
+
+      const result = await this.authUseCase.verifyForgotPasswordOtp(
+        tempToken,
+        otp,
+      );
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  };
+
+  resetPassword = async (req: Request, res: Response) => {
+    try {
+      const { resetToken, newPassword } = req.body;
+
+      if (!resetToken || !newPassword) {
+        return res
+          .status(400)
+          .json({ message: "Thiếu thông tin (resetToken hoặc mật khẩu mới)" });
+      }
+
+      if (newPassword.length < 8) {
+        return res
+          .status(400)
+          .json({ message: "Mật khẩu phải có ít nhất 8 ký tự" });
+      }
+
+      const result = await this.authUseCase.resetPassword(
+        resetToken,
+        newPassword,
+      );
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
     }
   };
 }

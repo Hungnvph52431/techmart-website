@@ -1,27 +1,36 @@
-import { IUserRepository } from '../../domain/repositories/IUserRepository';
-import { UserLoginDTO } from '../../domain/entities/User';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import { IUserRepository } from "../../domain/repositories/IUserRepository";
+import { UserLoginDTO } from "../../domain/entities/User";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import crypto from "crypto";
+// import { sendForgotPasswordOtpEmail } from "../../application/services/EmailService";
 
-const JWT_SECRET: string = process.env.JWT_SECRET || 'secret';
-// SỬA TẠI ĐÂY: Ép kiểu 'any' hoặc dùng kiểu cụ thể để TypeScript không bắt bẻ
-const JWT_EXPIRES = (process.env.JWT_EXPIRES_IN || '7d') as any;
+const JWT_SECRET: string = process.env.JWT_SECRET || "secret";
+const JWT_EXPIRES = (process.env.JWT_EXPIRES_IN || "7d") as any;
+
+const OTP_EXPIRY_MINUTES = 10;
+const TEMP_TOKEN_EXPIRY = "15m";
 
 export class AuthUseCase {
   constructor(private userRepository: IUserRepository) {}
 
-  async login(loginData: UserLoginDTO): Promise<{ token: string; user: any } | null> {
+  async login(
+    loginData: UserLoginDTO,
+  ): Promise<{ token: string; user: any } | null> {
     const user = await this.userRepository.findByEmail(loginData.email);
     if (!user) return null;
 
-    const isPasswordValid = await bcrypt.compare(loginData.password, user.password);
+    const isPasswordValid = await bcrypt.compare(
+      loginData.password,
+      user.password,
+    );
     if (!isPasswordValid) return null;
 
     // Bây giờ TypeScript sẽ cho phép dùng JWT_EXPIRES mà không báo lỗi
     const token = jwt.sign(
       { userId: user.userId, email: user.email, role: user.role },
       JWT_SECRET,
-      { expiresIn: JWT_EXPIRES }
+      { expiresIn: JWT_EXPIRES },
     );
 
     const { password, ...userWithoutPassword } = user;
@@ -30,7 +39,7 @@ export class AuthUseCase {
 
   async register(userData: any) {
     const existingUser = await this.userRepository.findByEmail(userData.email);
-    if (existingUser) throw new Error('Email already exists');
+    if (existingUser) throw new Error("Email already exists");
 
     const user = await this.userRepository.create(userData);
     const { password, ...userWithoutPassword } = user;
@@ -38,7 +47,7 @@ export class AuthUseCase {
     const token = jwt.sign(
       { userId: user.userId, email: user.email, role: user.role },
       JWT_SECRET,
-      { expiresIn: JWT_EXPIRES }
+      { expiresIn: JWT_EXPIRES },
     );
 
     return { token, user: userWithoutPassword };
@@ -58,4 +67,6 @@ export class AuthUseCase {
       return null;
     }
   }
+
+  
 }

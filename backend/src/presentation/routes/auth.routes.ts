@@ -9,5 +9,8 @@ export const createAuthRoutes = (authController: AuthController) => {
   router.post('/register', authController.register);
   router.get('/profile', authMiddleware, authController.getProfile);
 
+  router.post('/forgot-password', authController.forgotPassword);
+  router.post('/verify-otp', authController.verifyOtp);
+  router.post('/reset-password', authController.resetPassword);
   return router;
 };

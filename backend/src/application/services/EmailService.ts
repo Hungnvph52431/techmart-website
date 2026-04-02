@@ -1,5 +1,5 @@
-import nodemailer from 'nodemailer';
-import type { Transporter } from 'nodemailer';
+import nodemailer from "nodemailer";
+import type { Transporter } from "nodemailer";
 
 // Lazy initialization — tránh đọc env trước khi dotenv.config() chạy
 let _transporter: Transporter | null = null;
@@ -7,12 +7,12 @@ let _transporter: Transporter | null = null;
 function getTransporter(): Transporter {
   if (!_transporter) {
     _transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      host: process.env.SMTP_HOST || "smtp.gmail.com",
       port: Number(process.env.SMTP_PORT) || 587,
       secure: false,
       auth: {
-        user: process.env.SMTP_USER || '',
-        pass: process.env.SMTP_PASS || '',
+        user: process.env.SMTP_USER || "",
+        pass: process.env.SMTP_PASS || "",
       },
     });
   }
@@ -42,28 +42,30 @@ interface PaymentSuccessData {
 }
 
 function formatCurrency(amount: number): string {
-  return amount.toLocaleString('vi-VN') + 'đ';
+  return amount.toLocaleString("vi-VN") + "đ";
 }
 
 function getPaymentMethodLabel(method: string): string {
   const map: Record<string, string> = {
-    cod: 'Thanh toán khi nhận hàng (COD)',
-    bank_transfer: 'Chuyển khoản ngân hàng',
-    momo: 'Ví MoMo',
-    vnpay: 'VNPay',
-    wallet: 'Ví TechMart',
-    deposit: 'Đặt cọc (Ví + COD)',
+    cod: "Thanh toán khi nhận hàng (COD)",
+    bank_transfer: "Chuyển khoản ngân hàng",
+    momo: "Ví MoMo",
+    vnpay: "VNPay",
+    wallet: "Ví TechMart",
+    deposit: "Đặt cọc (Ví + COD)",
   };
   return map[method] || method;
 }
 
-export async function sendPaymentSuccessEmail(data: PaymentSuccessData): Promise<void> {
+export async function sendPaymentSuccessEmail(
+  data: PaymentSuccessData,
+): Promise<void> {
   if (!process.env.SMTP_USER) {
-    console.warn('[Email] SMTP_USER chưa cấu hình — bỏ qua gửi email');
+    console.warn("[Email] SMTP_USER chưa cấu hình — bỏ qua gửi email");
     return;
   }
 
-  const fromName = process.env.SMTP_FROM_NAME || 'TechMart';
+  const fromName = process.env.SMTP_FROM_NAME || "TechMart";
   const fromEmail = process.env.SMTP_USER;
 
   const itemsHtml = data.items
@@ -74,9 +76,9 @@ export async function sendPaymentSuccessEmail(data: PaymentSuccessData): Promise
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;">${item.quantity}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;">${formatCurrency(item.price)}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;">${formatCurrency(item.subtotal)}</td>
-      </tr>`
+      </tr>`,
     )
-    .join('');
+    .join("");
 
   const html = `
   <div style="max-width:600px;margin:0 auto;font-family:'Segoe UI',Arial,sans-serif;color:#333;">
@@ -135,9 +137,11 @@ export async function sendPaymentSuccessEmail(data: PaymentSuccessData): Promise
       subject: `[TechMart] Thanh toán thành công — Đơn hàng #${data.orderCode}`,
       html,
     });
-    console.log(`[Email] Đã gửi email thanh toán thành công cho ${data.customerEmail} (đơn ${data.orderCode})`);
+    console.log(
+      `[Email] Đã gửi email thanh toán thành công cho ${data.customerEmail} (đơn ${data.orderCode})`,
+    );
   } catch (error) {
-    console.error('[Email] Lỗi gửi email:', error);
+    console.error("[Email] Lỗi gửi email:", error);
   }
 }
 
@@ -163,20 +167,23 @@ interface OrderCreatedData {
   shippingCity: string;
 }
 
-export async function sendOrderCreatedEmail(data: OrderCreatedData): Promise<void> {
+export async function sendOrderCreatedEmail(
+  data: OrderCreatedData,
+): Promise<void> {
   if (!process.env.SMTP_USER) {
-    console.warn('[Email] SMTP_USER chưa cấu hình — bỏ qua gửi email');
+    console.warn("[Email] SMTP_USER chưa cấu hình — bỏ qua gửi email");
     return;
   }
 
-  const fromName = process.env.SMTP_FROM_NAME || 'TechMart';
+  const fromName = process.env.SMTP_FROM_NAME || "TechMart";
   const fromEmail = process.env.SMTP_USER;
 
-  const paymentNote = data.paymentMethod === 'cod'
-    ? '<p style="color:#f59e0b;font-weight:bold;">Bạn sẽ thanh toán khi nhận hàng (COD).</p>'
-    : data.paymentMethod === 'wallet'
-      ? '<p style="color:#10b981;font-weight:bold;">Đã thanh toán bằng Ví TechMart.</p>'
-      : `<p style="color:#f59e0b;font-weight:bold;">Vui lòng hoàn tất thanh toán qua ${getPaymentMethodLabel(data.paymentMethod)} để đơn hàng được xử lý.</p>`;
+  const paymentNote =
+    data.paymentMethod === "cod"
+      ? '<p style="color:#f59e0b;font-weight:bold;">Bạn sẽ thanh toán khi nhận hàng (COD).</p>'
+      : data.paymentMethod === "wallet"
+        ? '<p style="color:#10b981;font-weight:bold;">Đã thanh toán bằng Ví TechMart.</p>'
+        : `<p style="color:#f59e0b;font-weight:bold;">Vui lòng hoàn tất thanh toán qua ${getPaymentMethodLabel(data.paymentMethod)} để đơn hàng được xử lý.</p>`;
 
   const itemsHtml = data.items
     .map(
@@ -186,9 +193,9 @@ export async function sendOrderCreatedEmail(data: OrderCreatedData): Promise<voi
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;">${item.quantity}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;">${formatCurrency(item.price)}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;">${formatCurrency(item.subtotal)}</td>
-      </tr>`
+      </tr>`,
     )
-    .join('');
+    .join("");
 
   const html = `
   <div style="max-width:600px;margin:0 auto;font-family:'Segoe UI',Arial,sans-serif;color:#333;">
@@ -250,9 +257,11 @@ export async function sendOrderCreatedEmail(data: OrderCreatedData): Promise<voi
       subject: `[TechMart] Đặt hàng thành công — Đơn hàng #${data.orderCode}`,
       html,
     });
-    console.log(`[Email] Đã gửi email đặt hàng thành công cho ${data.customerEmail} (đơn ${data.orderCode})`);
+    console.log(
+      `[Email] Đã gửi email đặt hàng thành công cho ${data.customerEmail} (đơn ${data.orderCode})`,
+    );
   } catch (error) {
-    console.error('[Email] Lỗi gửi email đặt hàng:', error);
+    console.error("[Email] Lỗi gửi email đặt hàng:", error);
   }
 }
 
@@ -267,13 +276,15 @@ interface WalletTopupSuccessData {
   newBalance: number;
 }
 
-export async function sendWalletTopupEmail(data: WalletTopupSuccessData): Promise<void> {
+export async function sendWalletTopupEmail(
+  data: WalletTopupSuccessData,
+): Promise<void> {
   if (!process.env.SMTP_USER) {
-    console.warn('[Email] SMTP_USER chưa cấu hình — bỏ qua gửi email');
+    console.warn("[Email] SMTP_USER chưa cấu hình — bỏ qua gửi email");
     return;
   }
 
-  const fromName = process.env.SMTP_FROM_NAME || 'TechMart';
+  const fromName = process.env.SMTP_FROM_NAME || "TechMart";
   const fromEmail = process.env.SMTP_USER;
 
   const html = `
@@ -318,8 +329,11 @@ export async function sendWalletTopupEmail(data: WalletTopupSuccessData): Promis
       subject: `[TechMart] Nạp ví thành công — ${data.referenceCode}`,
       html,
     });
-    console.log(`[Email] Đã gửi email nạp ví thành công cho ${data.customerEmail} (${data.referenceCode})`);
+    console.log(
+      `[Email] Đã gửi email nạp ví thành công cho ${data.customerEmail} (${data.referenceCode})`,
+    );
   } catch (error) {
-    console.error('[Email] Lỗi gửi email nạp ví:', error);
+    console.error("[Email] Lỗi gửi email nạp ví:", error);
   }
 }
+
