@@ -30,7 +30,7 @@ export class AuthUseCase {
 
   async register(userData: any) {
     const existingUser = await this.userRepository.findByEmail(userData.email);
-    if (existingUser) throw new Error('Email already exists');
+    if (existingUser) throw new Error('Email đã tồn tại');
 
     const user = await this.userRepository.create(userData);
     const { password, ...userWithoutPassword } = user;
