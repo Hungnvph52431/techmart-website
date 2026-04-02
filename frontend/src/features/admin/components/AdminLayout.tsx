@@ -18,16 +18,19 @@ import {
   Wallet,
   Menu,
   PanelLeftClose,
+  Tag,
 } from 'lucide-react';
+
+const ALLOWED_ROLES = ['admin', 'staff', 'warehouse'];
 
 export const AdminLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, clearAuth } = useAuthStore();
 
-  // Kiểm tra quyền truy cập Admin
+  // Kiểm tra quyền truy cập
   useEffect(() => {
-    if (!user || user.role !== 'admin') {
+    if (!user || !ALLOWED_ROLES.includes(user.role)) {
       navigate('/login');
     }
   }, [user, navigate]);
@@ -44,9 +47,13 @@ export const AdminLayout = () => {
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  if (!user || user.role !== 'admin') return null;
+  if (!user || !ALLOWED_ROLES.includes(user.role)) return null;
 
-  // FIX LỖI 2339: Sử dụng fullName từ Store
+  const isAdmin = user.role === 'admin';
+  const isStaff = user.role === 'staff';
+  const isWarehouse = user.role === 'warehouse';
+
+  const roleLabel = isAdmin ? 'Admin' : isStaff ? 'Nhân viên' : 'Kho';
   const displayName = user.fullName || user.email;
 
   return (
@@ -76,6 +83,8 @@ export const AdminLayout = () => {
             <div className="flex items-center space-x-2 text-gray-600 bg-gray-100 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-tighter">
               <UserIcon size={14} />
               <span>{displayName}</span>
+              <span className="text-gray-400">·</span>
+              <span className="text-blue-500">{roleLabel}</span>
             </div>
             
             <Link to="/" className="text-gray-400 hover:text-blue-600 flex items-center gap-1 text-[10px] font-black uppercase tracking-widest transition-colors">
@@ -99,20 +108,37 @@ export const AdminLayout = () => {
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 mb-3 mt-2">Tổng quan</p>
             <SidebarLink to="/admin" icon={<LayoutDashboard size={18} />} label="Dashboard" active={isActive('/admin')} />
 
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 mt-8 mb-3">Cấu hình TechMart</p>
-            <SidebarLink to="/admin/categories" icon={<Layers size={18} />} label="Danh mục" active={isActive('/admin/categories')} />
-            <SidebarLink to="/admin/attributes" icon={<Settings2 size={18} />} label="Thuộc tính" active={isActive('/admin/attributes')} />
+            {/* Cấu hình — Admin + Staff */}
+            {(isAdmin || isStaff) && (<>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 mt-8 mb-3">Cấu hình TechMart</p>
+              <SidebarLink to="/admin/categories" icon={<Layers size={18} />} label="Danh mục" active={isActive('/admin/categories')} />
+              <SidebarLink to="/admin/brands" icon={<Tag size={18} />} label="Thương hiệu" active={isActive('/admin/brands')} />
+              {isAdmin && <SidebarLink to="/admin/attributes" icon={<Settings2 size={18} />} label="Thuộc tính" active={isActive('/admin/attributes')} />}
+            </>)}
 
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 mt-8 mb-3">Quản lý bán hàng</p>
-            <SidebarLink to="/admin/products" icon={<Package size={18} />} label="Sản phẩm" active={isActive('/admin/products')} />
-            <SidebarLink to="/admin/orders" icon={<ShoppingCart size={18} />} label="Đơn hàng" active={isActive('/admin/orders')} />
-            <SidebarLink to="/admin/users" icon={<Users size={18} />} label="Khách hàng" active={isActive('/admin/users')} />
 
-            <SidebarLink to="/admin/vouchers" icon={<Ticket size={18} />} label="Mã giảm giá" active={isActive('/admin/vouchers')} />
-            <SidebarLink to="/admin/banners" icon={<Image size={18} />} label="Banner" active={isActive('/admin/banners')} />
-            <SidebarLink to="/admin/reviews" icon={<Star size={18} />} label="Đánh giá" active={isActive('/admin/reviews')} />
-            <SidebarLink to="/admin/returns" icon={<RotateCcw size={18} />} label="Hoàn/Trả hàng" active={isActive('/admin/returns')} />
-            <SidebarLink to="/admin/wallet-topups" icon={<Wallet size={18} />} label="Lịch sử nạp ví" active={isActive('/admin/wallet-topups')} />
+            {/* Sản phẩm — Admin + Warehouse */}
+            {(isAdmin || isWarehouse) && <SidebarLink to="/admin/products" icon={<Package size={18} />} label="Sản phẩm" active={isActive('/admin/products')} />}
+
+            {/* Đơn hàng — tất cả */}
+            <SidebarLink to="/admin/orders" icon={<ShoppingCart size={18} />} label="Đơn hàng" active={isActive('/admin/orders')} />
+
+            {/* Khách hàng — Admin + Staff */}
+            {(isAdmin || isStaff) && <SidebarLink to="/admin/users" icon={<Users size={18} />} label="Khách hàng" active={isActive('/admin/users')} />}
+
+            {/* Đánh giá & Hoàn trả — Admin + Staff */}
+            {(isAdmin || isStaff) && <>
+              <SidebarLink to="/admin/reviews" icon={<Star size={18} />} label="Đánh giá" active={isActive('/admin/reviews')} />
+              <SidebarLink to="/admin/returns" icon={<RotateCcw size={18} />} label="Hoàn/Trả hàng" active={isActive('/admin/returns')} />
+            </>}
+
+            {/* Admin only */}
+            {isAdmin && <>
+              <SidebarLink to="/admin/vouchers" icon={<Ticket size={18} />} label="Mã giảm giá" active={isActive('/admin/vouchers')} />
+              <SidebarLink to="/admin/banners" icon={<Image size={18} />} label="Banner" active={isActive('/admin/banners')} />
+              <SidebarLink to="/admin/wallet-topups" icon={<Wallet size={18} />} label="Lịch sử nạp ví" active={isActive('/admin/wallet-topups')} />
+            </>}
           </nav>
         </aside>
 
