@@ -26,7 +26,6 @@ import { CustomerOrdersLayout } from '@/features/orders/components/CustomerOrder
 import { OrdersPage } from '@/features/orders/pages/OrdersPage';
 import { OrderDetailPage } from '@/features/orders/pages/OrderDetailPage';
 import { PaymentResultPage } from '@/features/payment/pages/PaymentResultPage';
-import { BankTransferPage } from '@/features/payment/pages/BankTransferPage';
 // --- QUẢN TRỊ (ADMIN) ---
 import { AdminReviews } from '@/features/admin/pages/AdminReviews';
 import { AdminLayout } from '@/features/admin/components/AdminLayout';
@@ -38,6 +37,7 @@ import { AdminOrders } from '@/features/admin/pages/AdminOrders';
 import { AdminUsers } from '@/features/admin/pages/AdminUsers';
 import { AdminAttributes } from '@/features/admin/pages/AdminAttributes';
 import { AdminVoucher } from '@/features/admin/pages/AdminVouchers';
+import { AdminBrands } from '@/features/admin/pages/AdminBrands';
 import { AdminBanners } from '@/features/admin/pages/AdminBanners';
 import { AdminOrderDetail } from './features/admin/pages/AdminOrderDetail';
 import { AdminReturns } from '@/features/admin/pages/AdminReturns';
@@ -64,7 +64,6 @@ function App() {
         <Route path="/cart" element={<CartPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/payment/result" element={<PaymentResultPage />} />
-        <Route path="/payment/bank-transfer/:orderId" element={<BankTransferPage />} />
         {/* Bảo vệ các route cần đăng nhập (Đơn hàng & Profile) */}
         <Route element={<CustomerRouteGuard />}>
           <Route path="/orders" element={<CustomerOrdersLayout />}>
@@ -90,6 +89,7 @@ function App() {
           <Route path="orders" element={<AdminOrders />} />
           <Route path="/admin/orders/:id" element={<AdminOrderDetail />} />
           <Route path="users" element={<AdminUsers />} />
+          <Route path="brands" element={<AdminBrands />} />
           <Route path="vouchers" element={<AdminVoucher />} />
           <Route path="reviews" element={<AdminReviews />} />
           <Route path="returns" element={<AdminReturns />} />

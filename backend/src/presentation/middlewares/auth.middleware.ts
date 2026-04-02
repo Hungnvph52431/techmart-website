@@ -29,3 +29,27 @@ export const adminMiddleware = (req: AuthRequest, res: Response, next: NextFunct
   }
   next();
 };
+
+// Admin + Staff
+export const staffMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (!['admin', 'staff'].includes(req.user?.role)) {
+    return res.status(403).json({ message: 'Yêu cầu quyền nhân viên' });
+  }
+  next();
+};
+
+// Admin + Staff + Warehouse (tất cả role nội bộ)
+export const internalMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (!['admin', 'staff', 'warehouse'].includes(req.user?.role)) {
+    return res.status(403).json({ message: 'Yêu cầu quyền nội bộ' });
+  }
+  next();
+};
+
+// Admin + Warehouse
+export const warehouseMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (!['admin', 'warehouse'].includes(req.user?.role)) {
+    return res.status(403).json({ message: 'Yêu cầu quyền kho' });
+  }
+  next();
+};

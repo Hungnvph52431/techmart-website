@@ -3,7 +3,7 @@
 
 import { Router } from 'express';
 import { ReviewController } from '../controllers/Reviewcontroller ';
-import { authMiddleware, adminMiddleware } from '../middlewares/auth.middleware';
+import { authMiddleware, adminMiddleware, staffMiddleware } from '../middlewares/auth.middleware';
 
 export const createReviewRoutes = (reviewController: ReviewController) => {
   const router = Router();
@@ -29,7 +29,8 @@ export const createReviewRoutes = (reviewController: ReviewController) => {
 
 export const createAdminReviewRoutes = (reviewController: ReviewController) => {
   const router = Router();
-  router.use(authMiddleware, adminMiddleware);
+  // Admin + Staff: quản lý đánh giá
+  router.use(authMiddleware, staffMiddleware);
   router.get('/', reviewController.adminGetAll);
   router.patch('/:reviewId/status', reviewController.updateStatus);
   return router;

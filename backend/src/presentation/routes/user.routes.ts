@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { UserController } from "../controllers/UserControllers";
-import { authMiddleware, adminMiddleware } from "../middlewares/auth.middleware";
+import { authMiddleware, adminMiddleware, staffMiddleware } from "../middlewares/auth.middleware";
 import { uploadAvatar, uploadBanner } from "../middlewares/upload.middleware";
 import pool  from "../../infrastructure/database/connection";
 import type { AuthRequest } from "../middlewares/auth.middleware";
@@ -52,11 +52,15 @@ export const createUserRoutes = (userController: UserController) => {
     }
   });
 
-  // ✅ Các route admin — áp dụng adminMiddleware từ đây trở xuống
+  // Tất cả role nội bộ: xem stats (dùng cho Dashboard)
+  router.get('/stats', authMiddleware, userController.getStats);
+
+  // Staff + Admin: xem danh sách & chi tiết khách hàng (chăm sóc khách hàng)
+  router.get('/', authMiddleware, staffMiddleware, userController.getAll);
+  router.get('/:id', authMiddleware, staffMiddleware, userController.getById);
+
+  // Admin only: tạo/sửa/xoá, thay đổi trạng thái, điểm, mật khẩu
   router.use(authMiddleware, adminMiddleware);
-  router.get('/', userController.getAll);
-  router.get('/stats', userController.getStats);
-  router.get('/:id', userController.getById);
   router.post('/', userController.create);
   router.put('/:id', userController.update);
   router.delete('/:id', userController.delete);

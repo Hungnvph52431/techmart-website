@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { OrderController } from '../controllers/OrderController';
-import { authMiddleware, adminMiddleware } from '../middlewares/auth.middleware';
+import { authMiddleware, adminMiddleware, staffMiddleware } from '../middlewares/auth.middleware';
 import { uploadReturnEvidence } from '../middlewares/upload.middleware';
 
 export const createOrderRoutes = (orderController: OrderController) => {
@@ -8,34 +8,20 @@ export const createOrderRoutes = (orderController: OrderController) => {
 
   // --- 1. ROUTES DÀNH CHO ADMIN (Quản trị & Thống kê) ---
   // Route thống kê phải đặt trên cùng để tránh nhầm lẫn với tham số :id
-  router.get(
-    '/stats', 
-    authMiddleware, 
-    adminMiddleware, 
-    orderController.getStats
-  );
+  // Staff + Warehouse + Admin: xem thống kê
+  router.get('/stats', authMiddleware, orderController.getStats);
 
-  // Lấy danh sách toàn bộ đơn hàng (Admin)
-  router.get(
-    '/', 
-    authMiddleware, 
-    adminMiddleware, 
-    orderController.getAll
-  );
+  // Staff + Admin: xem tất cả đơn hàng
+  router.get('/', authMiddleware, staffMiddleware, orderController.getAll);
 
-  // Cập nhật trạng thái đơn hàng & thanh toán
-  router.patch(
-    '/:id/status',
-    authMiddleware,
-    adminMiddleware,
-    orderController.updateStatus
-  );
+  // Staff + Admin: cập nhật trạng thái đơn hàng
+  router.patch('/:id/status', authMiddleware, staffMiddleware, orderController.updateStatus);
 
-  // Quản lý Hoàn/Trả hàng (Admin)
-  router.get('/admin/returns', authMiddleware, adminMiddleware, orderController.adminListAllReturns);
-  router.patch('/:id/returns/:returnId/review', authMiddleware, adminMiddleware, orderController.adminReviewReturn);
-  router.patch('/:id/returns/:returnId/receive', authMiddleware, adminMiddleware, orderController.adminReceiveReturn);
-  router.patch('/:id/returns/:returnId/refund', authMiddleware, adminMiddleware, orderController.adminRefundReturn);
+  // Quản lý Hoàn/Trả hàng (Admin + Staff)
+  router.get('/admin/returns', authMiddleware, staffMiddleware, orderController.adminListAllReturns);
+  router.patch('/:id/returns/:returnId/review', authMiddleware, staffMiddleware, orderController.adminReviewReturn);
+  router.patch('/:id/returns/:returnId/receive', authMiddleware, staffMiddleware, orderController.adminReceiveReturn);
+  router.patch('/:id/returns/:returnId/refund', authMiddleware, staffMiddleware, orderController.adminRefundReturn);
 
   // --- 2. ROUTES DÀNH CHO KHÁCH HÀNG (Yêu cầu Đăng nhập) ---
   router.use(authMiddleware);

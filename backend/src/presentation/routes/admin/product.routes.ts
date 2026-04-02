@@ -1,18 +1,19 @@
 import { Router, Request, Response } from 'express';
 import { AdminProductController } from '../../controllers/AdminProductController';
-import { adminMiddleware, authMiddleware } from '../../middlewares/auth.middleware';
+import { adminMiddleware, authMiddleware, warehouseMiddleware } from '../../middlewares/auth.middleware';
 import { uploadImage } from '../../middlewares/upload.middleware';
 export const createAdminProductRoutes = (
   adminProductController: AdminProductController
 ) => {
   const router = Router();
-  router.use(authMiddleware, adminMiddleware);
+  router.use(authMiddleware);
 
-  router.get('/', adminProductController.getAll);
-  router.get('/:id', adminProductController.getById);
-  router.post('/', adminProductController.create);
-  router.put('/:id', adminProductController.update);
-  router.patch('/:id/archive', adminProductController.archive);
+  // Admin + Warehouse: xem và quản lý sản phẩm/tồn kho
+  router.get('/', warehouseMiddleware, adminProductController.getAll);
+  router.get('/:id', warehouseMiddleware, adminProductController.getById);
+  router.post('/', warehouseMiddleware, adminProductController.create);
+  router.put('/:id', warehouseMiddleware, adminProductController.update);
+  router.patch('/:id/archive', warehouseMiddleware, adminProductController.archive);
 
   // ✅ Upload ảnh sản phẩm — trả về URL để dùng trong form
   router.post('/upload/image', uploadImage.single('image'), (req: Request, res: Response) => {
