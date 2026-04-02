@@ -52,6 +52,7 @@ getAll = async (req: Request, res: Response) => {
       categorySlug: resolvedCategorySlug,
       brandSlug: resolvedBrandSlug,
       search: req.query.search as string || undefined,
+      sort: req.query.sort as string || undefined,
       isFeatured: req.query.featured === 'true' || req.query.isFeatured === 'true',
       isNew: req.query.isNew === 'true',
       isBestseller: req.query.isBestseller === 'true',
