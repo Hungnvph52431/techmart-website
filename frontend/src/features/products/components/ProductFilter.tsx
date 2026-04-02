@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { SlidersHorizontal, X } from "lucide-react";
 import { brandService, type Brand } from "@/services/brand.service";
 import { categoryService, type Category } from "@/services/category.service";
 
@@ -9,7 +9,7 @@ const FILTER_GROUPS: {
   key: string;
   label: string;
   paramKey: string;
-  multi: boolean; // true = multi-select, false = single
+  multi: boolean;
   options: { value: string; label: string }[];
 }[] = [
   {
@@ -56,8 +56,7 @@ const FILTER_GROUPS: {
   },
 ];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-// tempFilters lưu dạng: { ram: "6GB,8GB", chip: "Snapdragon", price: "0-5000000" }
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 const getValues = (csv: string): string[] => csv ? csv.split(",") : [];
 const toggleInCsv = (csv: string, value: string): string => {
   const arr = getValues(csv);
@@ -66,10 +65,9 @@ const toggleInCsv = (csv: string, value: string): string => {
   return arr.join(",");
 };
 
-// ─── Main ────────────────────────────────────────────────────────────────────
+// ─── Main ─────────────────────────────────────────────────────────────────────
 export const ProductsFilter = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [searchInput, setSearchInput] = useState(searchParams.get("search") || "");
   const [showPanel, setShowPanel] = useState(false);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [childCategories, setChildCategories] = useState<Category[]>([]);
@@ -116,24 +114,16 @@ export const ProductsFilter = () => {
     setSearchParams(next);
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateParams({ search: searchInput });
-  };
-
-  // Toggle pill trong panel
   const toggleTemp = (group: typeof FILTER_GROUPS[0], value: string) => {
     setTempFilters(prev => {
       const key = group.paramKey;
       if (group.multi) {
         return { ...prev, [key]: toggleInCsv(prev[key] || "", value) };
       }
-      // single-select (price): toggle on/off
       return { ...prev, [key]: prev[key] === value ? "" : value };
     });
   };
 
-  // Apply filters
   const applyFilters = () => {
     const updates: Record<string, string> = {};
     FILTER_GROUPS.forEach(g => {
@@ -156,43 +146,24 @@ export const ProductsFilter = () => {
     setShowPanel(false);
   };
 
-  // Reset panel
   const resetFilters = () => {
     setTempFilters({});
   };
 
+  // Reset hoàn toàn về tất cả sản phẩm
   const clearAll = () => {
-    setSearchInput("");
     setTempFilters({});
-    setSearchParams({ page: "1" });
+    setSearchParams({});
     setShowPanel(false);
   };
 
-  const hasAnyFilter = brand || category || realActiveCount > 0 || searchParams.get("search");
+  const hasAnyFilter = brand || category || realActiveCount > 0;
 
   return (
     <div className="space-y-3">
 
-      {/* ── Search + Brand pills ── */}
+      {/* ── Brand + Category pills ── */}
       <div className="bg-white rounded-2xl border border-gray-100 p-4">
-        <form onSubmit={handleSearch} className="flex gap-2 mb-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
-            <input value={searchInput} onChange={e => setSearchInput(e.target.value)}
-              placeholder="Tìm iPhone, Samsung, Xiaomi..."
-              className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm font-medium focus:outline-none focus:border-blue-400 focus:bg-white transition-all" />
-            {searchInput && (
-              <button type="button" onClick={() => { setSearchInput(""); updateParams({ search: "" }); }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                <X size={15} />
-              </button>
-            )}
-          </div>
-          <button type="submit"
-            className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors">
-            Tìm
-          </button>
-        </form>
 
         {/* Brand pills */}
         <div className="flex flex-wrap items-center gap-2">
@@ -208,7 +179,13 @@ export const ProductsFilter = () => {
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-sm font-semibold border transition-all ${
                 brand === b.slug ? "border-blue-600 bg-blue-600 text-white" : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
               }`}>
-              {b.logoUrl && <img src={b.logoUrl.startsWith('/') ? `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5001'}${b.logoUrl}` : b.logoUrl} alt="" className="w-4 h-4 object-contain" />}
+              {b.logoUrl && (
+                <img
+                  src={b.logoUrl.startsWith('/') ? `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${b.logoUrl}` : b.logoUrl}
+                  alt=""
+                  className="w-4 h-4 object-contain"
+                />
+              )}
               {b.name}
             </button>
           ))}
@@ -266,7 +243,6 @@ export const ProductsFilter = () => {
             }
             if (!val) return null;
 
-            // Multi-value: hiện từng giá trị
             const values = getValues(val);
             const labels = values.map(v => g.options.find(o => o.value === v)?.label || v);
 
@@ -296,7 +272,7 @@ export const ProductsFilter = () => {
           )}
         </div>
 
-        {/* ── Filter panel (CellphoneS style) ── */}
+        {/* ── Filter panel ── */}
         {showPanel && (
           <div className="mt-3 pt-3 border-t border-gray-100">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -326,7 +302,6 @@ export const ProductsFilter = () => {
               })}
             </div>
 
-            {/* Buttons */}
             <div className="flex gap-3 mt-5 pt-4 border-t border-gray-100">
               <button onClick={resetFilters}
                 className="flex-1 py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 transition-all">

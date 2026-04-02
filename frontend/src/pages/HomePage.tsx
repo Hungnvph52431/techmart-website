@@ -135,14 +135,14 @@ const SmallBannerCard = ({ banner }: { banner: Banner }) => (
 const ProductRow = ({ products, loading }: { products: Product[]; loading: boolean }) => {
   if (loading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        {[1,2,3,4,5].map(i => <div key={i} className="animate-pulse bg-gray-100 h-72 rounded-2xl" />)}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
+        {[1,2,3,4].map(i => <div key={i} className="animate-pulse bg-gray-100 h-72 rounded-2xl" />)}
       </div>
     );
   }
   if (products.length === 0) return <p className="text-center text-gray-400 py-8">Đang cập nhật...</p>;
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
       {products.map(p => <ProductCard key={p.productId} product={p} />)}
     </div>
   );
@@ -165,10 +165,10 @@ export const HomePage = () => {
       try {
         setLoading(true);
         const [dealData, featuredData, newData, bestsellerData, sliders, middles, cats, brds] = await Promise.all([
-          productService.getAll({ onSale: true, limit: 10 }),
-          productService.getAll({ isFeatured: true, limit: 10 }),
-          productService.getAll({ isNew: true, limit: 10 }),
-          productService.getAll({ isBestseller: true, limit: 10 }),
+          productService.getAll({ onSale: true, limit: 8 }),
+          productService.getAll({ isFeatured: true, limit: 8 }),
+          productService.getAll({ isNew: true, limit: 8 }),
+          productService.getAll({ isBestseller: true, limit: 8 }),
           bannerService.getActive('home_slider'),
           bannerService.getActive('home_middle'),
           categoryService.getAll(),

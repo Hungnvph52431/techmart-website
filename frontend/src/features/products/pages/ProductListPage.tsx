@@ -42,7 +42,7 @@ export const ProductListPage = () => {
           minPrice:     searchParams.get("minPrice")                || undefined,
           maxPrice:     searchParams.get("maxPrice")                || undefined,
           page,
-          limit: 15,
+          limit: 12,
         };
 
         const data = await productService.getAll(filters) as any;
@@ -69,7 +69,7 @@ export const ProductListPage = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
           <h1 className="text-3xl font-black text-gray-800 uppercase italic tracking-tight">
-            Kho máy TechMart
+            Danh Sách Sản Phẩm
           </h1>
           <ProductsSort />
         </div>
@@ -103,7 +103,7 @@ export const ProductListPage = () => {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6 mb-12">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', marginBottom: '3rem' }}>
               {products.map((product) => (
                 <ProductCard key={product.productId} product={product} />
               ))}
