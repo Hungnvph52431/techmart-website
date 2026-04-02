@@ -1,5 +1,4 @@
 // frontend/src/features/products/pages/ProductListPage.tsx
-// Thêm các filter spec vào filters object
 
 import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout/Layout";
@@ -28,17 +27,10 @@ export const ProductListPage = () => {
           categorySlug: searchParams.get("category")?.toLowerCase() || undefined,
           brandSlug:    searchParams.get("brand")?.toLowerCase()    || undefined,
           search:       searchParams.get("search")                  || undefined,
-          isFeatured:   searchParams.get("isFeatured") === "true" || searchParams.get("featured") === "true" ? true : undefined,
-          isBestseller: searchParams.get("isBestseller") === "true" ? true : undefined,
-          isNew:        searchParams.get("isNew") === "true" ? true : undefined,
-          onSale:       searchParams.get("onSale") === "true" ? true : undefined,
-          sort:         searchParams.get("sort")                    || undefined,
-          // ✅ Thêm spec filters
+          sort:         searchParams.get("sort")                    || undefined, // ✅ gửi thẳng "price-asc" lên backend
           ram:          searchParams.get("ram")                     || undefined,
           storage:      searchParams.get("storage")                 || undefined,
           chip:         searchParams.get("chip")                    || undefined,
-          need:         searchParams.get("need")                    || undefined,
-          feature:      searchParams.get("feature")                 || undefined,
           minPrice:     searchParams.get("minPrice")                || undefined,
           maxPrice:     searchParams.get("maxPrice")                || undefined,
           page,
@@ -69,12 +61,11 @@ export const ProductListPage = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
           <h1 className="text-3xl font-black text-gray-800 uppercase italic tracking-tight">
-            Danh Sách Sản Phẩm
+            <a href="/products">Danh Sách Sản Phẩm</a>
           </h1>
           <ProductsSort />
         </div>
 
-        {/* Bộ lọc mới */}
         <div className="mb-6">
           <ProductsFilter />
         </div>

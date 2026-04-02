@@ -20,7 +20,7 @@ export class ProductRepository implements IProductRepository {
 
  async findAll(filters?: any): Promise<Product[]> {
   const { query, params } = this.buildBaseListQuery(true, filters);
-  const fullSql = `${this.storefrontListSelect()} ${query} ORDER BY p.created_at DESC`;
+  const fullSql = `${this.storefrontListSelect()} ${query} ${this.buildSortClause(filters?.sort)}`;
   const [rows] = await this.pool.query<RowDataPacket[]>(fullSql, params);
   const products = rows.map(row => this.mapRowToProduct(row));
   return this.attachRelations(products, { includeVariants: false });
@@ -31,7 +31,7 @@ export class ProductRepository implements IProductRepository {
   const offset = (Number(page) - 1) * Number(limit);
   const { query, params } = this.buildBaseListQuery(true, filters);
 
-  const dataSql = `${this.storefrontListSelect()} ${query} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`;
+  const dataSql = `${this.storefrontListSelect()} ${query} ${this.buildSortClause(filters?.sort)} LIMIT ? OFFSET ?`;
   const [rows] = await this.pool.query<RowDataPacket[]>(dataSql, [...params, Number(limit), Number(offset)]);
 
   const countSql = `SELECT COUNT(*) as total ${query}`;
@@ -669,6 +669,16 @@ async delete(id: number): Promise<boolean> {
       isActive:        Boolean(row.is_active ?? 1),
     } as any;
   }
+
+  private buildSortClause(sort?: string): string {
+  switch (sort) {
+    case 'price-asc':  return 'ORDER BY COALESCE(p.sale_price, p.price) ASC';
+    case 'price-desc': return 'ORDER BY COALESCE(p.sale_price, p.price) DESC';
+    case 'rating':     return 'ORDER BY p.rating_avg DESC, p.review_count DESC';
+    case 'newest':     return 'ORDER BY p.created_at DESC';
+    default:           return 'ORDER BY p.created_at DESC';
+  }
+}
 
   private async attachRelations(products: Product[], options: { includeVariants: boolean }): Promise<Product[]> {
     if (products.length === 0) return [];
