@@ -84,7 +84,7 @@ export const ProductListContent = () => {
 
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '3rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '3rem' }}>
             {products.map((product) => (
               <ProductCard key={product.productId} product={product} />
             ))}

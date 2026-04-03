@@ -158,44 +158,48 @@ export const ProductsFilter = () => {
     <div className="flex gap-4 items-start">
 
       {/* ── Cột 3/10: Sidebar thương hiệu ── */}
-      <aside className="w-[30%] shrink-0 bg-white rounded-2xl border border-gray-100 p-4 sticky top-4">
-        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Thương hiệu</h3>
-        <div className="flex flex-col gap-1.5">
-          <button
-            onClick={() => updateParams({ brand: "" })}
-            className={`w-28 text-center px-3 py-2 rounded-xl text-sm font-semibold border transition-all ${
-              !brand
-                ? "border-blue-600 bg-blue-600 text-white"
-                : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
-            }`}
-          >
-            Tất cả
-          </button>
-          {brands.map(b => (
-            <button
-              key={b.brandId}
-              onClick={() => updateParams({ brand: brand === b.slug ? "" : b.slug! })}
-              className={`w-28 text-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold border transition-all ${
-                brand === b.slug
-                  ? "border-blue-600 bg-blue-600 text-white"
-                  : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
-              }`}
-            >
-              {b.logoUrl && (
-                <img
-                  src={b.logoUrl.startsWith('/') ? `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5001'}${b.logoUrl}` : b.logoUrl}
-                  alt=""
-                  className="w-4 h-4 object-contain shrink-0"
-                />
-              )}
-              <span className="truncate">{b.name}</span>
-            </button>
-          ))}
-        </div>
-      </aside>
+      <aside className="w-[15%] shrink-0 bg-white rounded-2xl border border-gray-100 p-4 sticky top-4">
+  <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-3">Thương hiệu</h3>
+  
+   {/* Nút Tất cả */}
+    <button
+      onClick={() => updateParams({ brand: "" })}
+      className={`w-full flex items-center justify-start px-3 py-2.5 rounded-xl text-base font-semibold border transition-all mb-2 ${
+        !brand
+          ? "border-blue-600 bg-blue-600 text-white shadow-sm shadow-blue-200"
+          : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 hover:bg-gray-100"
+      }`}
+    >
+      Tất cả
+    </button>
+
+    {/* Danh sách thương hiệu - 1 cột, căn trái */}
+    <div className="flex flex-col gap-1.5">
+      {brands.map(b => (
+        <button
+          key={b.brandId}
+          onClick={() => updateParams({ brand: brand === b.slug ? "" : b.slug! })}
+          className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-base font-semibold border transition-all ${
+            brand === b.slug
+              ? "border-blue-600 bg-blue-600 text-white shadow-sm shadow-blue-200"
+              : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 hover:bg-gray-100"
+          }`}
+        >
+          {b.logoUrl && (
+            <img
+              src={b.logoUrl.startsWith('/') ? `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5001'}${b.logoUrl}` : b.logoUrl}
+              alt=""
+              className="w-5 h-5 object-contain shrink-0"
+            />
+          )}
+          <span className="truncate text-left">{b.name}</span>
+        </button>
+      ))}
+    </div>
+  </aside>
 
       {/* ── Cột 7/10: Danh mục + Bộ lọc + Sản phẩm ── */}
-      <div className="w-[70%] min-w-0 space-y-3">
+      <div className="w-[85%] min-w-0 space-y-3">
 
         {/* Danh mục + Bộ lọc */}
         <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
@@ -203,10 +207,10 @@ export const ProductsFilter = () => {
           {/* Category pills */}
           {childCategories.length > 0 && (
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-wide mr-1">Danh mục:</span>
+              <span className="text-sm font-bold text-gray-400 uppercase tracking-wide mr-1">Danh mục:</span>
               <button
                 onClick={() => updateParams({ category: "" })}
-                className={`px-3.5 py-1.5 rounded-xl text-sm font-semibold border transition-all ${
+                className={`px-3.5 py-1.5 rounded-xl text-base font-semibold border transition-all {
                   !category
                     ? "border-blue-600 bg-blue-600 text-white"
                     : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
