@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { productService } from "@/services/product.service";
 import { Product } from "@/types";
@@ -26,6 +26,7 @@ import {
   getProductPurchaseStockLimit,
   getRemainingProductQuantity,
 } from "@/features/cart/lib/cartQuantity";
+import { RelatedProducts } from "../components/RelatedProducts";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const BACKEND_URL =
@@ -351,6 +352,9 @@ export const ProductDetailPage = () => {
   const headerRatingAverage =
     reviewSummary.total > 0 ? reviewSummary.average : 0;
   const specs = parseSpecs((product as any).specifications);
+  console.log("product keys:", Object.keys(product));
+  console.log("categorySlug:", (product as any).categorySlug);
+  console.log("full product:", product);
 
   return (
     <Layout>
@@ -359,12 +363,15 @@ export const ProductDetailPage = () => {
           {/* ── Breadcrumb ── */}
           <nav className="flex items-center gap-1.5 text-xs text-gray-400 mb-8 font-medium">
             <span className="hover:text-gray-600 cursor-pointer transition-colors">
-              Trang chủ
+              <a href="/">Trang chủ</a>
             </span>
             <ChevronRight size={12} />
-            <span className="hover:text-gray-600 cursor-pointer transition-colors">
+            <Link
+              to={`/products?brand=${(product as any).brandSlug || product.brandName?.toLowerCase() || ""}`}
+              className="hover:text-gray-600 transition-colors"
+            >
               {product.brandName || "Sản phẩm"}
-            </span>
+            </Link>
             <ChevronRight size={12} />
             <span className="text-gray-700 line-clamp-1">{product.name}</span>
           </nav>
@@ -784,6 +791,14 @@ export const ProductDetailPage = () => {
               }
             />
           </div>
+          {(product as any).categoryId && (
+            <div className="mt-16 pt-10 border-t border-gray-100">
+              <RelatedProducts categoryId={(product as any).categoryId} />
+              
+            </div>
+            
+          )}
+
         </div>
       </div>
     </Layout>
