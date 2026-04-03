@@ -201,7 +201,7 @@ export const PaymentResultPage = () => {
   const [searchParams] = useSearchParams();
   const [visible, setVisible] = useState(false);
   const [repaying, setRepaying] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState(REPAY_WINDOW_MINUTES * 60);
+  const [secondsLeft, setSecondsLeft] = useState(0); // khởi tạo = 0
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const statusParam = (searchParams.get("status") as ResultStatus) || "error";
@@ -213,32 +213,7 @@ export const PaymentResultPage = () => {
 
   const getStorageKey = (id: string) => `repay_expires_${id}`;
 
-  const calculateRemainingSeconds = (): number => {
-    if (!orderId) return 0;
-
-    const key = getStorageKey(orderId);
-    const storedExpires = localStorage.getItem(key);
-
-    if (!storedExpires) return 0;
-
-    const expiresAt = parseInt(storedExpires, 10);
-    const remaining = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
-
-    if (remaining <= 0) {
-      localStorage.removeItem(key);
-      return 0;
-    }
-
-    return remaining;
-  };
-
-  const saveExpiryTime = () => {
-    if (!orderId || !canRepay) return;
-    const key = getStorageKey(orderId);
-    const expiresAt = Date.now() + REPAY_WINDOW_MINUTES * 60 * 1000;
-    localStorage.setItem(key, expiresAt.toString());
-  };
-
+  // ==================== EFFECT 1: Khởi tạo thời gian hết hạn ====================
   useEffect(() => {
     if (!canRepay || !orderId) {
       if (orderId) localStorage.removeItem(getStorageKey(orderId));
@@ -246,29 +221,42 @@ export const PaymentResultPage = () => {
       return;
     }
 
-    const remaining = calculateRemainingSeconds();
-    setSecondsLeft(remaining);
+    const key = getStorageKey(orderId);
+    let storedExpires = localStorage.getItem(key);
 
-    // Chỉ tạo timer nếu còn thời gian
-    if (remaining > 0) {
-      if (!localStorage.getItem(getStorageKey(orderId))) {
-        saveExpiryTime();
-      }
-
-      timerRef.current = setInterval(() => {
-        setSecondsLeft((prev) => {
-          if (prev <= 1) {
-            if (timerRef.current) clearInterval(timerRef.current);
-            localStorage.removeItem(getStorageKey(orderId));
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      // Đã hết hạn
-      localStorage.removeItem(getStorageKey(orderId));
+    // Nếu chưa có thời gian (đơn mới) → tạo mới 10 phút
+    if (!storedExpires) {
+      const expiresAt = Date.now() + REPAY_WINDOW_MINUTES * 60 * 1000;
+      localStorage.setItem(key, expiresAt.toString());
+      storedExpires = expiresAt.toString();
     }
+
+    const expiresAt = parseInt(storedExpires, 10);
+    const remaining = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+
+    setSecondsLeft(remaining);
+  }, [canRepay, orderId]);
+
+  // ==================== EFFECT 2: Chạy countdown timer ====================
+  useEffect(() => {
+    if (secondsLeft <= 0 || !orderId) {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      return;
+    }
+
+    timerRef.current = setInterval(() => {
+      setSecondsLeft((prev) => {
+        if (prev <= 1) {
+          if (timerRef.current) clearInterval(timerRef.current);
+          localStorage.removeItem(getStorageKey(orderId));
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
     return () => {
       if (timerRef.current) {
@@ -276,13 +264,15 @@ export const PaymentResultPage = () => {
         timerRef.current = null;
       }
     };
-  }, [canRepay, orderId]);
+  }, [secondsLeft, orderId]);
 
+  // Effect xử lý success + animation
   useEffect(() => {
     if (statusParam === "success") {
       useCartStore.getState().clearCart();
     }
-    setTimeout(() => setVisible(true), 100);
+    const timeout = setTimeout(() => setVisible(true), 100);
+    return () => clearTimeout(timeout);
   }, [statusParam]);
 
   const handleRepay = async () => {
@@ -304,8 +294,8 @@ export const PaymentResultPage = () => {
 
   const displayStatus: Exclude<ResultStatus, "loading"> =
     statusParam === "loading" ? "error" : statusParam;
-  const config = RESULT_CONFIG[displayStatus];
 
+  const config = RESULT_CONFIG[displayStatus];
   const expired = secondsLeft <= 0;
 
   return (
