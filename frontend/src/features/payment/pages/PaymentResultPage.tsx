@@ -1,201 +1,382 @@
-// src/pages/PaymentResultPage.tsx
+import { useEffect, useState, useRef } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import {
+  CheckCircle,
+  XCircle,
+  ArrowRight,
+  ShoppingBag,
+  Loader2,
+  RefreshCw,
+} from "lucide-react";
+import { Layout } from "@/components/layout/Layout";
+import { useCartStore } from "@/store/cartStore";
+import api from "@/services/api";
+import toast from "react-hot-toast";
 
-import { useEffect, useState, useRef } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { CheckCircle, XCircle, ArrowRight, ShoppingBag, Loader2, RefreshCw } from 'lucide-react';
-import { Layout } from '@/components/layout/Layout';
-import { useCartStore } from '@/store/cartStore';
-import api from '@/services/api';
-import toast from 'react-hot-toast';
+type ResultStatus = "loading" | "success" | "cancel" | "failed" | "error";
 
-type ResultStatus = 'loading' | 'success' | 'cancel' | 'failed' | 'error';
-
-const RESULT_CONFIG: Record<Exclude<ResultStatus, 'loading'>, {
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-  color: string;
-  bg: string;
-}> = {
+const RESULT_CONFIG: Record<
+  Exclude<ResultStatus, "loading">,
+  {
+    icon: React.ReactNode;
+    title: string;
+    subtitle: string;
+    color: string;
+    bg: string;
+  }
+> = {
   success: {
-    icon: <CheckCircle className="w-20 h-20 text-emerald-500" strokeWidth={1.5} />,
-    title: 'Thanh toán thành công!',
-    subtitle: 'Đơn hàng của bạn đã được xác nhận. Chúng tôi sẽ xử lý và giao hàng sớm nhất.',
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-50 border-emerald-200',
+    icon: (
+      <CheckCircle className="w-20 h-20 text-emerald-500" strokeWidth={1.5} />
+    ),
+    title: "Thanh toán thành công!",
+    subtitle:
+      "Đơn hàng của bạn đã được xác nhận. Chúng tôi sẽ xử lý và giao hàng sớm nhất.",
+    color: "text-emerald-600",
+    bg: "bg-emerald-50 border-emerald-200",
   },
   cancel: {
     icon: <XCircle className="w-20 h-20 text-rose-400" strokeWidth={1.5} />,
-    title: 'Đã hủy thanh toán',
-    subtitle: 'Giao dịch đã bị hủy. Đơn hàng vẫn còn hiệu lực, bạn có thể thanh toán lại trong vòng 10 phút.',
-    color: 'text-rose-600',
-    bg: 'bg-rose-50 border-rose-200',
+    title: "Đã hủy thanh toán",
+    subtitle:
+      "Giao dịch đã bị hủy. Đơn hàng vẫn còn hiệu lực, bạn có thể thanh toán lại trong vòng 10 phút.",
+    color: "text-rose-600",
+    bg: "bg-rose-50 border-rose-200",
   },
   failed: {
     icon: <XCircle className="w-20 h-20 text-rose-500" strokeWidth={1.5} />,
-    title: 'Thanh toán thất bại',
-    subtitle: 'Giao dịch không thành công. Vui lòng kiểm tra lại thông tin thẻ hoặc thử thanh toán lại.',
-    color: 'text-rose-600',
-    bg: 'bg-rose-50 border-rose-200',
+    title: "Thanh toán thất bại",
+    subtitle:
+      "Giao dịch không thành công. Vui lòng kiểm tra lại thông tin thẻ hoặc thử thanh toán lại.",
+    color: "text-rose-600",
+    bg: "bg-rose-50 border-rose-200",
   },
   error: {
     icon: <XCircle className="w-20 h-20 text-gray-400" strokeWidth={1.5} />,
-    title: 'Có lỗi xảy ra',
-    subtitle: 'Đã xảy ra lỗi trong quá trình xử lý. Vui lòng liên hệ hỗ trợ nếu tiền đã bị trừ.',
-    color: 'text-gray-600',
-    bg: 'bg-gray-50 border-gray-200',
+    title: "Có lỗi xảy ra",
+    subtitle:
+      "Đã xảy ra lỗi trong quá trình xử lý. Vui lòng liên hệ hỗ trợ nếu tiền đã bị trừ.",
+    color: "text-gray-600",
+    bg: "bg-gray-50 border-gray-200",
   },
 };
 
-const REPAY_WINDOW_SECONDS = 10 * 60;
+const REPAY_WINDOW_MINUTES = 10;
+
+function DigitBlock({ value, label }: { value: string; label: string }) {
+  const [prev, setPrev] = useState(value);
+  const [flipping, setFlipping] = useState(false);
+
+  useEffect(() => {
+    if (value !== prev) {
+      setFlipping(true);
+      const t = setTimeout(() => {
+        setPrev(value);
+        setFlipping(false);
+      }, 300);
+      return () => clearTimeout(t);
+    }
+  }, [value, prev]);
+
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <div className="relative w-16 h-20 perspective">
+        <div className="absolute inset-0 rounded-xl bg-slate-900 translate-y-0.5 translate-x-0.5" />
+
+        <div
+          className={`relative w-full h-full rounded-xl bg-gradient-to-b from-slate-700 to-slate-800 border border-slate-600/50 flex items-center justify-center overflow-hidden shadow-xl
+            transition-transform duration-300 ease-in-out ${flipping ? "scale-y-90 opacity-80" : "scale-y-100 opacity-100"}`}
+          style={{ transformOrigin: "top" }}
+        >
+          <div className="absolute inset-x-0 top-0 h-1/2 bg-white/5 rounded-t-xl" />
+          <div className="absolute inset-x-0 top-1/2 h-px bg-black/40" />
+
+          <span
+            className="font-black text-4xl text-white tabular-nums tracking-tight select-none"
+            style={{
+              fontVariantNumeric: "tabular-nums",
+              letterSpacing: "-0.02em",
+            }}
+          >
+            {flipping ? prev : value}
+          </span>
+        </div>
+      </div>
+
+      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function CountdownWidget({
+  secondsLeft,
+  totalSeconds,
+  repaying,
+  onRepay,
+}: {
+  secondsLeft: number;
+  totalSeconds: number;
+  repaying: boolean;
+  onRepay: () => void;
+}) {
+  const urgent = secondsLeft <= 60;
+  const pct = Math.max(0, (secondsLeft / totalSeconds) * 100);
+  const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
+  const ss = String(secondsLeft % 60).padStart(2, "0");
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-6 space-y-6 shadow-sm">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+          Thời gian thanh toán lại
+        </p>
+        <span
+          className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
+            urgent
+              ? "bg-red-50 text-red-500 border border-red-200"
+              : "bg-blue-50 text-blue-500 border border-blue-200"
+          }`}
+        >
+          {urgent ? "⚡ Sắp hết" : "Còn hiệu lực"}
+        </span>
+      </div>
+
+      <div className="flex flex-col items-center">
+        <div className="flex items-center justify-center gap-3 mb-4">
+          <DigitBlock value={mm[0]} label="PHÚT" />
+          <DigitBlock value={mm[1]} label="PHÚT" />
+          <span className="text-4xl font-black text-slate-300 pb-8">:</span>
+          <DigitBlock value={ss[0]} label="GIÂY" />
+          <DigitBlock value={ss[1]} label="GIÂY" />
+        </div>
+
+        <div className="w-full max-w-[240px] h-1.5 bg-slate-100 rounded-full overflow-hidden mb-1">
+          <div
+            className={`h-full rounded-full transition-all duration-1000 ${urgent ? "bg-red-400" : "bg-blue-500"}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+
+      <button
+        onClick={onRepay}
+        disabled={repaying}
+        className={`relative overflow-hidden flex items-center justify-center gap-2.5 w-full py-4 rounded-xl font-black uppercase tracking-wider text-sm text-white transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed shadow-lg
+          ${
+            urgent
+              ? "bg-gradient-to-r from-red-500 to-rose-500 shadow-red-200 hover:from-red-600 hover:to-rose-600"
+              : "bg-gradient-to-r from-blue-600 to-blue-500 shadow-blue-200 hover:from-blue-700 hover:to-blue-600"
+          }`}
+      >
+        {!repaying && (
+          <span className="absolute inset-0 bg-white/10 -skew-x-12 translate-x-[-200%] hover:translate-x-[200%] transition-transform duration-700" />
+        )}
+        {repaying ? (
+          <Loader2 size={16} className="animate-spin" />
+        ) : (
+          <RefreshCw size={16} />
+        )}
+        {repaying ? "Đang chuyển hướng..." : "Thanh toán lại qua VNPay"}
+      </button>
+    </div>
+  );
+}
+
+function ExpiredBanner() {
+  return (
+    <div className="rounded-2xl border-2 border-dashed border-rose-200 bg-rose-50 px-6 py-6 text-center space-y-2">
+      <p className="font-black text-rose-600 text-lg">
+        Đã hết thời gian thanh toán lại
+      </p>
+      <p className="text-sm text-rose-500/80">
+        Vui lòng liên hệ hỗ trợ hoặc tạo đơn hàng mới.
+      </p>
+    </div>
+  );
+}
 
 export const PaymentResultPage = () => {
   const [searchParams] = useSearchParams();
   const [visible, setVisible] = useState(false);
   const [repaying, setRepaying] = useState(false);
-  const [seconds, setSeconds] = useState(REPAY_WINDOW_SECONDS);
+  const [secondsLeft, setSecondsLeft] = useState(REPAY_WINDOW_MINUTES * 60);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const statusParam = (searchParams.get('status') as ResultStatus) || 'error';
-  const orderId = searchParams.get('orderId');
-  const orderCode = searchParams.get('orderCode');
+  const statusParam = (searchParams.get("status") as ResultStatus) || "error";
+  const orderId = searchParams.get("orderId");
+  const orderCode = searchParams.get("orderCode");
 
-  const canRepay = statusParam === 'cancel' || statusParam === 'failed';
-  const expired = seconds <= 0;
+  const canRepay =
+    (statusParam === "cancel" || statusParam === "failed") && !!orderId;
+
+  const getStorageKey = (id: string) => `repay_expires_${id}`;
+
+  const calculateRemainingSeconds = (): number => {
+    if (!orderId) return 0;
+
+    const key = getStorageKey(orderId);
+    const storedExpires = localStorage.getItem(key);
+
+    if (!storedExpires) return 0;
+
+    const expiresAt = parseInt(storedExpires, 10);
+    const remaining = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+
+    if (remaining <= 0) {
+      localStorage.removeItem(key);
+      return 0;
+    }
+
+    return remaining;
+  };
+
+  const saveExpiryTime = () => {
+    if (!orderId || !canRepay) return;
+    const key = getStorageKey(orderId);
+    const expiresAt = Date.now() + REPAY_WINDOW_MINUTES * 60 * 1000;
+    localStorage.setItem(key, expiresAt.toString());
+  };
 
   useEffect(() => {
-    if (!canRepay) return;
+    if (!canRepay || !orderId) {
+      if (orderId) localStorage.removeItem(getStorageKey(orderId));
+      setSecondsLeft(0);
+      return;
+    }
 
-    timerRef.current = setInterval(() => {
-      setSeconds((s) => {
-        if (s <= 1) {
-          clearInterval(timerRef.current!);
-          return 0;
-        }
-        return s - 1;
-      });
-    }, 1000);
+    const remaining = calculateRemainingSeconds();
+    setSecondsLeft(remaining);
+
+    // Chỉ tạo timer nếu còn thời gian
+    if (remaining > 0) {
+      if (!localStorage.getItem(getStorageKey(orderId))) {
+        saveExpiryTime();
+      }
+
+      timerRef.current = setInterval(() => {
+        setSecondsLeft((prev) => {
+          if (prev <= 1) {
+            if (timerRef.current) clearInterval(timerRef.current);
+            localStorage.removeItem(getStorageKey(orderId));
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      // Đã hết hạn
+      localStorage.removeItem(getStorageKey(orderId));
+    }
 
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     };
-  }, [canRepay]);
+  }, [canRepay, orderId]);
 
   useEffect(() => {
-    if (statusParam === 'success') {
+    if (statusParam === "success") {
       useCartStore.getState().clearCart();
     }
     setTimeout(() => setVisible(true), 100);
-  }, []);
-
-  const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
-  const ss = String(seconds % 60).padStart(2, '0');
-  const progressPct = (seconds / REPAY_WINDOW_SECONDS) * 100;
+  }, [statusParam]);
 
   const handleRepay = async () => {
-    if (!orderId || expired) return;
+    if (!orderId || secondsLeft <= 0) return;
+
     try {
       setRepaying(true);
-      const { data } = await api.post('/payment/vnpay/repay', { orderId: Number(orderId) });
+      const { data } = await api.post("/payment/vnpay/repay", {
+        orderId: Number(orderId),
+      });
       window.location.href = data.paymentUrl;
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Không thể tạo lại link thanh toán');
+      toast.error(
+        error?.response?.data?.message || "Không thể tạo lại link thanh toán",
+      );
       setRepaying(false);
     }
   };
 
-  const displayStatus: Exclude<ResultStatus, 'loading'> =
-    statusParam === 'loading' ? 'error' : statusParam;
+  const displayStatus: Exclude<ResultStatus, "loading"> =
+    statusParam === "loading" ? "error" : statusParam;
   const config = RESULT_CONFIG[displayStatus];
+
+  const expired = secondsLeft <= 0;
 
   return (
     <Layout>
-      <div className="min-h-[70vh] flex items-center justify-center px-4 py-16">
+      <div className="min-h-[60vh] flex items-center justify-center px-4 py-8">
         <div
           className={`w-full max-w-md text-center transition-all duration-500 ${
-            visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+            visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
           }`}
         >
-          <div className="flex justify-center mb-6">{config.icon}</div>
+          <div className="flex items-center justify-center gap-3 mb-4 text-left">
+            <div className="shrink-0">{config.icon}</div>
 
-          <h1 className={`text-2xl font-black ${config.color} mb-3`}>
-            {config.title}
-          </h1>
-          <p className="text-gray-500 text-sm font-medium leading-relaxed mb-6">
-            {config.subtitle}
-          </p>
+            <div>
+              <h1
+                className={`text-xl font-black ${config.color} leading-tight`}
+              >
+                {config.title}
+              </h1>
+              <p className="text-gray-500 text-sm leading-tight">
+                {config.subtitle}
+              </p>
+            </div>
+          </div>
 
           {(orderId || orderCode) && (
-            <div className={`inline-flex flex-col items-center gap-1 px-6 py-4 rounded-2xl border ${config.bg} mb-8`}>
-              <p className="text-xs font-black uppercase tracking-widest text-gray-500">
+            <div
+              className={`inline-flex flex-col items-center gap-1 px-4 py-3 rounded-xl border ${config.bg} mb-5`}
+            >
+              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
                 Mã đơn hàng
               </p>
-              <p className={`font-black text-lg font-mono ${config.color}`}>
+              <p className={`font-black text-base font-mono ${config.color}`}>
                 #{orderCode || orderId}
               </p>
             </div>
           )}
 
-          <div className="space-y-3">
-            {/* ── THANH TOÁN LẠI ── */}
+          <div className="space-y-2">
             {canRepay && orderId && (
-              <div className="space-y-2 mb-1">
+              <div>
                 {!expired ? (
-                  <>
-                    <div className="flex items-center justify-between text-xs font-bold text-gray-400 px-1">
-                      <span>Thời gian thanh toán lại</span>
-                      <span
-                        className={`font-black tabular-nums transition-colors ${
-                          seconds <= 60 ? 'text-red-500' : 'text-gray-500'
-                        }`}
-                      >
-                        {mm}:{ss}
-                      </span>
-                    </div>
-                    <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mb-3">
-                      <div
-                        className={`h-full rounded-full transition-all duration-1000 ${
-                          seconds <= 60 ? 'bg-red-400' : 'bg-blue-500'
-                        }`}
-                        style={{ width: `${progressPct}%` }}
-                      />
-                    </div>
-
-                    <button
-                      onClick={handleRepay}
-                      disabled={repaying}
-                      className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl bg-blue-600 text-white font-black uppercase tracking-wider text-sm hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-60 shadow-lg shadow-blue-100"
-                    >
-                      {repaying ? (
-                        <Loader2 size={16} className="animate-spin" />
-                      ) : (
-                        <RefreshCw size={16} />
-                      )}
-                      {repaying ? 'Đang chuyển hướng...' : 'Thanh toán lại qua VNPay'}
-                    </button>
-                  </>
+                  <CountdownWidget
+                    secondsLeft={secondsLeft}
+                    totalSeconds={REPAY_WINDOW_MINUTES * 60}
+                    repaying={repaying}
+                    onRepay={handleRepay}
+                  />
                 ) : (
-                  <div className="py-3 px-4 rounded-2xl bg-gray-50 border-2 border-gray-100 text-sm text-gray-400 font-bold">
-                    ⏱ Đã hết thời gian thanh toán lại. Vui lòng liên hệ hỗ trợ hoặc đặt đơn mới.
-                  </div>
+                  <ExpiredBanner />
                 )}
               </div>
             )}
 
-            {(statusParam === 'success' || statusParam === 'cancel' || statusParam === 'failed') && orderId && (
-              <Link
-                to={`/orders/${orderId}`}
-                className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl bg-slate-900 text-white font-black uppercase tracking-wider text-sm hover:bg-slate-800 transition-all"
-              >
-                <ShoppingBag size={16} />
-                Xem chi tiết đơn hàng
-                <ArrowRight size={16} />
-              </Link>
-            )}
+            {(statusParam === "success" ||
+              statusParam === "cancel" ||
+              statusParam === "failed") &&
+              orderId && (
+                <Link
+                  to={`/orders/${orderId}`}
+                  className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-800"
+                >
+                  <ShoppingBag size={14} />
+                  Xem chi tiết
+                  <ArrowRight size={14} />
+                </Link>
+              )}
 
             <Link
               to="/"
-              className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl border-2 border-gray-200 text-gray-600 font-black uppercase tracking-wider text-sm hover:bg-gray-50 transition-all"
+              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50"
             >
               Tiếp tục mua sắm
             </Link>
