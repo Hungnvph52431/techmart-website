@@ -27,7 +27,7 @@ export const ProductListPage = () => {
           categorySlug: searchParams.get("category")?.toLowerCase() || undefined,
           brandSlug:    searchParams.get("brand")?.toLowerCase()    || undefined,
           search:       searchParams.get("search")                  || undefined,
-          sort:         searchParams.get("sort")                    || undefined, // ✅ gửi thẳng "price-asc" lên backend
+          sort:         searchParams.get("sort")                    || undefined, 
           ram:          searchParams.get("ram")                     || undefined,
           storage:      searchParams.get("storage")                 || undefined,
           chip:         searchParams.get("chip")                    || undefined,
