@@ -221,7 +221,7 @@ export class PaymentController {
     }
   };
 
-  // ─── 5. IPN — Thanh toán lại ────────────────────────────────
+  // ─── 5. Thanh toán lại ────────────────────────────────
   repay = async (req: AuthRequest, res: Response) => {
     try {
       const { orderId } = req.body;
