@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import {  SlidersHorizontal, X } from "lucide-react";
 import { brandService, type Brand } from "@/services/brand.service";
 import { categoryService, type Category } from "@/services/category.service";
 
@@ -69,7 +69,7 @@ const toggleInCsv = (csv: string, value: string): string => {
 // ─── Main ────────────────────────────────────────────────────────────────────
 export const ProductsFilter = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [searchInput, setSearchInput] = useState(searchParams.get("search") || "");
+
   const [showPanel, setShowPanel] = useState(false);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [childCategories, setChildCategories] = useState<Category[]>([]);
@@ -116,11 +116,6 @@ export const ProductsFilter = () => {
     setSearchParams(next);
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateParams({ search: searchInput });
-  };
-
   // Toggle pill trong panel
   const toggleTemp = (group: typeof FILTER_GROUPS[0], value: string) => {
     setTempFilters(prev => {
@@ -162,7 +157,6 @@ export const ProductsFilter = () => {
   };
 
   const clearAll = () => {
-    setSearchInput("");
     setTempFilters({});
     setSearchParams({ page: "1" });
     setShowPanel(false);
@@ -175,24 +169,7 @@ export const ProductsFilter = () => {
 
       {/* ── Search + Brand pills ── */}
       <div className="bg-white rounded-2xl border border-gray-100 p-4">
-        <form onSubmit={handleSearch} className="flex gap-2 mb-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
-            <input value={searchInput} onChange={e => setSearchInput(e.target.value)}
-              placeholder="Tìm iPhone, Samsung, Xiaomi..."
-              className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm font-medium focus:outline-none focus:border-blue-400 focus:bg-white transition-all" />
-            {searchInput && (
-              <button type="button" onClick={() => { setSearchInput(""); updateParams({ search: "" }); }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                <X size={15} />
-              </button>
-            )}
-          </div>
-          <button type="submit"
-            className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors">
-            Tìm
-          </button>
-        </form>
+       
 
         {/* Brand pills */}
         <div className="flex flex-wrap items-center gap-2">
