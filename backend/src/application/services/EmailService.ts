@@ -1,5 +1,5 @@
-import nodemailer from 'nodemailer';
-import type { Transporter } from 'nodemailer';
+import nodemailer from "nodemailer";
+import type { Transporter } from "nodemailer";
 
 // Lazy initialization — tránh đọc env trước khi dotenv.config() chạy
 let _transporter: Transporter | null = null;
@@ -7,12 +7,12 @@ let _transporter: Transporter | null = null;
 function getTransporter(): Transporter {
   if (!_transporter) {
     _transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      host: process.env.SMTP_HOST || "smtp.gmail.com",
       port: Number(process.env.SMTP_PORT) || 587,
       secure: false,
       auth: {
-        user: process.env.SMTP_USER || '',
-        pass: process.env.SMTP_PASS || '',
+        user: process.env.SMTP_USER || "",
+        pass: process.env.SMTP_PASS || "",
       },
     });
   }
@@ -42,28 +42,30 @@ interface PaymentSuccessData {
 }
 
 function formatCurrency(amount: number): string {
-  return amount.toLocaleString('vi-VN') + 'đ';
+  return amount.toLocaleString("vi-VN") + "đ";
 }
 
 function getPaymentMethodLabel(method: string): string {
   const map: Record<string, string> = {
-    cod: 'Thanh toán khi nhận hàng (COD)',
-    bank_transfer: 'Chuyển khoản ngân hàng',
-    momo: 'Ví MoMo',
-    vnpay: 'VNPay',
-    wallet: 'Ví TechMart',
-    deposit: 'Đặt cọc (Ví + COD)',
+    cod: "Thanh toán khi nhận hàng (COD)",
+    bank_transfer: "Chuyển khoản ngân hàng",
+    momo: "Ví MoMo",
+    vnpay: "VNPay",
+    wallet: "Ví TechMart",
+    deposit: "Đặt cọc (Ví + COD)",
   };
   return map[method] || method;
 }
 
-export async function sendPaymentSuccessEmail(data: PaymentSuccessData): Promise<void> {
+export async function sendPaymentSuccessEmail(
+  data: PaymentSuccessData,
+): Promise<void> {
   if (!process.env.SMTP_USER) {
-    console.warn('[Email] SMTP_USER chưa cấu hình — bỏ qua gửi email');
+    console.warn("[Email] SMTP_USER chưa cấu hình — bỏ qua gửi email");
     return;
   }
 
-  const fromName = process.env.SMTP_FROM_NAME || 'TechMart';
+  const fromName = process.env.SMTP_FROM_NAME || "TechMart";
   const fromEmail = process.env.SMTP_USER;
 
   const itemsHtml = data.items
@@ -74,9 +76,9 @@ export async function sendPaymentSuccessEmail(data: PaymentSuccessData): Promise
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;">${item.quantity}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;">${formatCurrency(item.price)}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;">${formatCurrency(item.subtotal)}</td>
-      </tr>`
+      </tr>`,
     )
-    .join('');
+    .join("");
 
   const html = `
   <div style="max-width:600px;margin:0 auto;font-family:'Segoe UI',Arial,sans-serif;color:#333;">
@@ -135,9 +137,11 @@ export async function sendPaymentSuccessEmail(data: PaymentSuccessData): Promise
       subject: `[TechMart] Thanh toán thành công — Đơn hàng #${data.orderCode}`,
       html,
     });
-    console.log(`[Email] Đã gửi email thanh toán thành công cho ${data.customerEmail} (đơn ${data.orderCode})`);
+    console.log(
+      `[Email] Đã gửi email thanh toán thành công cho ${data.customerEmail} (đơn ${data.orderCode})`,
+    );
   } catch (error) {
-    console.error('[Email] Lỗi gửi email:', error);
+    console.error("[Email] Lỗi gửi email:", error);
   }
 }
 
@@ -163,20 +167,23 @@ interface OrderCreatedData {
   shippingCity: string;
 }
 
-export async function sendOrderCreatedEmail(data: OrderCreatedData): Promise<void> {
+export async function sendOrderCreatedEmail(
+  data: OrderCreatedData,
+): Promise<void> {
   if (!process.env.SMTP_USER) {
-    console.warn('[Email] SMTP_USER chưa cấu hình — bỏ qua gửi email');
+    console.warn("[Email] SMTP_USER chưa cấu hình — bỏ qua gửi email");
     return;
   }
 
-  const fromName = process.env.SMTP_FROM_NAME || 'TechMart';
+  const fromName = process.env.SMTP_FROM_NAME || "TechMart";
   const fromEmail = process.env.SMTP_USER;
 
-  const paymentNote = data.paymentMethod === 'cod'
-    ? '<p style="color:#f59e0b;font-weight:bold;">Bạn sẽ thanh toán khi nhận hàng (COD).</p>'
-    : data.paymentMethod === 'wallet'
-      ? '<p style="color:#10b981;font-weight:bold;">Đã thanh toán bằng Ví TechMart.</p>'
-      : `<p style="color:#f59e0b;font-weight:bold;">Vui lòng hoàn tất thanh toán qua ${getPaymentMethodLabel(data.paymentMethod)} để đơn hàng được xử lý.</p>`;
+  const paymentNote =
+    data.paymentMethod === "cod"
+      ? '<p style="color:#f59e0b;font-weight:bold;">Bạn sẽ thanh toán khi nhận hàng (COD).</p>'
+      : data.paymentMethod === "wallet"
+        ? '<p style="color:#10b981;font-weight:bold;">Đã thanh toán bằng Ví TechMart.</p>'
+        : `<p style="color:#f59e0b;font-weight:bold;">Vui lòng hoàn tất thanh toán qua ${getPaymentMethodLabel(data.paymentMethod)} để đơn hàng được xử lý.</p>`;
 
   const itemsHtml = data.items
     .map(
@@ -186,9 +193,9 @@ export async function sendOrderCreatedEmail(data: OrderCreatedData): Promise<voi
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;">${item.quantity}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;">${formatCurrency(item.price)}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;">${formatCurrency(item.subtotal)}</td>
-      </tr>`
+      </tr>`,
     )
-    .join('');
+    .join("");
 
   const html = `
   <div style="max-width:600px;margin:0 auto;font-family:'Segoe UI',Arial,sans-serif;color:#333;">
@@ -250,9 +257,11 @@ export async function sendOrderCreatedEmail(data: OrderCreatedData): Promise<voi
       subject: `[TechMart] Đặt hàng thành công — Đơn hàng #${data.orderCode}`,
       html,
     });
-    console.log(`[Email] Đã gửi email đặt hàng thành công cho ${data.customerEmail} (đơn ${data.orderCode})`);
+    console.log(
+      `[Email] Đã gửi email đặt hàng thành công cho ${data.customerEmail} (đơn ${data.orderCode})`,
+    );
   } catch (error) {
-    console.error('[Email] Lỗi gửi email đặt hàng:', error);
+    console.error("[Email] Lỗi gửi email đặt hàng:", error);
   }
 }
 
@@ -267,13 +276,15 @@ interface WalletTopupSuccessData {
   newBalance: number;
 }
 
-export async function sendWalletTopupEmail(data: WalletTopupSuccessData): Promise<void> {
+export async function sendWalletTopupEmail(
+  data: WalletTopupSuccessData,
+): Promise<void> {
   if (!process.env.SMTP_USER) {
-    console.warn('[Email] SMTP_USER chưa cấu hình — bỏ qua gửi email');
+    console.warn("[Email] SMTP_USER chưa cấu hình — bỏ qua gửi email");
     return;
   }
 
-  const fromName = process.env.SMTP_FROM_NAME || 'TechMart';
+  const fromName = process.env.SMTP_FROM_NAME || "TechMart";
   const fromEmail = process.env.SMTP_USER;
 
   const html = `
@@ -318,8 +329,135 @@ export async function sendWalletTopupEmail(data: WalletTopupSuccessData): Promis
       subject: `[TechMart] Nạp ví thành công — ${data.referenceCode}`,
       html,
     });
-    console.log(`[Email] Đã gửi email nạp ví thành công cho ${data.customerEmail} (${data.referenceCode})`);
+    console.log(
+      `[Email] Đã gửi email nạp ví thành công cho ${data.customerEmail} (${data.referenceCode})`,
+    );
   } catch (error) {
-    console.error('[Email] Lỗi gửi email nạp ví:', error);
+    console.error("[Email] Lỗi gửi email nạp ví:", error);
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
+// Gửi OTP cho Quên mật khẩu
+// ──────────────────────────────────────────────────────────────
+interface ForgotPasswordOtpData {
+  customerName: string;
+  customerEmail: string;
+  otp: string;
+  expiresInMinutes: number;
+}
+
+export async function sendForgotPasswordOtpEmail(
+  data: ForgotPasswordOtpData,
+): Promise<void> {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn(
+      "[Email] SMTP_USER hoặc SMTP_PASS chưa được cấu hình — bỏ qua gửi OTP",
+    );
+    throw new Error(
+      "Cấu hình email chưa hoàn tất. Vui lòng kiểm tra biến môi trường.",
+    );
+  }
+
+  const fromName = process.env.SMTP_FROM_NAME || "TechMart";
+  const fromEmail = process.env.SMTP_USER;
+
+  const html = `
+<div style="max-width:600px; margin:0 auto; font-family:'Segoe UI', system-ui, Arial, sans-serif; color:#333; background:#f9fafb; padding:20px;">
+    
+    <div style="background: linear-gradient(135deg, #b91c1c 0%, #ef4444 100%); padding: 40px 24px; text-align: center; border-radius: 16px 16px 0 0;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
+            Đặt Lại Mật Khẩu
+        </h1>
+        <p style="color: #fee2e2; margin: 10px 0 0 0; font-size: 16px;">
+            Mã OTP xác thực tài khoản TechMart
+        </p>
+    </div>
+
+    <!-- Body -->
+    <div style="background: #ffffff; padding: 40px 32px; border-radius: 0 0 16px 16px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);">
+
+        <p style="margin-bottom: 16px;">Xin chào <strong style="color:#b91c1c;">${data.customerName}</strong>,</p>
+        
+        <p style="font-size: 15.5px; color: #374151; line-height: 1.6;">
+            Bạn đã yêu cầu đặt lại mật khẩu cho tài khoản TechMart. 
+            Vui lòng sử dụng mã OTP dưới đây để tiếp tục:
+        </p>
+
+        <div style="margin: 32px 0; text-align: center;">
+            <div style="background: #fef2f2; 
+                        border: 4px dashed #ef4444; 
+                        border-radius: 16px; 
+                        padding: 32px 20px;">
+                
+                <p style="margin: 0 0 12px 0; color: #b91c1c; font-size: 13.5px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;">
+                    MÃ OTP CỦA BẠN
+                </p>
+                
+                <div style="font-size: 54px; 
+                            font-weight: 800; 
+                            letter-spacing: 18px; 
+                            color: #991b1b; 
+                            background: #ffffff; 
+                            padding: 18px 32px; 
+                            border-radius: 12px; 
+                            display: inline-block; 
+                            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);">
+                    ${data.otp}
+                </div>
+                
+                <p style="margin: 20px 0 0 0; color: #ef4444; font-size: 15px; font-weight: 600;">
+                    Hiệu lực trong <strong>${data.expiresInMinutes} phút</strong>
+                </p>
+            </div>
+        </div>
+
+        <div style="background:#fff7ed; border-left: 5px solid #f59e0b; padding: 16px 20px; border-radius: 8px; margin: 24px 0;">
+            <p style="margin: 0; font-size: 14.5px; color: #b45309; line-height: 1.6;">
+                <strong>⚠️ Lưu ý quan trọng:</strong><br>
+                Không chia sẻ mã OTP này với bất kỳ ai. 
+                TechMart sẽ <strong>không bao giờ</strong> yêu cầu bạn cung cấp mã qua điện thoại hoặc tin nhắn.
+            </p>
+        </div>
+
+        <hr style="margin: 32px 0; border: none; border-top: 1px solid #e5e7eb;">
+
+        <div style="text-align: center;">
+            <p style="color: #64748b; font-size: 14px; margin: 0;">
+                Cảm ơn bạn đã sử dụng dịch vụ của <strong>TechMart</strong>.
+            </p>
+            <p style="color: #94a3b8; font-size: 13px; margin: 12px 0 0 0;">
+                Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email hoặc liên hệ ngay với chúng tôi.
+            </p>
+
+            <div style="margin-top: 24px;">
+                <a href="tel:19001234" 
+                   style="color: #ef4444; text-decoration: none; font-weight: 700; font-size: 15px;">
+                    Hotline hỗ trợ: 1900 1234
+                </a>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+            <p style="color: #94a3b8; font-size: 12.5px;">
+                © ${new Date().getFullYear()} TechMart. All rights reserved.
+            </p>
+        </div>
+    </div>
+</div>`;
+  try {
+    await getTransporter().sendMail({
+      from: `"${fromName}" <${fromEmail}>`,
+      to: data.customerEmail,
+      subject: `[TechMart] Mã OTP đặt lại mật khẩu - ${data.otp}`,
+      html,
+    });
+
+    console.log(`[Email] ✓ Đã gửi OTP thành công cho ${data.customerEmail}`);
+  } catch (error: any) {
+    console.error("[Email] ✗ Lỗi gửi OTP:", error.message || error);
+    throw new Error(
+      `Không thể gửi OTP qua email: ${error.message || "Lỗi không xác định"}`,
+    );
   }
 }

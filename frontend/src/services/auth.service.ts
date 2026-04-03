@@ -1,5 +1,5 @@
-import api from './api';
-import { User } from '@/types';
+import api from "./api";
+import { User } from "@/types";
 
 // Định nghĩa phản hồi từ API
 export interface AuthResponse {
@@ -12,21 +12,22 @@ export interface AuthResponse {
  */
 export const normalizeAuthUser = (input: any): User => ({
   userId: Number(input?.userId ?? input?.user_id ?? input?.id ?? 0),
-  email: input?.email ?? '',
+  email: input?.email ?? "",
   // Ưu tiên fullName để khớp với logic Header/AdminLayout
-  fullName: input?.fullName ?? input?.name ?? '',
+  fullName: input?.fullName ?? input?.name ?? "",
   phone: input?.phone || undefined,
-  role: input?.role ?? 'customer',
-  status: input?.status ?? 'active',
-  points: typeof input?.points === 'number' ? input.points : 0,
-  membershipLevel: input?.membershipLevel ?? input?.membership_level ?? 'bronze',
+  role: input?.role ?? "customer",
+  status: input?.status ?? "active",
+  points: typeof input?.points === "number" ? input.points : 0,
+  membershipLevel:
+    input?.membershipLevel ?? input?.membership_level ?? "bronze",
   walletBalance: Number(input?.walletBalance ?? input?.wallet_balance ?? 0),
 });
 
 export const authService = {
   // 1. ĐĂNG NHẬP
   login: async (email: string, password: string): Promise<AuthResponse> => {
-    const response = await api.post('/auth/login', { email, password });
+    const response = await api.post("/auth/login", { email, password });
     return {
       token: response.data.token,
       user: normalizeAuthUser(response.data.user),
@@ -49,7 +50,7 @@ export const authService = {
       address: userData.address,
     };
 
-    const response = await api.post('/auth/register', payload);
+    const response = await api.post("/auth/register", payload);
 
     return {
       token: response.data.token,
@@ -59,7 +60,7 @@ export const authService = {
 
   // 3. LẤY THÔNG TIN CÁ NHÂN
   getProfile: async (): Promise<{ user: User }> => {
-    const response = await api.get('/auth/profile');
+    const response = await api.get("/auth/profile");
     return {
       user: normalizeAuthUser(response.data.user),
     };
@@ -67,9 +68,27 @@ export const authService = {
 
   // 4. ĐĂNG XUẤT
   logout: () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
     // Xóa sạch cả auth-storage để tránh "rác" dữ liệu
-    localStorage.removeItem('auth-storage'); 
+    localStorage.removeItem("auth-storage");
+  },
+
+  forgotPassword: async (email: string) => {
+    const res = await api.post("/auth/forgot-password", { email });
+    return res.data;
+  },
+
+  verifyOtp: async (tempToken: string, otp: string) => {
+    const res = await api.post("/auth/verify-otp", { tempToken, otp });
+    return res.data;
+  },
+
+  resetPassword: async (resetToken: string, newPassword: string) => {
+    const res = await api.post("/auth/reset-password", {
+      resetToken,
+      newPassword,
+    });
+    return res.data;
   },
 };

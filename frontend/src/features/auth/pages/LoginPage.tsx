@@ -96,6 +96,13 @@ export const LoginPage = () => {
               <Link to="/register" className="text-blue-600 hover:text-blue-700 font-bold underline-offset-4 hover:underline">
                 Đăng ký ngay
               </Link>
+              <br />
+              <Link
+                to="/forgot-password"
+                className="text-blue-600 hover:text-blue-700 font-bold underline-offset-4 hover:underline"
+              >
+                Quên mật khẩu?
+              </Link>
             </p>
           </div>
         </div>
