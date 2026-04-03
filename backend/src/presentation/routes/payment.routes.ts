@@ -20,5 +20,7 @@ export const createPaymentRoutes = (paymentController: PaymentController) => {
   // ✅ Không cần auth
   router.get('/vnpay/ipn', paymentController.vnpayIpn);
 
+  
+
   return router;
 };
