@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { UserUseCase } from "../../application/use-cases/UserUseCase";
+import type { AuthRequest } from "../middlewares/auth.middleware";
 
 export class UserController {
     constructor(private userUseCase: UserUseCase) { }
@@ -254,14 +255,14 @@ export class UserController {
             if (isNaN(userId)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Invalid user ID',
+                    message: 'ID người dùng không hợp lệ',
                 });
             }
 
             if (!oldPassword || !newPassword) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Old password and new password are required',
+                    message: 'Vui lòng nhập mật khẩu hiện tại và mật khẩu mới',
                 });
             }
 
@@ -270,18 +271,58 @@ export class UserController {
             if (!success) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Failed to change password',
+                    message: 'Không thể đổi mật khẩu',
                 });
             }
 
             res.json({
                 success: true,
-                message: 'Password changed successfully',
+                message: 'Đổi mật khẩu thành công',
             });
         } catch (error: any) {
             res.status(400).json({
                 success: false,
-                message: error.message || 'Failed to change password',
+                message: error.message || 'Không thể đổi mật khẩu',
+            });
+        }
+    };
+
+    changeMyPassword = async (req: AuthRequest, res: Response) => {
+        try {
+            const userId = Number(req.user?.userId);
+            const { oldPassword, newPassword } = req.body;
+
+            if (isNaN(userId)) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Phiên đăng nhập không hợp lệ',
+                });
+            }
+
+            if (!oldPassword || !newPassword) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Vui lòng nhập mật khẩu hiện tại và mật khẩu mới',
+                });
+            }
+
+            const success = await this.userUseCase.changePassword(userId, oldPassword, newPassword);
+
+            if (!success) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Không thể đổi mật khẩu',
+                });
+            }
+
+            res.json({
+                success: true,
+                message: 'Đổi mật khẩu thành công',
+            });
+        } catch (error: any) {
+            res.status(400).json({
+                success: false,
+                message: error.message || 'Không thể đổi mật khẩu',
             });
         }
     };

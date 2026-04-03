@@ -3,7 +3,7 @@ import { Layout } from '@/components/layout/Layout';
 import { useAuthStore } from '@/store/authStore';
 import { useWishlistStore } from '@/store/wishlistStore';
 import { useNavigate } from 'react-router-dom';
-import { userService, type UpdateUserPayload } from '@/services/user.service';
+import { userService } from '@/services/user.service';
 import { addressService, type Address } from '@/services/address.service';
 import { FavoriteProductsSection } from '@/features/account/components/FavoriteProductsSection';
 import api from '@/services/api';
@@ -189,6 +189,34 @@ interface AddressFormData {
   isDefault: boolean;
 }
 const EMPTY_FORM: AddressFormData = { fullName: '', phone: '', addressLine: '', ward: '', district: '', city: '', isDefault: false };
+
+interface ChangePasswordFormData {
+  oldPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+const EMPTY_PASSWORD_FORM: ChangePasswordFormData = {
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: '',
+};
+
+const getNewPasswordValidationMessage = (password: string) => {
+  if (!password.trim()) {
+    return 'Vui lòng nhập mật khẩu mới';
+  }
+
+  if (password.length < 6) {
+    return 'Mật khẩu mới phải có ít nhất 6 ký tự';
+  }
+
+  if (!/[A-Z]/.test(password)) {
+    return 'Mật khẩu mới phải có ít nhất 1 chữ in hoa';
+  }
+
+  return '';
+};
 
 // ─── Address Modal ────────────────────────────────────────────────────────────
 const AddressModal = ({ editing, onSave, onClose }: {
@@ -761,6 +789,122 @@ const EditableField = ({ label, value, icon, onSave, type = 'text', placeholder,
   );
 };
 
+const ChangePasswordCard = ({
+  loading,
+  onSubmit,
+}: {
+  loading: boolean;
+  onSubmit: (payload: { oldPassword: string; newPassword: string }) => Promise<boolean>;
+}) => {
+  const [form, setForm] = useState<ChangePasswordFormData>(EMPTY_PASSWORD_FORM);
+
+  const newPasswordError = form.newPassword ? getNewPasswordValidationMessage(form.newPassword) : '';
+  const confirmPasswordError =
+    form.confirmPassword && form.newPassword !== form.confirmPassword
+      ? 'Mật khẩu xác nhận không khớp'
+      : '';
+
+  const handleChange = (field: keyof ChangePasswordFormData, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!form.oldPassword.trim()) {
+      toast.error('Vui lòng nhập mật khẩu hiện tại');
+      return;
+    }
+
+    const passwordValidationMessage = getNewPasswordValidationMessage(form.newPassword);
+    if (passwordValidationMessage) {
+      toast.error(passwordValidationMessage);
+      return;
+    }
+
+    if (form.newPassword !== form.confirmPassword) {
+      toast.error('Mật khẩu xác nhận không khớp');
+      return;
+    }
+
+    const changed = await onSubmit({
+      oldPassword: form.oldPassword,
+      newPassword: form.newPassword,
+    });
+
+    if (changed) {
+      setForm(EMPTY_PASSWORD_FORM);
+    }
+  };
+
+  const inputClassName =
+    'w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:border-blue-400 focus:outline-none transition-colors';
+
+  return (
+    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="px-6 py-4 border-b border-slate-100">
+        <h2 className="text-sm font-bold text-slate-700">Đổi mật khẩu</h2>
+        <p className="text-[10px] text-slate-400 mt-1">
+          Mật khẩu mới phải có ít nhất 6 ký tự và chứa ít nhất 1 chữ in hoa.
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Mật khẩu hiện tại</label>
+          <input
+            type="password"
+            value={form.oldPassword}
+            onChange={(e) => handleChange('oldPassword', e.target.value)}
+            className={inputClassName}
+            placeholder="Nhập mật khẩu hiện tại"
+            autoComplete="current-password"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Mật khẩu mới</label>
+          <input
+            type="password"
+            value={form.newPassword}
+            onChange={(e) => handleChange('newPassword', e.target.value)}
+            className={inputClassName}
+            placeholder="Nhập mật khẩu mới"
+            autoComplete="new-password"
+          />
+          <p className={`text-[11px] ${newPasswordError ? 'text-red-500' : 'text-slate-400'}`}>
+            {newPasswordError || 'Tối thiểu 6 ký tự, có ít nhất 1 chữ in hoa.'}
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Xác nhận mật khẩu mới</label>
+          <input
+            type="password"
+            value={form.confirmPassword}
+            onChange={(e) => handleChange('confirmPassword', e.target.value)}
+            className={inputClassName}
+            placeholder="Nhập lại mật khẩu mới"
+            autoComplete="new-password"
+          />
+          <p className={`text-[11px] ${confirmPasswordError ? 'text-red-500' : 'text-slate-400'}`}>
+            {confirmPasswordError || 'Mật khẩu xác nhận phải trùng với mật khẩu mới.'}
+          </p>
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-3 rounded-2xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+        >
+          {loading ? <Loader2 size={14} className="animate-spin" /> : <Shield size={14} />}
+          {loading ? 'Đang cập nhật...' : 'Cập nhật mật khẩu'}
+        </button>
+      </form>
+    </div>
+  );
+};
+
 // ─── Main ProfilePage ─────────────────────────────────────────────────────────
 export const ProfilePage = () => {
   const { user, setAuth, clearAuth } = useAuthStore();
@@ -771,6 +915,7 @@ export const ProfilePage = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingAddress, setEditingAddress] = useState<Address | undefined>();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState('');
   const [bannerUrl, setBannerUrl] = useState('');
 
@@ -858,6 +1003,21 @@ export const ProfilePage = () => {
     clearAuth(); toast.success('Đã đăng xuất'); navigate('/login');
   };
 
+  const handleChangePassword = async ({ oldPassword, newPassword }: { oldPassword: string; newPassword: string }) => {
+    setChangingPassword(true);
+
+    try {
+      await userService.changePassword(oldPassword, newPassword);
+      toast.success('Đổi mật khẩu thành công');
+      return true;
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Không thể đổi mật khẩu');
+      return false;
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
 
   return (
     <Layout>
@@ -924,6 +1084,8 @@ export const ProfilePage = () => {
               <EditableField label="Vai trò" value={ROLE_LABELS[userRole] || 'Khách hàng'} icon={<Shield size={15} />} readOnly />
             </div>
           </div>
+
+          <ChangePasswordCard loading={changingPassword} onSubmit={handleChangePassword} />
 
           <FavoriteProductsSection userId={u.userId} />
 

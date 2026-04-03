@@ -52,6 +52,8 @@ export const createUserRoutes = (userController: UserController) => {
     }
   });
 
+  router.patch('/me/password', authMiddleware, userController.changeMyPassword);
+
   // Tất cả role nội bộ: xem stats (dùng cho Dashboard)
   router.get('/stats', authMiddleware, userController.getStats);
 

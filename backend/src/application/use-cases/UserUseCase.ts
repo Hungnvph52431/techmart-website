@@ -3,6 +3,16 @@ import { User } from '../../domain/entities/User';
 import bcrypt from 'bcryptjs';
 import { CreateUserDTO, UpdateUserDTO } from '../../domain/entities/User';
 
+const validatePasswordPolicy = (password: string) => {
+    if (password.length < 6) {
+        throw new Error('Mật khẩu mới phải có ít nhất 6 ký tự');
+    }
+
+    if (!/[A-Z]/.test(password)) {
+        throw new Error('Mật khẩu mới phải có ít nhất 1 chữ in hoa');
+    }
+};
+
 export interface UserFilters {
     role?: 'customer' | 'admin' | 'staff' | 'warehouse';
     status?: 'active' | 'inactive' | 'banned';
@@ -181,15 +191,15 @@ export class UserUseCase {
     async changePassword(userId: number, oldPassword: string, newPassword: string): Promise<boolean> {
         const user = await this.userRepository.findById(userId);
         if (!user) {
-            throw new Error('User not found');
+            throw new Error('Không tìm thấy người dùng');
         }
         const isPasswordValid = await bcrypt.compare(oldPassword, user.password);
         if (!isPasswordValid) {
-            throw new Error('Old password is incorrect');
+            throw new Error('Mật khẩu hiện tại không chính xác');
         }
-        if (newPassword.length < 6) {
-            throw new Error('New password must be at least 6 characters long');
-        }
+
+        validatePasswordPolicy(newPassword);
+
         const hashedPassword = await bcrypt.hash(newPassword, 10);
         return await this.userRepository.updatePassword(userId, hashedPassword);
     }
