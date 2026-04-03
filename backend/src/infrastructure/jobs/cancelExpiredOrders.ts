@@ -1,16 +1,20 @@
 import pool from "../database/connection";
 import { RowDataPacket } from "mysql2";
 
-const EXPIRE_MINUTES = 1;
+const EXPIRE_MINUTES = 10;
 
 export async function cancelExpiredOrders(): Promise<void> {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
 
+    console.log(
+      `[CancelExpiredOrders] 🚀 Bắt đầu quét đơn hết hạn (expire: ${EXPIRE_MINUTES} phút)`,
+    );
+
     // 1. Tìm đơn hàng hết hạn thanh toán
     const [expiredOrders] = await conn.query<RowDataPacket[]>(
-      `SELECT order_id, order_code, status
+      `SELECT order_id, order_code, status, order_date, payment_method, payment_status
        FROM orders
        WHERE payment_method IN ('vnpay', 'bank_transfer')
          AND payment_status = 'pending'
@@ -20,29 +24,28 @@ export async function cancelExpiredOrders(): Promise<void> {
     );
 
     if (expiredOrders.length === 0) {
+      console.log(`[CancelExpiredOrders] ✅ Không có đơn nào cần hủy`);
       await conn.rollback();
       return;
     }
 
-    console.log(
-      `[CancelExpiredOrders] Tìm thấy ${expiredOrders.length} đơn hết hạn`,
-    );
-
     for (const order of expiredOrders) {
       const orderId: number = order.order_id;
+      const orderCode: string = order.order_code;
 
-      // Mỗi đơn dùng transaction riêng — lỗi 1 đơn không ảnh hưởng đơn khác
       const innerConn = await pool.getConnection();
       try {
         await innerConn.beginTransaction();
 
-        // 2. Lấy danh sách sản phẩm trong đơn
-        const [items] = await innerConn.query<RowDataPacket[]>(
-          `SELECT product_id, variant_id, quantity FROM order_details WHERE order_id = ?`,
+        const [rawItems] = await innerConn.query<RowDataPacket[]>(
+          `SELECT order_detail_id, product_id, variant_id, quantity, product_name, variant_name
+           FROM order_details
+           WHERE order_id = ?
+           ORDER BY product_id, variant_id`,
           [orderId],
         );
 
-        // 3. Cập nhật status → cancelled, payment_status → failed
+        // 2. Cập nhật status đơn hàng → cancelled
         const [result] = await innerConn.query<any>(
           `UPDATE orders
            SET status         = 'cancelled',
@@ -59,14 +62,13 @@ export async function cancelExpiredOrders(): Promise<void> {
           ],
         );
 
-        // Nếu không update được (đơn đã bị xử lý bởi luồng khác) → bỏ qua
         if (result.affectedRows === 0) {
           await innerConn.rollback();
           innerConn.release();
           continue;
         }
 
-        // 4. Ghi event hủy đơn vào timeline
+        // 3. Ghi event hủy đơn vào timeline
         await innerConn.query(
           `INSERT INTO order_events
              (order_id, event_type, from_status, to_status, actor_role, note, created_at)
@@ -78,7 +80,7 @@ export async function cancelExpiredOrders(): Promise<void> {
           ],
         );
 
-        // 5. Ghi event thay đổi payment_status
+        // 4. Ghi event thay đổi payment_status
         await innerConn.query(
           `INSERT INTO order_events
              (order_id, event_type, from_status, to_status, actor_role, note, created_at)
@@ -86,52 +88,27 @@ export async function cancelExpiredOrders(): Promise<void> {
           [orderId, `Thanh toán hết hạn sau ${EXPIRE_MINUTES} phút`],
         );
 
-        // 6. Hoàn tồn kho: cộng lại stock_quantity theo entities (không dùng reserved_quantity)
-        for (const item of items) {
-          if (item.variant_id) {
-            // Có variant → chỉ hoàn kho variant, KHÔNG cộng vào product
-            await innerConn.query(
-              `UPDATE product_variants
-               SET stock_quantity = stock_quantity + ?,
-                   updated_at     = NOW()
-               WHERE variant_id = ?`,
-              [item.quantity, item.variant_id],
-            );
-          } else {
-            // Không có variant → hoàn kho trực tiếp vào product
-            await innerConn.query(
-              `UPDATE products
-               SET stock_quantity = stock_quantity + ?,
-                   updated_at     = NOW()
-               WHERE product_id = ?`,
-              [item.quantity, item.product_id],
-            );
-          }
-        }
-
         await innerConn.commit();
-        console.log(
-          `[CancelExpiredOrders] ✅ Đã hủy đơn #${order.order_code} (ID: ${orderId})`,
-        );
-      } catch (err) {
+      } catch (err: any) {
         await innerConn.rollback();
         console.error(
-          `[CancelExpiredOrders] ❌ Lỗi khi hủy đơn ${orderId}:`,
-          err,
+          `[CancelExpiredOrders] ❌ LỖI khi xử lý đơn ${orderCode} (ID: ${orderId}):`,
+          err.message,
         );
+        if (err.stack) console.error(err.stack);
       } finally {
         innerConn.release();
       }
     }
 
-    // Transaction ngoài chỉ dùng để query danh sách — commit/rollback ở đây không ảnh hưởng kho
     await conn.commit();
-  } catch (err) {
+  } catch (err: any) {
     await conn.rollback();
     console.error(
-      "[CancelExpiredOrders] ❌ Lỗi khi query danh sách đơn hết hạn:",
-      err,
+      `[CancelExpiredOrders] ❌ LỖI NGHIÊM TRỌNG khi quét danh sách đơn:`,
+      err.message,
     );
+    if (err.stack) console.error(err.stack);
   } finally {
     conn.release();
   }
