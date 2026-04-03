@@ -22,6 +22,8 @@ import { CouponRepository } from './infrastructure/repositories/CouponRepository
 import { BannerRepository } from './infrastructure/repositories/BannerRepository';
 import { WishlistRepository } from './infrastructure/repositories/WishlistRepository';
 
+//------Jobs--------
+
 // --- USE CASES ---
 import { AuthUseCase } from './application/use-cases/AuthUseCase';
 import { ProductUseCase } from './application/use-cases/ProductUseCase';
@@ -198,10 +200,8 @@ const startServer = async () => {
         `🗺️ Vietnam administrative dataset: ${vietnamAdministrativeService.getSummary().provinceCount} provinces, ${vietnamAdministrativeService.getSummary().wardCount} wards`
       );
 
-      // ✅ THÊM ĐOẠN NÀY:
       const scheduler = new OrderScheduler(orderUseCase);
       scheduler.start();
-      // ✅ KẾT THÚC ĐOẠN THÊM
     });
   } catch (error) {
     console.error('Failed to start server:', error);
