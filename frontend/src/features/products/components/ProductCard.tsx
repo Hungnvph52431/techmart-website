@@ -194,21 +194,21 @@ export const ProductCard = ({ product }: ProductCardProps) => {
             {/* 2. NỘI DUNG SẢN PHẨM */}
             <div className="flex flex-1 flex-col px-4 py-3">
               {product.brandName && (
-                <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-blue-600">
+                <div className="mb-1 text-xs font-bold uppercase tracking-wider text-blue-600">
                   {product.brandName}
                 </div>
               )}
 
-              <h3 className="mb-2 line-clamp-2 min-h-[40px] text-sm font-semibold text-gray-800 leading-snug transition-colors group-hover:text-blue-600">
+              <h3 className="mb-2 line-clamp-2 min-h-[48px] text-sm font-semibold text-gray-800 leading-snug transition-colors group-hover:text-blue-600">
                 {product.name}
               </h3>
 
               <div className="mt-auto flex items-baseline gap-2">
-                <span className="text-base font-black text-red-600">
+                <span className="text-lg font-black text-red-600">
                   {currentPrice.toLocaleString("vi-VN")}₫
                 </span>
                 {discount > 0 && (
-                  <span className="text-xs text-gray-400 line-through">
+                  <span className="text-sm text-gray-400 line-through">
                     {originalPrice.toLocaleString("vi-VN")}₫
                   </span>
                 )}
@@ -221,9 +221,9 @@ export const ProductCard = ({ product }: ProductCardProps) => {
               <div className="flex min-w-0 items-center gap-2.5">
                 <div className="flex items-center rounded-md bg-yellow-50 px-2 py-0.5">
                   <Star className="h-3 w-3 fill-current text-yellow-500" />
-                  <span className="ml-1 text-[11px] font-bold text-yellow-700">{ratingValue}</span>
+                  <span className="ml-1 text-xs font-bold text-yellow-700">{ratingValue}</span>
                 </div>
-                <span className="truncate text-[11px] font-medium text-gray-400">
+                <span className="truncate text-xs font-medium text-gray-400">
                   Đã bán {soldQuantityText}
                 </span>
               </div>
@@ -251,7 +251,7 @@ export const ProductCard = ({ product }: ProductCardProps) => {
               type="button"
               onClick={handleAddToCart}
               disabled={isDisabled || loadingVariants}
-              className={`flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold uppercase tracking-wide transition-all ${
+              className={`flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold uppercase tracking-wide transition-all ${
                 isDisabled
                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   : loadingVariants
