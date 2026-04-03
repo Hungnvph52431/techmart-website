@@ -28,7 +28,7 @@ export const ProductListContent = ({
 
   // Ưu tiên props từ parent (ProductsFilter) trước, sau đó mới lấy từ URL
   const finalSearch = propSearch || searchParams.get("search") || "";
-  const finalCategorySlug = propCategorySlug || searchParams.get("categorySlug") || "";
+  const finalCategorySlug = propCategorySlug || searchParams.get("category") || searchParams.get("categorySlug") || "";
   const finalBrand = propBrand || searchParams.get("brand") || "";
 
   useEffect(() => {

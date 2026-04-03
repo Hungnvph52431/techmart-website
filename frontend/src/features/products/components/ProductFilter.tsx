@@ -210,7 +210,7 @@ export const ProductsFilter = () => {
               <span className="text-sm font-bold text-gray-400 uppercase tracking-wide mr-1">Danh mục:</span>
               <button
                 onClick={() => updateParams({ category: "" })}
-                className={`px-3.5 py-1.5 rounded-xl text-base font-semibold border transition-all {
+                className={`px-3.5 py-1.5 rounded-xl text-base font-semibold border transition-all ${
                   !category
                     ? "border-blue-600 bg-blue-600 text-white"
                     : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
@@ -222,7 +222,7 @@ export const ProductsFilter = () => {
                 <button
                   key={c.categoryId}
                   onClick={() => updateParams({ category: category === c.slug ? "" : c.slug })}
-                  className={`px-3.5 py-1.5 rounded-xl text-sm font-semibold border transition-all ${
+                  className={`px-3.5 py-1.5 rounded-xl text-base font-semibold border transition-all ${
                     category === c.slug
                       ? "border-blue-600 bg-blue-600 text-white"
                       : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
