@@ -23,6 +23,7 @@ import { BannerRepository } from './infrastructure/repositories/BannerRepository
 import { WishlistRepository } from './infrastructure/repositories/WishlistRepository';
 
 //------Jobs--------
+import { paymentScheduler } from './infrastructure/jobs/scheduler';
 
 // --- USE CASES ---
 import { AuthUseCase } from './application/use-cases/AuthUseCase';
@@ -202,6 +203,7 @@ const startServer = async () => {
 
       const scheduler = new OrderScheduler(orderUseCase);
       scheduler.start();
+      paymentScheduler(); 
     });
   } catch (error) {
     console.error('Failed to start server:', error);
