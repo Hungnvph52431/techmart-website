@@ -363,77 +363,87 @@ export async function sendForgotPasswordOtpEmail(
   const fromEmail = process.env.SMTP_USER;
 
   const html = `
-<div style="max-width: 600px; margin: 0 auto; font-family: 'Segoe UI', system-ui, Arial, sans-serif; background: #f8fafc; padding: 20px;">
-  
-  <!-- Header -->
-  <div style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 32px 24px; text-align: center; border-radius: 16px 16px 0 0;">
-    <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.5px;">
-      Xác thực tài khoản TechMart
-    </h1>
-    <p style="color: #dbeafe; margin: 8px 0 0 0; font-size: 15px;">
-      Mã OTP đặt lại mật khẩu
-    </p>
-  </div>
-
-  <!-- Body -->
-  <div style="background: #ffffff; padding: 40px 32px; border-radius: 0 0 16px 16px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);">
+<div style="max-width:600px; margin:0 auto; font-family:'Segoe UI', system-ui, Arial, sans-serif; color:#333; background:#f9fafb; padding:20px;">
     
-    <p style="font-size: 16px; color: #334155; margin-bottom: 8px;">
-      Xin chào <strong style="color: #1e40af;">${data.customerName}</strong>,
-    </p>
-    
-    <p style="font-size: 15px; color: #475569; line-height: 1.6;">
-      Bạn đã yêu cầu đặt lại mật khẩu cho tài khoản TechMart. 
-      Vui lòng sử dụng mã OTP dưới đây để tiếp tục:
-    </p>
-
-    <!-- OTP Box -->
-    <div style="margin: 32px 0; text-align: center;">
-      <div style="background: #f8fafc; border: 2px solid #3b82f6; border-radius: 16px; padding: 28px 20px;">
-        <p style="margin: 0 0 12px 0; color: #64748b; font-size: 13px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;">
-          MÃ OTP CỦA BẠN
+    <div style="background: linear-gradient(135deg, #b91c1c 0%, #ef4444 100%); padding: 40px 24px; text-align: center; border-radius: 16px 16px 0 0;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
+            Đặt Lại Mật Khẩu
+        </h1>
+        <p style="color: #fee2e2; margin: 10px 0 0 0; font-size: 16px;">
+            Mã OTP xác thực tài khoản TechMart
         </p>
-        <div style="font-size: 52px; font-weight: 800; letter-spacing: 16px; color: #1e3a8a; background: white; padding: 16px 24px; border-radius: 12px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-          ${data.otp}
+    </div>
+
+    <!-- Body -->
+    <div style="background: #ffffff; padding: 40px 32px; border-radius: 0 0 16px 16px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);">
+
+        <p style="margin-bottom: 16px;">Xin chào <strong style="color:#b91c1c;">${data.customerName}</strong>,</p>
+        
+        <p style="font-size: 15.5px; color: #374151; line-height: 1.6;">
+            Bạn đã yêu cầu đặt lại mật khẩu cho tài khoản TechMart. 
+            Vui lòng sử dụng mã OTP dưới đây để tiếp tục:
+        </p>
+
+        <div style="margin: 32px 0; text-align: center;">
+            <div style="background: #fef2f2; 
+                        border: 4px dashed #ef4444; 
+                        border-radius: 16px; 
+                        padding: 32px 20px;">
+                
+                <p style="margin: 0 0 12px 0; color: #b91c1c; font-size: 13.5px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;">
+                    MÃ OTP CỦA BẠN
+                </p>
+                
+                <div style="font-size: 54px; 
+                            font-weight: 800; 
+                            letter-spacing: 18px; 
+                            color: #991b1b; 
+                            background: #ffffff; 
+                            padding: 18px 32px; 
+                            border-radius: 12px; 
+                            display: inline-block; 
+                            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);">
+                    ${data.otp}
+                </div>
+                
+                <p style="margin: 20px 0 0 0; color: #ef4444; font-size: 15px; font-weight: 600;">
+                    Hiệu lực trong <strong>${data.expiresInMinutes} phút</strong>
+                </p>
+            </div>
         </div>
-        <p style="margin: 16px 0 0 0; color: #64748b; font-size: 14.5px;">
-          Mã này có hiệu lực trong <strong style="color: #1e40af;">${data.expiresInMinutes} phút</strong>
-        </p>
-      </div>
-    </div>
 
-    <!-- Warning Box -->
-    <div style="background: #fefce8; border-left: 5px solid #eab308; padding: 16px 20px; border-radius: 8px; margin: 24px 0;">
-      <p style="margin: 0; font-size: 14px; color: #854d0e; line-height: 1.5;">
-        <strong>⚠️ Lưu ý quan trọng:</strong><br>
-        Không chia sẻ mã OTP này với bất kỳ ai. 
-        TechMart sẽ không bao giờ yêu cầu bạn cung cấp mã qua điện thoại hoặc tin nhắn.
-      </p>
-    </div>
+        <div style="background:#fff7ed; border-left: 5px solid #f59e0b; padding: 16px 20px; border-radius: 8px; margin: 24px 0;">
+            <p style="margin: 0; font-size: 14.5px; color: #b45309; line-height: 1.6;">
+                <strong>⚠️ Lưu ý quan trọng:</strong><br>
+                Không chia sẻ mã OTP này với bất kỳ ai. 
+                TechMart sẽ <strong>không bao giờ</strong> yêu cầu bạn cung cấp mã qua điện thoại hoặc tin nhắn.
+            </p>
+        </div>
 
-    <!-- Footer -->
-    <div style="text-align: center; margin-top: 40px; padding-top: 24px; border-top: 1px solid #e2e8f0;">
-      <p style="color: #64748b; font-size: 13.5px; margin: 0;">
-        Cảm ơn bạn đã tin tưởng và sử dụng dịch vụ tại <strong>TechMart</strong>.
-      </p>
-      <p style="color: #94a3b8; font-size: 13px; margin: 12px 0 0 0;">
-        Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email hoặc liên hệ ngay với chúng tôi.
-      </p>
-      
-      <div style="margin-top: 20px;">
-        <a href="tel:19001234" style="color: #3b82f6; text-decoration: none; font-weight: 600;">
-          Hotline hỗ trợ: 1900 1234
-        </a>
-      </div>
-    </div>
-  </div>
+        <hr style="margin: 32px 0; border: none; border-top: 1px solid #e5e7eb;">
 
-  <!-- Sub footer -->
-  <div style="text-align: center; margin-top: 24px;">
-    <p style="color: #94a3b8; font-size: 12px;">
-      © ${new Date().getFullYear()} TechMart. All rights reserved.
-    </p>
-  </div>
+        <div style="text-align: center;">
+            <p style="color: #64748b; font-size: 14px; margin: 0;">
+                Cảm ơn bạn đã sử dụng dịch vụ của <strong>TechMart</strong>.
+            </p>
+            <p style="color: #94a3b8; font-size: 13px; margin: 12px 0 0 0;">
+                Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email hoặc liên hệ ngay với chúng tôi.
+            </p>
+
+            <div style="margin-top: 24px;">
+                <a href="tel:19001234" 
+                   style="color: #ef4444; text-decoration: none; font-weight: 700; font-size: 15px;">
+                    Hotline hỗ trợ: 1900 1234
+                </a>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+            <p style="color: #94a3b8; font-size: 12.5px;">
+                © ${new Date().getFullYear()} TechMart. All rights reserved.
+            </p>
+        </div>
+    </div>
 </div>`;
   try {
     await getTransporter().sendMail({
