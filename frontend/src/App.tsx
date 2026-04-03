@@ -19,6 +19,8 @@ import { CheckoutPage } from '@/features/orders/pages/CheckoutPage';
 import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { RegisterPage } from '@/features/auth/pages/RegisterPage'; //
 import { ProfilePage } from '@/features/account/pages/ProfilePage'; //
+import { ForgotPasswordPage } from "./features/auth/pages/ForgotPasswordPage";
+
 
 // --- HỆ THỐNG ĐƠN HÀNG (KHÁCH HÀNG) ---
 import { CustomerRouteGuard } from '@/features/orders/components/CustomerRouteGuard';
@@ -61,6 +63,7 @@ function App() {
         <Route path="/products/:slug" element={<ProductDetailPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/payment/result" element={<PaymentResultPage />} />
