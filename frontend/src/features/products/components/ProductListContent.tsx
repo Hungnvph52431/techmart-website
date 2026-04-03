@@ -47,7 +47,7 @@ export const ProductListContent = ({
           minPrice: searchParams.get("minPrice") || undefined,
           maxPrice: searchParams.get("maxPrice") || undefined,
           page,
-          limit: 12,
+          limit: 15,
         };
 
         // Loại bỏ các giá trị undefined
@@ -110,7 +110,7 @@ export const ProductListContent = ({
         </div>
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '3rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem', marginBottom: '3rem' }}>
             {products.map((product) => (
               <ProductCard key={product.productId} product={product} />
             ))}
