@@ -221,5 +221,81 @@ export class PaymentController {
     }
   };
 
- 
+  // ─── 5. IPN — Thanh toán lại ────────────────────────────────
+  repay = async (req: AuthRequest, res: Response) => {
+    try {
+      const { orderId } = req.body;
+      if (!orderId) {
+        return res.status(400).json({ message: "Thiếu orderId" });
+      }
+
+      const order = await this.orderUseCase.getOrderById(Number(orderId));
+      if (!order) {
+        return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
+      }
+
+      // Kiểm tra quyền sở hữu
+      if (order.userId !== req.user.userId) {
+        return res
+          .status(403)
+          .json({ message: "Không có quyền thực hiện thao tác này" });
+      }
+
+      // Chỉ cho phép thanh toán lại khi:
+      // 1. Phương thức thanh toán là vnpay
+      // 2. Trạng thái thanh toán chưa hoàn thành (pending hoặc failed)
+      // 3. Đơn hàng chưa bị hủy
+      if (order.paymentMethod !== "vnpay") {
+        return res
+          .status(400)
+          .json({ message: "Chỉ hỗ trợ thanh toán lại cho đơn VNPay" });
+      }
+      if (order.paymentStatus === "paid") {
+        return res
+          .status(400)
+          .json({ message: "Đơn hàng này đã được thanh toán" });
+      }
+      if (order.status === "cancelled") {
+        return res
+          .status(400)
+          .json({ message: "Đơn hàng đã bị hủy, không thể thanh toán lại" });
+      }
+      if (!["pending", "failed"].includes(order.paymentStatus)) {
+        return res
+          .status(400)
+          .json({
+            message: `Không thể thanh toán lại với trạng thái: ${order.paymentStatus}`,
+          });
+      }
+
+      // Nếu paymentStatus là 'failed', reset về 'pending' để cho phép thanh toán lại
+      // (PAYMENT_STATUS_TRANSITIONS: failed → pending)
+      if (order.paymentStatus === "failed") {
+        await this.orderUseCase.updateOrderPaymentStatus(
+          order.orderId,
+          "pending",
+          req.user.userId,
+          "customer",
+          "Khách hàng yêu cầu thanh toán lại",
+        );
+      }
+
+      const ipAddr =
+        (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() ||
+        req.socket.remoteAddress?.replace("::ffff:", "") ||
+        "127.0.0.1";
+
+      const paymentUrl = createPaymentUrl({
+        orderId: order.orderId,
+        orderCode: order.orderCode,
+        amount: order.total,
+        ipAddr,
+      });
+
+      return res.json({ paymentUrl });
+    } catch (error: any) {
+      console.error("[Payment] repay error:", error);
+      return res.status(500).json({ message: error.message });
+    }
+  };
 }
