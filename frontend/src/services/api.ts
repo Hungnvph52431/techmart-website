@@ -1,5 +1,11 @@
 import axios from 'axios';
 
+const isLoginRequest = (error: any) => {
+  const method = error?.config?.method?.toLowerCase();
+  const url = String(error?.config?.url || '');
+  return method === 'post' && url.includes('/auth/login');
+};
+
 const api = axios.create({
   // Đảm bảo cổng 5001 khớp với cấu hình Backend của bạn
   baseURL: import.meta.env.VITE_API_URL || 'https://perhaps-robbie-ntsc-proceed.trycloudflare.com/',
@@ -30,7 +36,7 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !isLoginRequest(error)) {
       // Đã gộp: Xóa sạch localStorage và cả auth-storage của Zustand
       localStorage.removeItem('token');
       localStorage.removeItem('user');
