@@ -141,7 +141,7 @@ export const userService = {
     return unwrapData<UserStats>(response.data);
   },
 
-  async changePassword(userId: number, oldPassword: string, newPassword: string): Promise<void> {
-    await api.post(`/users/${userId}/password`, { oldPassword, newPassword });
+  async changePassword(oldPassword: string, newPassword: string): Promise<void> {
+    await api.patch('/users/me/password', { oldPassword, newPassword });
   }
 };
