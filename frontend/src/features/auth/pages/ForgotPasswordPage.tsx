@@ -3,7 +3,22 @@ import { Link, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { authService } from "@/services/auth.service";
 import toast from "react-hot-toast";
-import { Mail, ArrowLeft, Loader2, Lock, Eye, EyeOff } from "lucide-react";
+import { Mail, ArrowLeft, Loader2, Lock, Eye, EyeOff, Check, X } from "lucide-react";
+
+const passwordRules = [
+  {
+    label: "Mật khẩu phải từ 8 đến 20 ký tự",
+    test: (p: string) => p.length >= 8 && p.length <= 20,
+  },
+  {
+    label: "Bao gồm số, chữ viết hoa, chữ viết thường",
+    test: (p: string) => /[0-9]/.test(p) && /[A-Z]/.test(p) && /[a-z]/.test(p),
+  },
+  {
+    label: "Bao gồm ít nhất một ký tự đặc biệt !@#$^*()_",
+    test: (p: string) => /[!@#$^*()_]/.test(p),
+  },
+];
 
 type Step = "email" | "otp" | "reset";
 
@@ -21,6 +36,7 @@ export const ForgotPasswordPage = () => {
   const [resetToken, setResetToken] = useState(""); 
 
   const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,13 +80,27 @@ export const ForgotPasswordPage = () => {
     }
   };
 
+  const getRuleStyle = (passes: boolean) => {
+    if (!newPassword && !submitted) return "text-gray-400";
+    if (passes) return "text-green-500";
+    if (submitted) return "text-red-500";
+    return "text-gray-400";
+  };
+
+  const getRuleIcon = (passes: boolean) => {
+    if (!newPassword && !submitted) return <Check size={14} />;
+    if (passes) return <Check size={14} />;
+    if (submitted) return <X size={14} />;
+    return <Check size={14} />;
+  };
+
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitted(true);
 
-    if (newPassword.length < 8) {
-      toast.error("Mật khẩu phải có ít nhất 8 ký tự");
-      return;
-    }
+    const allRulesPass = passwordRules.every((r) => r.test(newPassword));
+    if (!allRulesPass) return;
+
     if (newPassword !== confirmPassword) {
       toast.error("Mật khẩu xác nhận không khớp");
       return;
@@ -116,7 +146,7 @@ export const ForgotPasswordPage = () => {
           </div>
 
           {step === "email" && (
-            <form onSubmit={handleSendOtp} className="space-y-6">
+            <form onSubmit={handleSendOtp} noValidate className="space-y-6">
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase ml-1">
                   Email tài khoản
@@ -152,7 +182,7 @@ export const ForgotPasswordPage = () => {
           )}
 
           {step === "otp" && (
-            <form onSubmit={handleVerifyOtp} className="space-y-6">
+            <form onSubmit={handleVerifyOtp} noValidate className="space-y-6">
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase ml-1">
                   Mã OTP (6 số)
@@ -192,7 +222,7 @@ export const ForgotPasswordPage = () => {
           )}
 
           {step === "reset" && (
-            <form onSubmit={handleResetPassword} className="space-y-6">
+            <form onSubmit={handleResetPassword} noValidate className="space-y-6">
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase ml-1">
                   Mật khẩu mới
@@ -208,7 +238,6 @@ export const ForgotPasswordPage = () => {
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="••••••••"
                     required
-                    minLength={8}
                     className="w-full pl-12 pr-12 py-4 bg-gray-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                   <button
@@ -219,6 +248,17 @@ export const ForgotPasswordPage = () => {
                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
                 </div>
+                <ul className="mt-2 space-y-1">
+                  {passwordRules.map((rule) => {
+                    const passes = rule.test(newPassword);
+                    return (
+                      <li key={rule.label} className={`flex items-center gap-1.5 text-sm ${getRuleStyle(passes)}`}>
+                        {getRuleIcon(passes)}
+                        {rule.label}
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
 
               <div>
