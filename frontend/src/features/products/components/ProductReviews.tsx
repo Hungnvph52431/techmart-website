@@ -74,6 +74,11 @@ const ReviewCard = ({
         Từ sản phẩm: {review.productName}
       </p>
     )}
+    {review.variantName && (
+      <span className="inline-block rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-semibold text-gray-500">
+        Phiên bản: {review.variantName}
+      </span>
+    )}
     {review.title && <p className="text-sm font-bold text-gray-800">{review.title}</p>}
     {review.comment && <p className="text-sm text-gray-600 leading-relaxed">{review.comment}</p>}
     <button onClick={() => onHelpful(review.reviewId)}

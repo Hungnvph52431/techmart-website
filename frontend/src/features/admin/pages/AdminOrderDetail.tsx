@@ -318,6 +318,21 @@ export const AdminOrderDetail = () => {
   const items = detail.items || [];
   const timeline: any[] = detail.timeline || [];
   const returns: any[] = detail.returns || [];
+  const returnedOrderDetailIds = new Set<number>(
+    returns
+      .filter((r: any) => r.status !== 'rejected')
+      .flatMap((r: any) => (r.items || []).map((i: any) => i.orderDetailId)),
+  );
+  const refundedOrderDetailIds = new Set<number>(
+    returns
+      .filter((r: any) => r.status === 'refunded' || r.status === 'closed')
+      .flatMap((r: any) => (r.items || []).map((i: any) => i.orderDetailId)),
+  );
+  const rejectedOrderDetailIds = new Set<number>(
+    returns
+      .filter((r: any) => r.status === 'rejected')
+      .flatMap((r: any) => (r.items || []).map((i: any) => i.orderDetailId)),
+  );
 
   const allowedStatuses = ORDER_STATUS_TRANSITIONS[order.status] || [];
   // Ẩn button cập nhật thanh toán khi đã hủy, hoặc khi đã hoàn trả + đã refunded
@@ -408,15 +423,36 @@ const allowedPayments = (() => {
               <span className="text-sm font-black text-red-500">{fmt(order.total || order.totalAmount)}</span>
             </div>
             <div className="divide-y divide-gray-50">
-              {items.length > 0 ? items.map((item: any) => (
-                <div key={item.orderDetailId} className="flex gap-4 px-6 py-4">
+              {items.length > 0 ? items.map((item: any) => {
+                const isItemReturned = returnedOrderDetailIds.has(item.orderDetailId);
+                const isItemRefunded = refundedOrderDetailIds.has(item.orderDetailId);
+                const isItemRejected = rejectedOrderDetailIds.has(item.orderDetailId);
+                return (
+                <div key={item.orderDetailId} className={`flex gap-4 px-6 py-4 ${isItemReturned ? 'opacity-50 bg-gray-50' : ''}`}>
                   <img
                     src={getImageUrl(item.productImage)}
                     alt={item.productName}
                     className="h-16 w-16 rounded-xl object-cover bg-gray-100 flex-shrink-0"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-gray-800 truncate">{item.productName}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-bold text-gray-800 truncate">{item.productName}</p>
+                      {isItemReturned && !isItemRefunded && (
+                        <span className="inline-flex rounded-full bg-gray-300 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-600 flex-shrink-0">
+                          Đang hoàn hàng
+                        </span>
+                      )}
+                      {isItemRefunded && (
+                        <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-green-700 flex-shrink-0">
+                          Đã hoàn hàng
+                        </span>
+                      )}
+                      {isItemRejected && !isItemReturned && (
+                        <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-600 flex-shrink-0">
+                          Từ chối hoàn hàng
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-gray-400 mt-0.5">{item.variantName || item.sku || `SKU #${item.productId}`}</p>
                     <p className="text-xs text-gray-500 mt-1">SL: {item.quantity} × {fmt(item.price)}</p>
                   </div>
@@ -424,7 +460,8 @@ const allowedPayments = (() => {
                     <p className="font-black text-gray-800">{fmt(item.subtotal)}</p>
                   </div>
                 </div>
-              )) : (
+                );
+              }) : (
                 <div className="px-6 py-8 text-center text-sm text-gray-400">Không có dữ liệu sản phẩm</div>
               )}
             </div>

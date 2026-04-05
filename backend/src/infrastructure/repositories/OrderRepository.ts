@@ -641,7 +641,40 @@ export class OrderRepository implements IOrderRepository {
       'SELECT * FROM order_returns WHERE order_id = ? ORDER BY requested_at DESC',
       [orderId]
     );
-    return rows.map(this.mapRowToOrderReturn);
+    const returns = rows.map(this.mapRowToOrderReturn);
+
+    if (returns.length === 0) return returns;
+
+    const returnIds = returns.map((r) => r.orderReturnId);
+    const placeholders = returnIds.map(() => '?').join(', ');
+    const [itemRows] = await pool.execute<RowDataPacket[]>(
+      `SELECT ori.order_return_id, ori.order_return_item_id, ori.order_detail_id,
+              ori.quantity, ori.reason, ori.restock_action, ori.created_at,
+              od.product_id, od.variant_id, od.product_name,
+              COALESCE(od.variant_name, pv.variant_name) AS resolved_variant_name,
+              COALESCE(od.sku, pv.sku, p.sku) AS resolved_sku
+       FROM order_return_items ori
+       JOIN order_details od ON od.order_detail_id = ori.order_detail_id
+       LEFT JOIN product_variants pv ON od.variant_id = pv.variant_id
+       LEFT JOIN products p ON od.product_id = p.product_id
+       WHERE ori.order_return_id IN (${placeholders})`,
+      returnIds
+    );
+
+    const itemsByReturnId = new Map<number, any[]>();
+    for (const row of itemRows as any[]) {
+      const rid = Number(row.order_return_id);
+      if (!itemsByReturnId.has(rid)) itemsByReturnId.set(rid, []);
+      itemsByReturnId.get(rid)!.push(row);
+    }
+
+    for (const ret of returns) {
+      ret.items = (itemsByReturnId.get(ret.orderReturnId) ?? []).map(
+        this.mapRowToOrderReturnItem
+      );
+    }
+
+    return returns;
   }
 
   async getReturnById(orderId: number, orderReturnId: number): Promise<OrderReturn | null> {

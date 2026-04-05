@@ -108,10 +108,12 @@ export class ReviewController {
     offset: number
   ) {
     let query = `
-      SELECT r.*, u.name AS user_name, NULL AS user_avatar, p.name AS product_name
+      SELECT r.*, u.name AS user_name, NULL AS user_avatar, p.name AS product_name,
+             od.variant_name AS variant_name
       FROM reviews r
       LEFT JOIN users u ON u.user_id = r.user_id
       LEFT JOIN products p ON p.product_id = r.product_id
+      LEFT JOIN order_details od ON od.order_detail_id = r.order_detail_id
       WHERE r.product_id = ? AND r.status = 'approved'
     `;
     const params: any[] = [productId];
@@ -156,10 +158,12 @@ export class ReviewController {
     }
 
     const [rows] = await pool.execute<RowDataPacket[]>(
-      `SELECT r.*, u.name AS user_name, NULL AS user_avatar, p.name AS product_name
+      `SELECT r.*, u.name AS user_name, NULL AS user_avatar, p.name AS product_name,
+              od.variant_name AS variant_name
        FROM reviews r
        LEFT JOIN users u ON u.user_id = r.user_id
        LEFT JOIN products p ON p.product_id = r.product_id
+       LEFT JOIN order_details od ON od.order_detail_id = r.order_detail_id
        WHERE r.product_id <> ?
          AND r.status = 'approved'
          AND r.rating = 5
@@ -606,6 +610,7 @@ export class ReviewController {
       reviewId: row.review_id,
       productId: row.product_id,
       productName: row.product_name,
+      variantName: row.variant_name || undefined,
       userId: row.user_id,
       userName: row.user_name || 'Ẩn danh',
       userAvatar: row.user_avatar,

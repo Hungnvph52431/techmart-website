@@ -3,7 +3,8 @@ import api from './api';
 export interface Review {
   reviewId: number;
   productId: number;
-  productName?: string;  // ✅ Thêm để Admin có thể hiển thị tên sản phẩm
+  productName?: string;
+  variantName?: string;
   userId: number;
   userName: string;
   userAvatar?: string;
