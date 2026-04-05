@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { sendForgotPasswordOtpEmail } from "../../application/services/EmailService";
+import { validatePasswordPolicy } from "./UserUseCase";
 
 const JWT_SECRET: string = process.env.JWT_SECRET || "secret";
 const JWT_EXPIRES = (process.env.JWT_EXPIRES_IN || "7d") as any;
@@ -40,6 +41,8 @@ export class AuthUseCase {
   async register(userData: any) {
     const existingUser = await this.userRepository.findByEmail(userData.email);
     if (existingUser) throw new Error("Email đã tồn tại");
+
+    validatePasswordPolicy(userData.password);
 
     const user = await this.userRepository.create(userData);
     const { password, ...userWithoutPassword } = user;
@@ -142,6 +145,8 @@ export class AuthUseCase {
 
     const user = await this.userRepository.findById(decoded.userId);
     if (!user) throw new Error("Người dùng không tồn tại");
+
+    validatePasswordPolicy(newPassword);
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);

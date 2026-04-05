@@ -3,13 +3,17 @@ import { User } from '../../domain/entities/User';
 import bcrypt from 'bcryptjs';
 import { CreateUserDTO, UpdateUserDTO } from '../../domain/entities/User';
 
-const validatePasswordPolicy = (password: string) => {
-    if (password.length < 6) {
-        throw new Error('Mật khẩu mới phải có ít nhất 6 ký tự');
+export const validatePasswordPolicy = (password: string) => {
+    if (password.length < 8 || password.length > 20) {
+        throw new Error('Mật khẩu phải từ 8 đến 20 ký tự');
     }
 
-    if (!/[A-Z]/.test(password)) {
-        throw new Error('Mật khẩu mới phải có ít nhất 1 chữ in hoa');
+    if (!/[0-9]/.test(password) || !/[A-Z]/.test(password) || !/[a-z]/.test(password)) {
+        throw new Error('Mật khẩu phải bao gồm số, chữ viết hoa và chữ viết thường');
+    }
+
+    if (!/[!@#$^*()_]/.test(password)) {
+        throw new Error('Mật khẩu phải có ít nhất một ký tự đặc biệt !@#$^*()_');
     }
 };
 
