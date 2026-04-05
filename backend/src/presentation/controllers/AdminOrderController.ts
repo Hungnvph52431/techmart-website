@@ -54,6 +54,10 @@ export class AdminOrderController {
 
   updateStatus = async (req: any, res: Response) => {
     try {
+      if (req.body.status === 'cancelled') {
+        return res.status(400).json({ message: 'Vui lòng dùng chức năng hủy đơn và nhập lý do hủy' });
+      }
+
       const order = await this.orderUseCase.transitionOrderStatus(
         Number(req.params.id),
         req.body.status,

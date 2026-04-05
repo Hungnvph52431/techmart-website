@@ -167,6 +167,15 @@ interface OrderCreatedData {
   shippingCity: string;
 }
 
+interface OrderCancelledData {
+  customerName: string;
+  customerEmail: string;
+  orderCode: string;
+  orderId: number;
+  cancelReason: string;
+  refundMessage?: string;
+}
+
 export async function sendOrderCreatedEmail(
   data: OrderCreatedData,
 ): Promise<void> {
@@ -262,6 +271,64 @@ export async function sendOrderCreatedEmail(
     );
   } catch (error) {
     console.error("[Email] Lỗi gửi email đặt hàng:", error);
+  }
+}
+
+export async function sendOrderCancelledEmail(
+  data: OrderCancelledData,
+): Promise<void> {
+  if (!process.env.SMTP_USER) {
+    console.warn("[Email] SMTP_USER chưa cấu hình — bỏ qua gửi email");
+    return;
+  }
+
+  const fromName = process.env.SMTP_FROM_NAME || "TechMart";
+  const fromEmail = process.env.SMTP_USER;
+  const refundHtml = data.refundMessage
+    ? `<p style="margin:12px 0 0;color:#2563eb;font-weight:600;">${data.refundMessage}</p>`
+    : "";
+
+  const html = `
+  <div style="max-width:600px;margin:0 auto;font-family:'Segoe UI',Arial,sans-serif;color:#333;">
+    <div style="background:#ef4444;padding:24px;text-align:center;border-radius:8px 8px 0 0;">
+      <h1 style="color:#fff;margin:0;font-size:22px;">Đơn hàng đã bị hủy</h1>
+    </div>
+    <div style="padding:24px;background:#fff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
+      <p>Xin chào <strong>${data.customerName}</strong>,</p>
+      <p>TechMart rất tiếc phải thông báo đơn hàng <strong>#${data.orderCode}</strong> của bạn đã được hủy bởi bộ phận vận hành.</p>
+
+      <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+        <tr style="background:#f9fafb;">
+          <td style="padding:8px 12px;"><strong>Mã đơn hàng</strong></td>
+          <td style="padding:8px 12px;">${data.orderCode}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 12px;vertical-align:top;"><strong>Lý do hủy</strong></td>
+          <td style="padding:8px 12px;color:#b91c1c;font-weight:600;">${data.cancelReason}</td>
+        </tr>
+      </table>
+
+      ${refundHtml}
+
+      <hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb;">
+      <p style="font-size:13px;color:#6b7280;">
+        Nếu cần hỗ trợ thêm, vui lòng liên hệ hotline <strong>1900 1234</strong> hoặc truy cập mục <strong>Đơn hàng của tôi</strong> để xem chi tiết.
+      </p>
+    </div>
+  </div>`;
+
+  try {
+    await getTransporter().sendMail({
+      from: `"${fromName}" <${fromEmail}>`,
+      to: data.customerEmail,
+      subject: `[TechMart] Đơn hàng #${data.orderCode} đã bị hủy`,
+      html,
+    });
+    console.log(
+      `[Email] Đã gửi email hủy đơn cho ${data.customerEmail} (đơn ${data.orderCode})`,
+    );
+  } catch (error) {
+    console.error("[Email] Lỗi gửi email:", error);
   }
 }
 
