@@ -15,7 +15,7 @@ import {
   getAllowedNextPaymentStatuses,
   RETURN_DEADLINE_DAYS,
 } from '../policies/OrderLifecycle';
-import { sendPaymentSuccessEmail, sendOrderCreatedEmail } from '../services/EmailService';
+import { sendOrderCancelledEmail, sendPaymentSuccessEmail, sendOrderCreatedEmail } from '../services/EmailService';
 import { VietnamAdministrativeService } from '../services/VietnamAdministrativeService';
 import pool from '../../infrastructure/database/connection';
 import { RowDataPacket } from 'mysql2';
@@ -266,6 +266,10 @@ export class OrderUseCase {
     actorRole: OrderActorRole,
     note?: string
   ) {
+    if (status === 'cancelled') {
+      throw new Error('Vui lòng dùng chức năng hủy đơn và nhập lý do hủy');
+    }
+
     const order = await this.orderRepository.findById(orderId);
     if (!order) return null;
 
@@ -384,7 +388,7 @@ export class OrderUseCase {
       throw new Error(`Đơn hàng đã ở trạng thái ${order.status}, không thể hủy`);
     }
 
-    return this.orderRepository.cancel({
+    const cancelledOrder = await this.orderRepository.cancel({
       orderId,
       currentStatus: order.status,
       actorUserId,
@@ -392,6 +396,12 @@ export class OrderUseCase {
       reason: reason.trim(),
       adminNote: adminNote?.trim(),
     });
+
+    if (cancelledOrder && actorRole !== 'customer') {
+      this.sendOrderCancelledEmailNotification(orderId).catch(() => {});
+    }
+
+    return cancelledOrder;
   }
 
   // --- QUẢN LÝ HOÀN TRẢ (RETURNS) ---
@@ -487,6 +497,39 @@ export class OrderUseCase {
       });
     } catch (error) {
       console.error('[OrderUseCase] sendOrderCreatedEmail failed:', error);
+    }
+  }
+
+  private async sendOrderCancelledEmailNotification(orderId: number): Promise<void> {
+    try {
+      const aggregate = await this.orderRepository.findAdminDetail(orderId);
+      if (!aggregate) return;
+
+      const order = aggregate.order;
+
+      const [userRows] = await pool.execute<RowDataPacket[]>(
+        'SELECT name, email FROM users WHERE user_id = ?',
+        [order.userId]
+      );
+      const user = userRows[0];
+      if (!user?.email || !order.cancelReason) return;
+
+      const refundMessage = order.paymentStatus === 'refunded'
+        ? `Số tiền ${order.total.toLocaleString('vi-VN')}đ đã được hoàn vào ví TechMart của bạn.`
+        : order.paymentMethod === 'deposit' && Number(order.depositAmount || 0) > 0
+          ? `Tiền cọc ${Number(order.depositAmount || 0).toLocaleString('vi-VN')}đ đã được hoàn vào ví TechMart của bạn.`
+          : undefined;
+
+      await sendOrderCancelledEmail({
+        customerName: user.name,
+        customerEmail: user.email,
+        orderCode: order.orderCode,
+        orderId: order.orderId,
+        cancelReason: order.cancelReason,
+        refundMessage,
+      });
+    } catch (error) {
+      console.error('[OrderUseCase] sendOrderCancelledEmail failed:', error);
     }
   }
 

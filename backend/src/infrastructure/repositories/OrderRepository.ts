@@ -44,6 +44,41 @@ export class OrderRepository implements IOrderRepository {
     return `RET-${timestamp}-${random}`;
   }
 
+  private buildCancellationNotificationMessage(orderCode: string, reason: string, refundMessage?: string) {
+    return [
+      `Đơn hàng #${orderCode} đã bị hủy.`,
+      `Lý do: ${reason}.`,
+      refundMessage,
+    ]
+      .filter(Boolean)
+      .join(' ');
+  }
+
+  private async createNotificationWithConnection(
+    connection: PoolConnection,
+    input: {
+      userId: number;
+      title: string;
+      message: string;
+      type: 'order' | 'promotion' | 'system' | 'review';
+      referenceId?: number;
+      createdAt: Date;
+    }
+  ) {
+    await connection.execute(
+      `INSERT INTO notifications (user_id, title, message, type, reference_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        input.userId,
+        input.title,
+        input.message,
+        input.type,
+        input.referenceId ?? null,
+        input.createdAt,
+      ]
+    );
+  }
+
   // --- FINDERS ---
   async findById(orderId: number): Promise<Order | null> {
     const [rows] = await pool.execute<RowDataPacket[]>(
@@ -354,6 +389,7 @@ export class OrderRepository implements IOrderRepository {
 
       // Auto-refund: hoàn tiền về ví nếu đơn đã thanh toán (VNPay/Wallet/Online)
       let refundNote = '';
+      let refundNotificationMessage: string | undefined;
       if (order.paymentStatus === 'paid') {
         const totalRefund = Number(order.total);
         if (totalRefund > 0) {
@@ -372,10 +408,11 @@ export class OrderRepository implements IOrderRepository {
             [order.userId, totalRefund, newBalance, input.orderId, `Hoàn tiền hủy đơn #${input.orderId}`, now]
           );
           refundNote = ` | Hoàn ${totalRefund.toLocaleString('vi-VN')}đ vào ví`;
+          refundNotificationMessage = `Số tiền ${totalRefund.toLocaleString('vi-VN')}đ đã được hoàn vào ví TechMart của bạn.`;
         }
         await connection.execute(
-          "UPDATE orders SET status = 'cancelled', payment_status = 'refunded', cancel_reason = ?, updated_at = ? WHERE order_id = ?",
-          [input.reason, now, input.orderId]
+          "UPDATE orders SET status = 'cancelled', payment_status = 'refunded', cancel_reason = ?, cancelled_at = ?, updated_at = ? WHERE order_id = ?",
+          [input.reason, now, now, input.orderId]
         );
       } else {
         // Hoàn tiền cọc nếu là đơn đặt cọc (deposit) chưa paid
@@ -396,11 +433,27 @@ export class OrderRepository implements IOrderRepository {
             [order.userId, depositAmt, dNewBalance, input.orderId, `Hoàn tiền cọc hủy đơn #${input.orderId}`, now]
           );
           refundNote = ` | Hoàn cọc ${depositAmt.toLocaleString('vi-VN')}đ vào ví`;
+          refundNotificationMessage = `Tiền cọc ${depositAmt.toLocaleString('vi-VN')}đ đã được hoàn vào ví TechMart của bạn.`;
         }
         await connection.execute(
-          "UPDATE orders SET status = 'cancelled', cancel_reason = ?, updated_at = ? WHERE order_id = ?",
-          [input.reason, now, input.orderId]
+          "UPDATE orders SET status = 'cancelled', cancel_reason = ?, cancelled_at = ?, updated_at = ? WHERE order_id = ?",
+          [input.reason, now, now, input.orderId]
         );
+      }
+
+      if (input.actorRole !== 'customer') {
+        await this.createNotificationWithConnection(connection, {
+          userId: order.userId,
+          title: `Đơn hàng #${order.orderCode} đã bị hủy`,
+          message: this.buildCancellationNotificationMessage(
+            order.orderCode,
+            input.reason,
+            refundNotificationMessage
+          ),
+          type: 'order',
+          referenceId: input.orderId,
+          createdAt: now,
+        });
       }
 
       await this.appendEventWithConnection(connection, {
@@ -1069,11 +1122,12 @@ export class OrderRepository implements IOrderRepository {
       order = await this.findById(options.orderId);
     }
     if (!order) return null;
-    const [items, returns] = await Promise.all([
+    const [items, timeline, returns] = await Promise.all([
       this.getOrderDetails(order.orderId),
+      this.getOrderTimeline(order.orderId),
       this.listReturns(order.orderId),
     ]);
-    return { order, items, timeline: [], returns };
+    return { order, items, timeline, returns };
   }
 
   private async getOrderDetailsWithExecutor(executor: SqlExecutor, id: number): Promise<OrderDetail[]> {
@@ -1107,12 +1161,35 @@ export class OrderRepository implements IOrderRepository {
   // --- MAPPERS ---
   private mapRowToOrder(row: any): Order {
     return {
-      orderId: row.order_id, orderCode: row.order_code, userId: row.user_id,
-      shippingName: row.shipping_name, shippingPhone: row.shipping_phone, shippingAddress: row.shipping_address,
-      shippingCity: row.shipping_city, subtotal: Number(row.subtotal), shippingFee: Number(row.shipping_fee),
-      discountAmount: Number(row.discount_amount), total: Number(row.total), paymentMethod: row.payment_method,
-      paymentStatus: row.payment_status, paymentDate: row.payment_date, depositAmount: Number(row.deposit_amount ?? 0),
-      status: row.status, orderDate: row.order_date, deliveredAt: row.delivered_at, updatedAt: row.updated_at
+      orderId: row.order_id,
+      orderCode: row.order_code,
+      userId: row.user_id,
+      shippingName: row.shipping_name,
+      shippingPhone: row.shipping_phone,
+      shippingAddress: row.shipping_address,
+      shippingWard: row.shipping_ward ?? undefined,
+      shippingDistrict: row.shipping_district ?? undefined,
+      shippingCity: row.shipping_city,
+      subtotal: Number(row.subtotal),
+      shippingFee: Number(row.shipping_fee),
+      discountAmount: Number(row.discount_amount),
+      total: Number(row.total),
+      couponId: row.coupon_id ?? undefined,
+      couponCode: row.coupon_code ?? undefined,
+      paymentMethod: row.payment_method,
+      paymentStatus: row.payment_status,
+      paymentDate: row.payment_date ?? undefined,
+      depositAmount: Number(row.deposit_amount ?? 0),
+      status: row.status,
+      customerNote: row.customer_note ?? undefined,
+      adminNote: row.admin_note ?? undefined,
+      cancelReason: row.cancel_reason ?? undefined,
+      orderDate: row.order_date,
+      confirmedAt: row.confirmed_at ?? undefined,
+      shippedAt: row.shipped_at ?? undefined,
+      deliveredAt: row.delivered_at ?? undefined,
+      cancelledAt: row.cancelled_at ?? undefined,
+      updatedAt: row.updated_at,
     };
   }
 
@@ -1140,7 +1217,27 @@ export class OrderRepository implements IOrderRepository {
   }
 
   private mapRowToOrderEvent(row: any): OrderEvent {
-    return { orderEventId: row.order_event_id, orderId: row.order_id, eventType: row.event_type, createdAt: row.created_at };
+    let metadata: Record<string, any> | undefined;
+    if (row.metadata) {
+      try {
+        metadata = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata;
+      } catch {
+        metadata = undefined;
+      }
+    }
+
+    return {
+      orderEventId: row.order_event_id,
+      orderId: row.order_id,
+      eventType: row.event_type,
+      fromStatus: row.from_status ?? undefined,
+      toStatus: row.to_status ?? undefined,
+      actorUserId: row.actor_user_id ?? undefined,
+      actorRole: row.actor_role ?? undefined,
+      note: row.note ?? undefined,
+      metadata,
+      createdAt: row.created_at,
+    };
   }
 
   private mapRowToOrderReturn(row: any): OrderReturn {

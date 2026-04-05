@@ -35,6 +35,11 @@ export const adminOrderService = {
     return response.data;
   },
 
+  cancel: async (orderId: number | string, payload: { reason: string; adminNote?: string }) => {
+    const response = await api.post(`/admin/orders/${orderId}/cancel`, payload);
+    return response.data;
+  },
+
   reviewReturn: async (orderId: number | string, returnId: number | string, payload: { decision: string; adminNote?: string }) => {
     const response = await api.post(`/admin/orders/${orderId}/returns/${returnId}/review`, payload);
     return response.data;

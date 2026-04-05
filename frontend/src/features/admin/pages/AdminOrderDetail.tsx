@@ -140,6 +140,12 @@ export const AdminOrderDetail = () => {
     label: string;
   }>({ show: false, type: 'status', nextValue: '', label: '' });
 
+  const [cancelDialog, setCancelDialog] = useState<{
+    show: boolean;
+    reason: string;
+    adminNote: string;
+  }>({ show: false, reason: '', adminNote: '' });
+
   // Return modal state
   const [returnModal, setReturnModal] = useState<{
     type: 'review' | 'receive' | 'refund' | 'close' | null;
@@ -188,6 +194,30 @@ export const AdminOrderDetail = () => {
       await loadDetail();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Cập nhật thất bại');
+    } finally {
+      setSubmitting(null);
+    }
+  };
+
+  const handleCancelOrder = async () => {
+    const reason = cancelDialog.reason.trim();
+
+    if (!reason) {
+      toast.error('Vui lòng nhập lý do hủy đơn');
+      return;
+    }
+
+    try {
+      setSubmitting('cancel');
+      await adminOrderService.cancel(orderId, {
+        reason,
+        adminNote: cancelDialog.adminNote.trim() || undefined,
+      });
+      toast.success('Đã hủy đơn và thông báo cho khách hàng');
+      setCancelDialog({ show: false, reason: '', adminNote: '' });
+      await loadDetail();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Không thể hủy đơn hàng');
     } finally {
       setSubmitting(null);
     }
@@ -586,11 +616,22 @@ const allowedPayments = (() => {
                 {allowedStatuses.map((s) => (
                   <button
                     key={s}
-                    onClick={() => setConfirmDialog({ show: true, type: 'status', nextValue: s, label: STATUS_LABELS[s] })}
+                    onClick={() => {
+                      if (s === 'cancelled') {
+                        setCancelDialog({ show: true, reason: '', adminNote: '' });
+                        return;
+                      }
+
+                      setConfirmDialog({ show: true, type: 'status', nextValue: s, label: STATUS_LABELS[s] });
+                    }}
                     disabled={!!submitting}
                     className={`w-full px-4 py-2.5 rounded-xl text-sm font-black uppercase border transition-all disabled:opacity-60 hover:shadow-sm ${STATUS_STYLES[s]}`}
                   >
-                    {submitting === 'status' ? 'Đang xử lý...' : STATUS_LABELS[s]}
+                    {submitting === 'cancel' && s === 'cancelled'
+                      ? 'Đang hủy...'
+                      : submitting === 'status'
+                      ? 'Đang xử lý...'
+                      : STATUS_LABELS[s]}
                   </button>
                 ))}
               </div>
@@ -678,6 +719,57 @@ const allowedPayments = (() => {
           )}
         </div>
       </div>
+
+      {cancelDialog.show && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+            <h3 className="font-black text-gray-800 text-lg uppercase">Hủy đơn hàng</h3>
+            <p className="text-sm text-gray-600">
+              Vui lòng nhập lý do hủy để khách hàng nhận được thông báo chính xác.
+            </p>
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-wider text-gray-500">
+                Lý do hủy <span className="text-rose-500">*</span>
+              </label>
+              <textarea
+                value={cancelDialog.reason}
+                onChange={(e) => setCancelDialog((prev) => ({ ...prev, reason: e.target.value }))}
+                rows={4}
+                placeholder="Ví dụ: Sản phẩm tạm hết hàng, không thể đáp ứng đơn đúng thời gian..."
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-rose-400 focus:outline-none"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-wider text-gray-500">
+                Ghi chú nội bộ
+              </label>
+              <textarea
+                value={cancelDialog.adminNote}
+                onChange={(e) => setCancelDialog((prev) => ({ ...prev, adminNote: e.target.value }))}
+                rows={3}
+                placeholder="Không bắt buộc. Chỉ dùng cho vận hành nội bộ."
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-blue-400 focus:outline-none"
+              />
+            </div>
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                onClick={() => setCancelDialog({ show: false, reason: '', adminNote: '' })}
+                disabled={submitting === 'cancel'}
+                className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 disabled:opacity-60"
+              >
+                Đóng
+              </button>
+              <button
+                onClick={handleCancelOrder}
+                disabled={submitting === 'cancel'}
+                className="px-5 py-2 rounded-xl bg-rose-600 text-white text-sm font-black hover:bg-rose-700 disabled:opacity-60"
+              >
+                {submitting === 'cancel' ? 'Đang hủy...' : 'Xác nhận hủy đơn'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL XÁC NHẬN CHUYỂN TRẠNG THÁI */}
       {confirmDialog.show && (
