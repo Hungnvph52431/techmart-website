@@ -105,16 +105,18 @@ const RETURN_STATUS_STYLES: Record<string, string> = {
 };
 
 const EVENT_LABELS: Record<string, string> = {
-  order_created: 'Đơn hàng được tạo',
-  status_changed: 'Thay đổi trạng thái',
+  order_created: 'Đơn hàng đã được tạo',
+  status_changed: 'Cập nhật trạng thái',
+  payment_status_changed: 'Cập nhật thanh toán',
   payment_received: 'Nhận thanh toán',
   payment_refunded: 'Hoàn tiền',
   order_cancelled: 'Đơn hàng bị hủy',
-  return_requested: 'Yêu cầu hoàn trả',
-  return_approved: 'Duyệt hoàn trả',
-  return_rejected: 'Từ chối hoàn trả',
+  return_requested: 'Yêu cầu hoàn/trả hàng',
+  return_approved: 'Yêu cầu hoàn/trả được duyệt',
+  return_rejected: 'Yêu cầu hoàn/trả bị từ chối',
   return_received: 'Đã nhận hàng hoàn trả',
-  return_refunded: 'Hoàn tiền thành công',
+  return_refunded: 'Đã hoàn tiền',
+  return_closed: 'Đơn hoàn/trả đã đóng',
 };
 
 const fmt = (n: number) => n?.toLocaleString('vi-VN') + '₫';
@@ -497,7 +499,7 @@ const allowedPayments = (() => {
               ) : timeline.map((event: any, i: number) => (
                 <div key={event.orderEventId || i} className="flex gap-4">
                   <div className="flex flex-col items-center">
-                    <div className="h-3 w-3 rounded-full bg-slate-800 mt-1 flex-shrink-0" />
+                    <div className="h-2.5 w-2.5 rounded-full bg-blue-600 mt-1 flex-shrink-0" />
                     {i < timeline.length - 1 && <div className="w-px flex-1 bg-gray-100 mt-1" />}
                   </div>
                   <div className="pb-4 min-w-0">
@@ -505,10 +507,18 @@ const allowedPayments = (() => {
                       {EVENT_LABELS[event.eventType] || event.eventType}
                     </p>
                     {(event.fromStatus || event.toStatus) && (
-                      <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-                        {event.fromStatus && <span className="font-medium">{STATUS_LABELS[event.fromStatus] || event.fromStatus}</span>}
+                      <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1 flex-wrap">
+                        {event.fromStatus && (
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${STATUS_STYLES[event.fromStatus] || RETURN_STATUS_STYLES[event.fromStatus] || 'bg-gray-100 text-gray-700'}`}>
+                            {STATUS_LABELS[event.fromStatus] || RETURN_STATUS_LABELS[event.fromStatus] || PAYMENT_STATUS_LABELS[event.fromStatus] || event.fromStatus}
+                          </span>
+                        )}
                         {event.fromStatus && event.toStatus && <ChevronRight size={10} />}
-                        {event.toStatus && <span className="font-medium text-blue-600">{STATUS_LABELS[event.toStatus] || event.toStatus}</span>}
+                        {event.toStatus && (
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${STATUS_STYLES[event.toStatus] || RETURN_STATUS_STYLES[event.toStatus] || 'bg-gray-100 text-gray-700'}`}>
+                            {STATUS_LABELS[event.toStatus] || RETURN_STATUS_LABELS[event.toStatus] || PAYMENT_STATUS_LABELS[event.toStatus] || event.toStatus}
+                          </span>
+                        )}
                       </p>
                     )}
                     {event.note && <p className="text-xs text-gray-500 mt-0.5 italic">"{event.note}"</p>}
