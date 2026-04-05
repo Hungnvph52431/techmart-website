@@ -8,7 +8,7 @@ import {
 import { IOrderRepository } from '../../domain/repositories/IOrderRepository';
 import { IReviewRepository } from '../../domain/repositories/IReviewRepository';
 
-const REVIEWABLE_ORDER_STATUSES: OrderStatus[] = ['delivered', 'completed'];
+const REVIEWABLE_ORDER_STATUSES: OrderStatus[] = ['delivered', 'completed', 'returned'];
 
 const isReviewableOrderStatus = (status: OrderStatus) =>
   REVIEWABLE_ORDER_STATUSES.includes(status);
