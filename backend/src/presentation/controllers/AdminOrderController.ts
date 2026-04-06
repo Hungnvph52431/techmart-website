@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { OrderUseCase } from '../../application/use-cases/OrderUseCase';
-import { toOrderDetail, toOrderListItem } from '../../application/mappers/OrderPresenter';
+import { toOrderDetail, toOrderListItem, toOrderTimeline } from '../../application/mappers/OrderPresenter';
 
 export class AdminOrderController {
   constructor(private orderUseCase: OrderUseCase) {}
@@ -46,7 +46,7 @@ export class AdminOrderController {
         return res.status(404).json({ message: 'Order not found' });
       }
 
-      res.json(timeline);
+      res.json(toOrderTimeline(timeline, 'admin'));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

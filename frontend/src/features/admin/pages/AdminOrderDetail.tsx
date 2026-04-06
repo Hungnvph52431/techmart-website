@@ -105,9 +105,9 @@ const RETURN_STATUS_STYLES: Record<string, string> = {
 };
 
 const EVENT_LABELS: Record<string, string> = {
-  order_created: 'Đơn hàng đã được tạo',
-  status_changed: 'Cập nhật trạng thái',
-  payment_status_changed: 'Cập nhật thanh toán',
+  order_created: 'Đơn hàng được tạo',
+  status_changed: 'Thay đổi trạng thái đơn hàng',
+  payment_status_changed: 'Thay đổi trạng thái thanh toán',
   payment_received: 'Nhận thanh toán',
   payment_refunded: 'Hoàn tiền',
   order_cancelled: 'Đơn hàng bị hủy',
@@ -115,8 +115,46 @@ const EVENT_LABELS: Record<string, string> = {
   return_approved: 'Yêu cầu hoàn/trả được duyệt',
   return_rejected: 'Yêu cầu hoàn/trả bị từ chối',
   return_received: 'Đã nhận hàng hoàn trả',
-  return_refunded: 'Đã hoàn tiền',
-  return_closed: 'Đơn hoàn/trả đã đóng',
+  return_refunded: 'Hoàn tiền thành công',
+  return_closed: 'Đóng yêu cầu hoàn trả',
+};
+
+const ACTOR_ROLE_LABELS: Record<string, string> = {
+  admin: 'Quản trị viên',
+  customer: 'Khách hàng',
+  staff: 'Nhân viên',
+  warehouse: 'Kho vận',
+  system: 'Hệ thống',
+};
+
+const getTimelineEventLabel = (event: any) =>
+  event.eventLabel || EVENT_LABELS[event.eventType] || event.eventType;
+
+const getTimelineStatusLabel = (event: any, value?: string) => {
+  if (!value) return '';
+
+  if (event.eventType === 'payment_status_changed') {
+    return PAYMENT_STATUS_LABELS[value] || value;
+  }
+
+  if (String(event.eventType || '').startsWith('return_')) {
+    return RETURN_STATUS_LABELS[value] || value;
+  }
+
+  return STATUS_LABELS[value] || PAYMENT_STATUS_LABELS[value] || RETURN_STATUS_LABELS[value] || value;
+};
+
+const getTimelineStatusBadgeClass = (event: any, value?: string) => {
+  if (!value) return 'bg-gray-100 text-gray-700';
+
+  if (event.eventType === 'payment_status_changed') {
+    if (value === 'paid') return 'bg-emerald-100 text-emerald-800';
+    if (value === 'failed') return 'bg-rose-100 text-rose-800';
+    if (value === 'refunded') return 'bg-blue-100 text-blue-800';
+    return 'bg-amber-100 text-amber-800';
+  }
+
+  return STATUS_STYLES[value] || RETURN_STATUS_STYLES[value] || 'bg-gray-100 text-gray-700';
 };
 
 const fmt = (n: number) => n?.toLocaleString('vi-VN') + '₫';
@@ -352,6 +390,8 @@ const allowedPayments = (() => {
   if (hasActiveReturn) return [];
   return PAYMENT_STATUS_TRANSITIONS[order.paymentStatus] || [];
 })();
+  const ordererName = order.customer?.name || order.customerName || '—';
+  const ordererEmail = order.customer?.email || order.customerEmail || '—';
   return (
     <div className="space-y-6">
       {/* HEADER */}
@@ -512,24 +552,58 @@ const allowedPayments = (() => {
                   </div>
                   <div className="pb-4 min-w-0">
                     <p className="font-bold text-gray-800 text-sm">
-                      {EVENT_LABELS[event.eventType] || event.eventType}
+                      {getTimelineEventLabel(event)}
                     </p>
                     {(event.fromStatus || event.toStatus) && (
                       <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1 flex-wrap">
                         {event.fromStatus && (
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${STATUS_STYLES[event.fromStatus] || RETURN_STATUS_STYLES[event.fromStatus] || 'bg-gray-100 text-gray-700'}`}>
-                            {STATUS_LABELS[event.fromStatus] || RETURN_STATUS_LABELS[event.fromStatus] || PAYMENT_STATUS_LABELS[event.fromStatus] || event.fromStatus}
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${getTimelineStatusBadgeClass(event, event.fromStatus)}`}>
+                            {event.fromLabel || getTimelineStatusLabel(event, event.fromStatus)}
                           </span>
                         )}
                         {event.fromStatus && event.toStatus && <ChevronRight size={10} />}
                         {event.toStatus && (
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${STATUS_STYLES[event.toStatus] || RETURN_STATUS_STYLES[event.toStatus] || 'bg-gray-100 text-gray-700'}`}>
-                            {STATUS_LABELS[event.toStatus] || RETURN_STATUS_LABELS[event.toStatus] || PAYMENT_STATUS_LABELS[event.toStatus] || event.toStatus}
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${getTimelineStatusBadgeClass(event, event.toStatus)}`}>
+                            {event.toLabel || getTimelineStatusLabel(event, event.toStatus)}
                           </span>
                         )}
                       </p>
                     )}
-                    {event.note && <p className="text-xs text-gray-500 mt-0.5 italic">"{event.note}"</p>}
+                    {(event.actorDisplayName || event.actorName || event.actorRole) && (
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {(() => {
+                          const actorName =
+                            event.actorDisplayName ||
+                            event.actorName ||
+                            ACTOR_ROLE_LABELS[event.actorRole] ||
+                            'Không xác định';
+                          const actorRole =
+                            event.actorDisplayRole ||
+                            ACTOR_ROLE_LABELS[event.actorRole] ||
+                            event.actorRole;
+
+                          return (
+                            <>
+                        Người thao tác:{' '}
+                        <span className="font-semibold text-gray-700">
+                              {actorName}
+                        </span>
+                              {actorRole && actorRole !== actorName && (
+                          <span className="text-gray-400">
+                                  {' '}· {actorRole}
+                          </span>
+                              )}
+                        {event.actorEmail && (
+                          <span className="text-gray-400">
+                            {' '}· {event.actorEmail}
+                          </span>
+                        )}
+                            </>
+                          );
+                        })()}
+                      </p>
+                    )}
+                    {(event.displayNote || event.note) && <p className="text-xs text-gray-500 mt-0.5 italic">"{event.displayNote || event.note}"</p>}
                     <p className="text-[10px] text-gray-400 mt-1">{fmtDate(event.createdAt)}</p>
                   </div>
                 </div>
@@ -739,6 +813,11 @@ const allowedPayments = (() => {
           <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-3">
             <h2 className="font-black text-gray-800 uppercase text-sm tracking-wider">Thông tin giao hàng</h2>
             <div className="space-y-2 text-sm">
+              <div className="pb-3 border-b border-gray-50">
+                <p className="text-gray-500 mb-1">Người đặt đơn</p>
+                <p className="font-bold text-gray-800">{ordererName}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{ordererEmail}</p>
+              </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Người nhận</span>
                 <span className="font-bold text-gray-800">{order.shipping?.name || order.shippingName}</span>
