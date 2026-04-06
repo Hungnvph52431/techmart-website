@@ -6,14 +6,19 @@ import { RowDataPacket, ResultSetHeader } from 'mysql2';
 export class CategoryRepository implements ICategoryRepository {
   async findAll(): Promise<Category[]> {
     const [rows] = await pool.execute<RowDataPacket[]>(
-      'SELECT * FROM categories ORDER BY display_order ASC, name ASC'
+      'SELECT * FROM categories WHERE deleted_at IS NULL ORDER BY display_order ASC, name ASC'
     );
     return rows.map(this.mapRowToCategory);
   }
-
+async findDeleted(): Promise<Category[]> {
+  const [rows] = await pool.execute<RowDataPacket[]>(
+    'SELECT * FROM categories WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC'
+  );
+  return rows.map(this.mapRowToCategory);
+}
   async findById(categoryId: number): Promise<Category | null> {
     const [rows] = await pool.execute<RowDataPacket[]>(
-      'SELECT * FROM categories WHERE category_id = ?',
+      'SELECT * FROM categories WHERE category_id = ? AND deleted_at IS NULL',
       [categoryId]
     );
     return rows.length > 0 ? this.mapRowToCategory(rows[0]) : null;
@@ -38,7 +43,7 @@ export class CategoryRepository implements ICategoryRepository {
   // --- CÁC HÀM KIỂM TRA RÀNG BUỘC ---
   async hasChildren(categoryId: number): Promise<boolean> {
     const [rows] = await pool.execute<RowDataPacket[]>(
-      'SELECT category_id FROM categories WHERE parent_id = ? LIMIT 1',
+      'SELECT category_id FROM categories WHERE parent_id = ? AND deleted_at IS NULL LIMIT 1',
       [categoryId]
     );
     return rows.length > 0;
@@ -114,6 +119,16 @@ export class CategoryRepository implements ICategoryRepository {
     return this.findById(categoryData.categoryId);
   }
 
+  // Soft delete: đánh dấu deleted_at, không xóa thật
+  async softDelete(categoryId: number): Promise<boolean> {
+    const [result] = await pool.execute<ResultSetHeader>(
+      'UPDATE categories SET deleted_at = ?, updated_at = ? WHERE category_id = ? AND deleted_at IS NULL',
+      [new Date(), new Date(), categoryId]
+    );
+    return result.affectedRows > 0;
+  }
+
+  // Hard delete: xóa hẳn khỏi DB (chỉ dùng khi đã soft delete trước)
   async delete(categoryId: number): Promise<boolean> {
     const [result] = await pool.execute<ResultSetHeader>(
       'DELETE FROM categories WHERE category_id = ?',
@@ -122,10 +137,36 @@ export class CategoryRepository implements ICategoryRepository {
     return result.affectedRows > 0;
   }
 
+  async restore(categoryId: number): Promise<boolean> {
+    const [result] = await pool.execute<ResultSetHeader>(
+      'UPDATE categories SET deleted_at = NULL, updated_at = ? WHERE category_id = ? AND deleted_at IS NOT NULL',
+      [new Date(), categoryId]
+    );
+    return result.affectedRows > 0;
+  }
+
+  // Kiểm tra danh mục đã bị soft delete chưa
+  async isDeleted(categoryId: number): Promise<boolean> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      'SELECT category_id FROM categories WHERE category_id = ? AND deleted_at IS NOT NULL',
+      [categoryId]
+    );
+    return rows.length > 0;
+  }
+
   async moveProductsToCategory(fromCategoryId: number, toCategoryId: number): Promise<number> {
     const [result] = await pool.execute<ResultSetHeader>(
       'UPDATE products SET category_id = ? WHERE category_id = ? AND deleted_at IS NULL',
       [toCategoryId, fromCategoryId]
+    );
+    return result.affectedRows;
+  }
+
+  // ← THÊM MỚI: chuyển danh mục con sang cha mới
+  async moveChildrenToCategory(fromParentId: number, toParentId: number | null): Promise<number> {
+    const [result] = await pool.execute<ResultSetHeader>(
+      'UPDATE categories SET parent_id = ? WHERE parent_id = ?',
+      [toParentId, fromParentId]
     );
     return result.affectedRows;
   }
@@ -142,7 +183,7 @@ export class CategoryRepository implements ICategoryRepository {
       parentId: undefined,
       imageUrl: undefined,
       displayOrder: 9999,
-      isActive: false,
+      isActive: true,
     });
   }
 
@@ -158,6 +199,7 @@ export class CategoryRepository implements ICategoryRepository {
       isActive: Boolean(row.is_active),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      deletedAt: row.deleted_at || null,
     };
   }
 }

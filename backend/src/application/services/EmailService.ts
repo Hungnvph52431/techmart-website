@@ -39,6 +39,8 @@ interface PaymentSuccessData {
   shippingPhone: string;
   shippingAddress: string;
   shippingCity: string;
+  voucherCode?: string;
+  discountAmount?: number;
 }
 
 function formatCurrency(amount: number): string {
@@ -67,6 +69,15 @@ export async function sendPaymentSuccessEmail(
 
   const fromName = process.env.SMTP_FROM_NAME || "TechMart";
   const fromEmail = process.env.SMTP_USER;
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+  const orderUrl = `${frontendUrl}/orders/${data.orderId}`;
+
+  const voucherRowHtml = data.voucherCode && data.discountAmount
+    ? `<tr>
+          <td style="padding:8px 12px;"><strong>Mã giảm giá</strong></td>
+          <td style="padding:8px 12px;color:#059669;">${data.voucherCode} (−${formatCurrency(data.discountAmount)})</td>
+        </tr>`
+    : '';
 
   const itemsHtml = data.items
     .map(
@@ -98,6 +109,7 @@ export async function sendPaymentSuccessEmail(
           <td style="padding:8px 12px;"><strong>Phương thức thanh toán</strong></td>
           <td style="padding:8px 12px;">${getPaymentMethodLabel(data.paymentMethod)}</td>
         </tr>
+        ${voucherRowHtml}
         <tr style="background:#f9fafb;">
           <td style="padding:8px 12px;"><strong>Tổng tiền</strong></td>
           <td style="padding:8px 12px;color:#2563eb;font-weight:bold;font-size:18px;">${formatCurrency(data.total)}</td>
@@ -122,6 +134,12 @@ export async function sendPaymentSuccessEmail(
       <h3 style="margin:20px 0 8px;font-size:16px;">Thông tin giao hàng</h3>
       <p style="margin:4px 0;"><strong>${data.shippingName}</strong> — ${data.shippingPhone}</p>
       <p style="margin:4px 0;">${data.shippingAddress}, ${data.shippingCity}</p>
+
+      <div style="text-align:center;margin:28px 0;">
+        <a href="${orderUrl}" style="display:inline-block;background:#2563eb;color:#fff;font-weight:bold;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;">
+          Xem chi tiết đơn hàng
+        </a>
+      </div>
 
       <hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb;">
       <p style="font-size:13px;color:#6b7280;">
@@ -165,6 +183,8 @@ interface OrderCreatedData {
   shippingPhone: string;
   shippingAddress: string;
   shippingCity: string;
+  voucherCode?: string;
+  discountAmount?: number;
 }
 
 interface OrderCancelledData {
@@ -187,12 +207,22 @@ export async function sendOrderCreatedEmail(
   const fromName = process.env.SMTP_FROM_NAME || "TechMart";
   const fromEmail = process.env.SMTP_USER;
 
+  const frontendUrl2 = process.env.FRONTEND_URL || "http://localhost:5173";
+  const orderUrl2 = `${frontendUrl2}/orders/${data.orderId}`;
+
   const paymentNote =
     data.paymentMethod === "cod"
       ? '<p style="color:#f59e0b;font-weight:bold;">Bạn sẽ thanh toán khi nhận hàng (COD).</p>'
       : data.paymentMethod === "wallet"
         ? '<p style="color:#10b981;font-weight:bold;">Đã thanh toán bằng Ví TechMart.</p>'
         : `<p style="color:#f59e0b;font-weight:bold;">Vui lòng hoàn tất thanh toán qua ${getPaymentMethodLabel(data.paymentMethod)} để đơn hàng được xử lý.</p>`;
+
+  const voucherRowHtml2 = data.voucherCode && data.discountAmount
+    ? `<tr>
+          <td style="padding:8px 12px;"><strong>Mã giảm giá</strong></td>
+          <td style="padding:8px 12px;color:#059669;">${data.voucherCode} (−${formatCurrency(data.discountAmount)})</td>
+        </tr>`
+    : '';
 
   const itemsHtml = data.items
     .map(
@@ -226,6 +256,7 @@ export async function sendOrderCreatedEmail(
           <td style="padding:8px 12px;"><strong>Phương thức thanh toán</strong></td>
           <td style="padding:8px 12px;">${getPaymentMethodLabel(data.paymentMethod)}</td>
         </tr>
+        ${voucherRowHtml2}
         <tr style="background:#f9fafb;">
           <td style="padding:8px 12px;"><strong>Tổng tiền</strong></td>
           <td style="padding:8px 12px;color:#10b981;font-weight:bold;font-size:18px;">${formatCurrency(data.total)}</td>
@@ -251,9 +282,14 @@ export async function sendOrderCreatedEmail(
       <p style="margin:4px 0;"><strong>${data.shippingName}</strong> — ${data.shippingPhone}</p>
       <p style="margin:4px 0;">${data.shippingAddress}, ${data.shippingCity}</p>
 
+      <div style="text-align:center;margin:28px 0;">
+        <a href="${orderUrl2}" style="display:inline-block;background:#10b981;color:#fff;font-weight:bold;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;">
+          Xem chi tiết đơn hàng
+        </a>
+      </div>
+
       <hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb;">
       <p style="font-size:13px;color:#6b7280;">
-        Bạn có thể theo dõi trạng thái đơn hàng trong mục <strong>Đơn hàng của tôi</strong> trên website.
         Nếu có bất kỳ thắc mắc nào, vui lòng liên hệ hotline <strong>1900 1234</strong>.
       </p>
     </div>

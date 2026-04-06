@@ -477,7 +477,15 @@ const allowedPayments = (() => {
               </div>
               {order.discountAmount > 0 && (
                 <div className="flex justify-between text-emerald-600">
-                  <span>Giảm giá</span><span>- {fmt(order.discountAmount)}</span>
+                  <span className="flex items-center gap-1.5">
+                    Giảm giá
+                    {order.couponCode && (
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase tracking-wide">
+                        {order.couponCode}
+                      </span>
+                    )}
+                  </span>
+                  <span>- {fmt(order.discountAmount)}</span>
                 </div>
               )}
               <div className="flex justify-between font-black text-gray-800 text-base border-t border-gray-200 pt-2 mt-2">

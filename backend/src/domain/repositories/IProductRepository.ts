@@ -82,6 +82,7 @@ export interface IProductRepository {
   update(product: UpdateProductDTO): Promise<Product | null>;
   delete(productId: number): Promise<boolean>;
   hardDelete(productId: number): Promise<boolean>;
+  restore(productId: number): Promise<boolean>;
   updateStock(productId: number, quantity: number): Promise<boolean>;
 
   // --- 3. QUẢN LÝ ẢNH (BÍ QUYẾT HIỂN THỊ ẢNH CỦA TUẤN ANH) ---

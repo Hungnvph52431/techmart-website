@@ -1,3 +1,4 @@
+import { AdminCategory } from '@/features/admin/types/catalog';
 import api from '../api';
 
 export const adminCategoryService = {
@@ -29,5 +30,14 @@ export const adminCategoryService = {
   remove: async (id: number | string) => {
     const response = await api.delete(`/categories/${id}`);
     return response.data;
+  },
+  getDeleted: async (): Promise<AdminCategory[]> => {
+    const res = await api.get('/admin/categories/deleted');
+    return res.data;
+  },
+
+  restore: async (id: number | string) => {
+    const res = await api.patch(`/admin/categories/${id}/restore`);
+    return res.data;
   },
 };
