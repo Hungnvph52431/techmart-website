@@ -14,6 +14,7 @@ export const createAdminProductRoutes = (
   router.post('/', warehouseMiddleware, adminProductController.create);
   router.put('/:id', warehouseMiddleware, adminProductController.update);
   router.patch('/:id/archive', warehouseMiddleware, adminProductController.archive);
+  router.patch('/:id/restore', warehouseMiddleware, adminProductController.restore);
 
   // ✅ Upload ảnh sản phẩm — trả về URL để dùng trong form
   router.post('/upload/image', uploadImage.single('image'), (req: Request, res: Response) => {

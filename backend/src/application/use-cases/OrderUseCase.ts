@@ -494,6 +494,8 @@ export class OrderUseCase {
         shippingPhone: order.shippingPhone,
         shippingAddress: order.shippingAddress,
         shippingCity: order.shippingCity,
+        voucherCode: order.couponCode || undefined,
+        discountAmount: order.discountAmount > 0 ? order.discountAmount : undefined,
       });
     } catch (error) {
       console.error('[OrderUseCase] sendOrderCreatedEmail failed:', error);
@@ -571,6 +573,8 @@ export class OrderUseCase {
         shippingPhone: order.shippingPhone,
         shippingAddress: order.shippingAddress,
         shippingCity: order.shippingCity,
+        voucherCode: order.couponCode || undefined,
+        discountAmount: order.discountAmount > 0 ? order.discountAmount : undefined,
       });
     } catch (error) {
       console.error('[OrderUseCase] sendPaymentEmail failed:', error);

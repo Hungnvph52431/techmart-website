@@ -65,10 +65,12 @@ CREATE TABLE categories (
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
     FOREIGN KEY (parent_id) REFERENCES categories(category_id) ON DELETE SET NULL,
     INDEX idx_slug (slug),
     INDEX idx_parent_id (parent_id),
-    INDEX idx_active (is_active)
+    INDEX idx_active (is_active),
+    INDEX idx_deleted_at (deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================

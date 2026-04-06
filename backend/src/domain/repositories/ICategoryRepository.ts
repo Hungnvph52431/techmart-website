@@ -1,3 +1,5 @@
+// backend/src/domain/repositories/ICategoryRepository.ts
+
 import { Category, CreateCategoryDTO, UpdateCategoryDTO } from '../entities/Category';
 
 export interface ICategoryRepository {
@@ -5,22 +7,20 @@ export interface ICategoryRepository {
   findById(categoryId: number): Promise<Category | null>;
   findBySlug(slug: string): Promise<Category | null>;
   findByParentId(parentId: number | null): Promise<Category[]>;
-  
-  // --- CÁC PHƯƠNG THỨC KIỂM TRA RÀNG BUỘC ---
-  /** Kiểm tra xem danh mục có danh mục con hay không */
+  findDeleted(): Promise<Category[]>; 
   hasChildren(categoryId: number): Promise<boolean>;
-  
-  /** Kiểm tra xem danh mục có chứa sản phẩm nào không */
   hasProducts(categoryId: number): Promise<boolean>;
 
-  // --- THAO TÁC DỮ LIỆU ---
   create(category: CreateCategoryDTO): Promise<Category>;
   update(category: UpdateCategoryDTO): Promise<Category | null>;
   delete(categoryId: number): Promise<boolean>;
 
-  /** Chuyển tất cả sản phẩm từ danh mục này sang danh mục khác */
-  moveProductsToCategory(fromCategoryId: number, toCategoryId: number): Promise<number>;
+  // ✅ THÊM 2 method còn thiếu
+  isDeleted(categoryId: number): Promise<boolean>;
+  softDelete(categoryId: number): Promise<boolean>;
+  restore(categoryId: number): Promise<boolean>;
 
-  /** Tìm hoặc tạo danh mục "Không xác định" */
+  moveProductsToCategory(fromCategoryId: number, toCategoryId: number): Promise<number>;
+  moveChildrenToCategory(fromParentId: number, toParentId: number | null): Promise<number>;
   findOrCreateUncategorized(): Promise<Category>;
 }

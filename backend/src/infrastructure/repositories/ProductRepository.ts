@@ -51,8 +51,21 @@ export class ProductRepository implements IProductRepository {
 }
 
   async findAdminList(filters?: any): Promise<Product[]> {
-    const { query, params } = this.buildBaseListQuery(false, filters);
-    const fullSql = `SELECT p.*, c.name as categoryName, b.name as brandName ${query} ORDER BY p.created_at DESC`;
+    let effectiveFilters = { ...filters };
+
+    // Khi lọc theo danh mục "Không xác định", hiển thị cả sản phẩm đã xóa
+    if (filters?.categoryId) {
+      const [catRows] = await pool.execute<RowDataPacket[]>(
+        `SELECT slug FROM categories WHERE category_id = ? LIMIT 1`,
+        [Number(filters.categoryId)]
+      );
+      if (catRows[0]?.slug === 'khong-xac-dinh') {
+        effectiveFilters._includeDeleted = true;
+      }
+    }
+
+    const { query, params } = this.buildBaseListQuery(false, effectiveFilters);
+    const fullSql = `SELECT p.*, c.name as categoryName, b.name as brandName ${query} ORDER BY (p.deleted_at IS NULL) DESC, p.created_at DESC`;
     const [rows] = await pool.execute<RowDataPacket[]>(fullSql, params);
     const products = rows.map((row) => this.mapRowToProduct(row));
     return this.attachRelations(products, { includeVariants: true });
@@ -472,9 +485,22 @@ async delete(id: number): Promise<boolean> {
   }
 
   async hardDelete(id: number): Promise<boolean> {
-    // Xóa hẳn: set deleted_at để soft-delete khỏi DB
+    // Chuyển sang danh mục "Không xác định" + đánh dấu deleted_at (soft-delete, có thể khôi phục)
+    const [catRows] = await pool.execute<RowDataPacket[]>(
+      `SELECT category_id FROM categories WHERE slug = 'khong-xac-dinh' LIMIT 1`
+    );
+    const unknownCategoryId = catRows[0]?.category_id ?? null;
     const [result] = await this.pool.execute<ResultSetHeader>(
-      'UPDATE products SET deleted_at = NOW() WHERE product_id = ? AND deleted_at IS NULL',
+      `UPDATE products SET deleted_at = NOW(), category_id = COALESCE(?, category_id)
+       WHERE product_id = ? AND deleted_at IS NULL`,
+      [unknownCategoryId, id]
+    );
+    return result.affectedRows > 0;
+  }
+
+  async restore(id: number): Promise<boolean> {
+    const [result] = await this.pool.execute<ResultSetHeader>(
+      `UPDATE products SET deleted_at = NULL, status = 'inactive' WHERE product_id = ? AND deleted_at IS NOT NULL`,
       [id]
     );
     return result.affectedRows > 0;
@@ -641,6 +667,7 @@ async delete(id: number): Promise<boolean> {
     isBestseller: Boolean(row.is_bestseller),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    deletedAt: row.deleted_at || null,
     images: [],
     variants: []
   } as any;
@@ -704,11 +731,21 @@ async delete(id: number): Promise<boolean> {
   }
 
  private buildBaseListQuery(publicOnly: boolean, filters?: any) {
+  const showDeleted = !publicOnly && filters?.status === 'deleted';
+  const includeDeleted = !publicOnly && filters?._includeDeleted === true;
+  let deletedClause: string;
+  if (showDeleted) {
+    deletedClause = 'p.deleted_at IS NOT NULL';
+  } else if (includeDeleted) {
+    deletedClause = '1=1';
+  } else {
+    deletedClause = 'p.deleted_at IS NULL';
+  }
   let query = `
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.category_id
     LEFT JOIN brands b ON p.brand_id = b.brand_id
-    WHERE p.deleted_at IS NULL
+    WHERE ${deletedClause}
   `;
   const params: any[] = [];
 
@@ -749,7 +786,7 @@ async delete(id: number): Promise<boolean> {
     params.push(`%${filters.search}%`, `%${filters.search}%`);
   }
   // Lọc theo trạng thái (admin filter)
-  if (filters?.status && filters.status !== 'all') {
+  if (filters?.status && filters.status !== 'all' && filters.status !== 'deleted') {
     query += ' AND p.status = ?';
     params.push(filters.status);
   }

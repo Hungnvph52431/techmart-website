@@ -187,6 +187,7 @@ export const toOrderDetail = (
     customerNote: aggregate.order.customerNote,
     adminNote: actorRole === 'admin' ? aggregate.order.adminNote : undefined,
     cancelReason: aggregate.order.cancelReason,
+    couponCode: aggregate.order.couponCode,
     paymentDate: aggregate.order.paymentDate,
     confirmedAt: aggregate.order.confirmedAt,
     shippedAt: aggregate.order.shippedAt,

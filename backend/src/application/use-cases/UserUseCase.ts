@@ -53,7 +53,7 @@ export class UserUseCase {
                 );
             }
 
-        }
+        }   
         return users.map(({ password, ...user }) => user as User);
     }
 

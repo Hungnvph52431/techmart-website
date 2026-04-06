@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { PlusCircle, Search, RefreshCw, Edit, Trash2, AlertTriangle, XCircle } from 'lucide-react';
+import { PlusCircle, Search, RefreshCw, Edit, Trash2, AlertTriangle, XCircle, RotateCcw } from 'lucide-react';
 import { productService } from '@/services/product.service';
 import { adminProductService } from '@/services/admin/product.service';
 import { adminCategoryService } from '@/services/admin/category.service'; 
@@ -23,6 +23,7 @@ const STATUS_OPTIONS = [
   { label: 'Ngừng bán', value: 'inactive' },
   { label: 'Hết hàng', value: 'out_of_stock' },
   { label: 'Đặt trước', value: 'pre_order' },
+  { label: '🗑 Đã xóa', value: 'deleted' },
 ];
 
 export const AdminProducts = () => {
@@ -122,23 +123,30 @@ export const AdminProducts = () => {
   };
 
   const handleDelete = (product: AdminProduct) => {
-    const isInactive = product.status === 'inactive';
+    setConfirmDialog({
+      show: true,
+      title: 'Xóa sản phẩm',
+      message: `Sản phẩm "${product.name}" sẽ được chuyển vào mục "Không xác định" và có thể khôi phục lại sau.`,
+      confirmLabel: 'Xóa',
+      confirmStyle: 'bg-red-600 hover:bg-red-700',
+      onConfirm: () => executeDelete(product),
+    });
+  };
 
-    if (isInactive) {
-      // Đã ngừng bán → confirm xóa vĩnh viễn
-      setConfirmDialog({
-        show: true,
-        title: 'Xóa vĩnh viễn sản phẩm',
-        message: `Sản phẩm "${product.name}" đã ngừng bán.\n\nHành động này sẽ XÓA VĨNH VIỄN khỏi hệ thống và không thể hoàn tác!`,
-        confirmLabel: 'Xóa vĩnh viễn',
-        confirmStyle: 'bg-red-600 hover:bg-red-700',
-        onConfirm: () => executeDelete(product),
-      });
-    } else {
-      // Đang bán → chuyển ngừng bán (không cần confirm)
-      executeDelete(product);
+  const handleRestore = async (product: AdminProduct) => {
+    try {
+      setActionLoading(product.productId);
+      await adminProductService.restore(product.productId);
+      toast.success(`Đã khôi phục "${product.name}"`);
+      fetchProducts();
+    } catch {
+      toast.error('Không thể khôi phục sản phẩm');
+    } finally {
+      setActionLoading(null);
     }
   };
+
+  const isDeleted = filters.status === 'deleted';
 
   return (
     <div className="space-y-6">
@@ -181,11 +189,9 @@ export const AdminProducts = () => {
               const children = childCats.filter(c => c.parentId === parent.categoryId);
               if (children.length === 0) {
                 return (
-                  <optgroup key={parent.categoryId} label={`📁 ${parent.name}`}>
-                    <option disabled style={{ color: '#999', fontStyle: 'italic' }}>
-                      -- Chưa có danh mục con --
-                    </option>
-                  </optgroup>
+                  <option key={parent.categoryId} value={parent.categoryId}>
+                    📁 {parent.name}
+                  </option>
                 );
               }
               return (
@@ -234,14 +240,15 @@ export const AdminProducts = () => {
             <tbody className="divide-y divide-gray-50">
               {products.map((product) => {
                 const isInactive = product.status === 'inactive';
+                const isProductDeleted = Boolean(product.deletedAt);
                 return (
-                <tr key={product.productId} className={`transition-colors ${isInactive ? 'bg-gray-50/80 opacity-60' : 'hover:bg-blue-50/20'}`}>
+                <tr key={product.productId} className={`transition-colors ${isProductDeleted ? 'bg-red-50/40 opacity-70' : isInactive ? 'bg-gray-50/80 opacity-60' : 'hover:bg-blue-50/20'}`}>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-4">
                      <img
   src={getImageUrl(product.mainImage)}
   alt={product.name}
-  className={`w-14 h-14 object-contain rounded-2xl border shadow-sm ${isInactive ? 'bg-gray-200 border-gray-200 grayscale' : 'bg-gray-100 border-gray-100'}`}
+  className={`w-14 h-14 object-contain rounded-2xl border shadow-sm ${isProductDeleted || isInactive ? 'bg-gray-200 border-gray-200 grayscale' : 'bg-gray-100 border-gray-100'}`}
   onError={(e) => {
     const el = e.target as HTMLImageElement;
     el.onerror = null;
@@ -249,8 +256,9 @@ export const AdminProducts = () => {
   }}
 />
                       <div>
-                        <div className={`text-sm font-black uppercase italic leading-tight ${isInactive ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{product.name}</div>
-                        <div className={`text-[10px] font-black font-mono mt-0.5 ${isInactive ? 'text-gray-400' : 'text-blue-600'}`}>SKU: {product.sku || 'N/A'}</div>
+                        <div className={`text-sm font-black uppercase italic leading-tight ${isProductDeleted ? 'text-red-400 line-through' : isInactive ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{product.name}</div>
+                        <div className={`text-[10px] font-black font-mono mt-0.5 ${isProductDeleted || isInactive ? 'text-gray-400' : 'text-blue-600'}`}>SKU: {product.sku || 'N/A'}</div>
+                        {isProductDeleted && <div className="text-[9px] font-bold text-red-500 mt-0.5 uppercase">Đã xóa</div>}
                       </div>
                     </div>
                   </td>
@@ -277,43 +285,65 @@ export const AdminProducts = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${
-                      product.status === 'active' ? 'bg-green-100 text-green-700' :
-                      isInactive ? 'bg-red-100 text-red-600 border border-red-200' :
-                      product.status === 'out_of_stock' ? 'bg-orange-100 text-orange-700' :
-                      'bg-slate-100 text-slate-500'
-                    }`}>
-                      {product.status === 'active' ? '✓ Đang bán' :
-                       isInactive ? '⛔ Ngừng bán' :
-                       product.status === 'out_of_stock' ? '✗ Hết hàng' :
-                       product.status === 'pre_order' ? '⏳ Đặt trước' :
-                       product.status}
-                    </span>
+                    {isProductDeleted ? (
+                      <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase bg-red-100 text-red-700 border border-red-200">
+                        🗑 Đã xóa
+                      </span>
+                    ) : (
+                      <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${
+                        product.status === 'active' ? 'bg-green-100 text-green-700' :
+                        isInactive ? 'bg-red-100 text-red-600 border border-red-200' :
+                        product.status === 'out_of_stock' ? 'bg-orange-100 text-orange-700' :
+                        'bg-slate-100 text-slate-500'
+                      }`}>
+                        {product.status === 'active' ? '✓ Đang bán' :
+                         isInactive ? '⛔ Ngừng bán' :
+                         product.status === 'out_of_stock' ? '✗ Hết hàng' :
+                         product.status === 'pre_order' ? '⏳ Đặt trước' :
+                         product.status}
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
-                      <Link
-                        to={`/admin/products/edit/${product.productId}`}
-                        className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                        title={isInactive ? 'Sửa để mở bán lại' : 'Sửa sản phẩm'}
-                      >
-                        <Edit size={16} />
-                      </Link>
-                      <button
-                        onClick={() => handleDelete(product)}
-                        disabled={actionLoading === product.productId}
-                        className={`p-2.5 rounded-xl transition-all disabled:opacity-30 ${
-                          isInactive
-                            ? 'text-red-700 hover:bg-red-100 bg-red-50'
-                            : 'text-red-600 hover:bg-red-50'
-                        }`}
-                        title={isInactive ? 'Xóa vĩnh viễn' : 'Ngừng bán'}
-                      >
-                        {actionLoading === product.productId ?
-                          <RefreshCw size={16} className="animate-spin" /> :
-                          <Trash2 size={16} />
-                        }
-                      </button>
+                      {isProductDeleted ? (
+                        <button
+                          onClick={() => handleRestore(product)}
+                          disabled={actionLoading === product.productId}
+                          className="flex items-center gap-1.5 px-3 py-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all text-xs font-bold disabled:opacity-30"
+                          title="Khôi phục sản phẩm"
+                        >
+                          {actionLoading === product.productId
+                            ? <RefreshCw size={14} className="animate-spin" />
+                            : <RotateCcw size={14} />}
+                          Khôi phục
+                        </button>
+                      ) : (
+                        <>
+                          <Link
+                            to={`/admin/products/edit/${product.productId}`}
+                            className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                            title={isInactive ? 'Sửa để mở bán lại' : 'Sửa sản phẩm'}
+                          >
+                            <Edit size={16} />
+                          </Link>
+                          <button
+                            onClick={() => handleDelete(product)}
+                            disabled={actionLoading === product.productId}
+                            className={`p-2.5 rounded-xl transition-all disabled:opacity-30 ${
+                              isInactive
+                                ? 'text-red-700 hover:bg-red-100 bg-red-50'
+                                : 'text-red-600 hover:bg-red-50'
+                            }`}
+                            title={isInactive ? 'Xóa vĩnh viễn' : 'Ngừng bán'}
+                          >
+                            {actionLoading === product.productId ?
+                              <RefreshCw size={16} className="animate-spin" /> :
+                              <Trash2 size={16} />
+                            }
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

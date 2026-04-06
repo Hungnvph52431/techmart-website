@@ -12,6 +12,7 @@ import {
   User, Mail, Phone, MapPin, Shield, LogOut, Pencil, Check, X,
   Navigation, Star, Loader2, Crown, Award,
   Plus, Trash2, Home, CheckCircle2, Camera, ChevronRight, Search,
+  Eye, EyeOff,
 } from 'lucide-react';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -201,6 +202,21 @@ const EMPTY_PASSWORD_FORM: ChangePasswordFormData = {
   newPassword: '',
   confirmPassword: '',
 };
+
+const passwordRules = [
+  {
+    label: 'Mật khẩu phải từ 8 đến 20 ký tự',
+    test: (p: string) => p.length >= 8 && p.length <= 20,
+  },
+  {
+    label: 'Chứa ít nhất 1 chữ số, 1 chữ hoa và 1 chữ thường',
+    test: (p: string) => /[0-9]/.test(p) && /[A-Z]/.test(p) && /[a-z]/.test(p),
+  },
+  {
+    label: 'Chứa ít nhất 1 ký tự đặc biệt (!@#$^*()_)',
+    test: (p: string) => /[!@#$^*()_]/.test(p),
+  },
+];
 
 const getNewPasswordValidationMessage = (password: string) => {
   if (!password.trim()) {
@@ -797,12 +813,24 @@ const ChangePasswordCard = ({
   onSubmit: (payload: { oldPassword: string; newPassword: string }) => Promise<boolean>;
 }) => {
   const [form, setForm] = useState<ChangePasswordFormData>(EMPTY_PASSWORD_FORM);
+  const [submitted, setSubmitted] = useState(false);
+  const [showOld, setShowOld] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
-  const newPasswordError = form.newPassword ? getNewPasswordValidationMessage(form.newPassword) : '';
-  const confirmPasswordError =
-    form.confirmPassword && form.newPassword !== form.confirmPassword
-      ? 'Mật khẩu xác nhận không khớp'
-      : '';
+  const getRuleStyle = (passes: boolean) => {
+    if (!form.newPassword && !submitted) return 'text-gray-400';
+    if (passes) return 'text-green-500';
+    if (submitted) return 'text-red-500';
+    return 'text-gray-400';
+  };
+
+  const getRuleIcon = (passes: boolean) => {
+    if (!form.newPassword && !submitted) return <Check size={13} />;
+    if (passes) return <Check size={13} />;
+    if (submitted) return <X size={13} />;
+    return <Check size={13} />;
+  };
 
   const handleChange = (field: keyof ChangePasswordFormData, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -810,22 +838,17 @@ const ChangePasswordCard = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitted(true);
 
     if (!form.oldPassword.trim()) {
       toast.error('Vui lòng nhập mật khẩu hiện tại');
       return;
     }
 
-    const passwordValidationMessage = getNewPasswordValidationMessage(form.newPassword);
-    if (passwordValidationMessage) {
-      toast.error(passwordValidationMessage);
-      return;
-    }
+    const allRulesPass = passwordRules.every((r) => r.test(form.newPassword));
+    if (!allRulesPass) return;
 
-    if (form.newPassword !== form.confirmPassword) {
-      toast.error('Mật khẩu xác nhận không khớp');
-      return;
-    }
+    if (form.newPassword !== form.confirmPassword) return;
 
     const changed = await onSubmit({
       oldPassword: form.oldPassword,
@@ -834,6 +857,7 @@ const ChangePasswordCard = ({
 
     if (changed) {
       setForm(EMPTY_PASSWORD_FORM);
+      setSubmitted(false);
     }
   };
 
@@ -844,52 +868,72 @@ const ChangePasswordCard = ({
     <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="px-6 py-4 border-b border-slate-100">
         <h2 className="text-sm font-bold text-slate-700">Đổi mật khẩu</h2>
-        <p className="text-[10px] text-slate-400 mt-1">
-          Mật khẩu mới phải có ít nhất 6 ký tự và chứa ít nhất 1 chữ in hoa.
-        </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+      <form onSubmit={handleSubmit} noValidate className="px-6 py-5 space-y-4">
         <div className="space-y-1.5">
           <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Mật khẩu hiện tại</label>
-          <input
-            type="password"
-            value={form.oldPassword}
-            onChange={(e) => handleChange('oldPassword', e.target.value)}
-            className={inputClassName}
-            placeholder="Nhập mật khẩu hiện tại"
-            autoComplete="current-password"
-          />
+          <div className="relative">
+            <input
+              type={showOld ? 'text' : 'password'}
+              value={form.oldPassword}
+              onChange={(e) => handleChange('oldPassword', e.target.value)}
+              className={inputClassName}
+              placeholder="Nhập mật khẩu hiện tại"
+              autoComplete="current-password"
+            />
+            <button type="button" onClick={() => setShowOld(!showOld)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+              {showOld ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
         </div>
 
         <div className="space-y-1.5">
           <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Mật khẩu mới</label>
-          <input
-            type="password"
-            value={form.newPassword}
-            onChange={(e) => handleChange('newPassword', e.target.value)}
-            className={inputClassName}
-            placeholder="Nhập mật khẩu mới"
-            autoComplete="new-password"
-          />
-          <p className={`text-[11px] ${newPasswordError ? 'text-red-500' : 'text-slate-400'}`}>
-            {newPasswordError || 'Tối thiểu 6 ký tự, có ít nhất 1 chữ in hoa.'}
-          </p>
+          <div className="relative">
+            <input
+              type={showNew ? 'text' : 'password'}
+              value={form.newPassword}
+              onChange={(e) => handleChange('newPassword', e.target.value)}
+              className={inputClassName}
+              placeholder="Nhập mật khẩu mới"
+              autoComplete="new-password"
+            />
+            <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+              {showNew ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+          <ul className="mt-2 space-y-1">
+            {passwordRules.map((rule) => {
+              const passes = rule.test(form.newPassword);
+              return (
+                <li key={rule.label} className={`flex items-center gap-1.5 text-sm ${getRuleStyle(passes)}`}>
+                  {getRuleIcon(passes)}
+                  {rule.label}
+                </li>
+              );
+            })}
+          </ul>
         </div>
 
         <div className="space-y-1.5">
           <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Xác nhận mật khẩu mới</label>
-          <input
-            type="password"
-            value={form.confirmPassword}
-            onChange={(e) => handleChange('confirmPassword', e.target.value)}
-            className={inputClassName}
-            placeholder="Nhập lại mật khẩu mới"
-            autoComplete="new-password"
-          />
-          <p className={`text-[11px] ${confirmPasswordError ? 'text-red-500' : 'text-slate-400'}`}>
-            {confirmPasswordError || 'Mật khẩu xác nhận phải trùng với mật khẩu mới.'}
-          </p>
+          <div className="relative">
+            <input
+              type={showConfirm ? 'text' : 'password'}
+              value={form.confirmPassword}
+              onChange={(e) => handleChange('confirmPassword', e.target.value)}
+              className={inputClassName}
+              placeholder="Nhập lại mật khẩu mới"
+              autoComplete="new-password"
+            />
+            <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+              {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+          {submitted && form.confirmPassword && form.newPassword !== form.confirmPassword && (
+            <p className="mt-1 text-sm text-red-500 flex items-center gap-1"><X size={13} /> Mật khẩu xác nhận không khớp</p>
+          )}
         </div>
 
         <button

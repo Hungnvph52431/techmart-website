@@ -40,7 +40,25 @@ export class CategoryController {
       res.status(500).json({ message: error.message });
     }
   };
+getDeleted = async (_req: Request, res: Response) => {
+  try {
+    const categories = await this.categoryUseCase.getDeletedCategories();
+    res.json(categories);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
+restore = async (req: Request, res: Response) => {
+  try {
+    const success = await this.categoryUseCase.restoreCategory(Number(req.params.id));
+    if (!success) return res.status(404).json({ message: 'Không tìm thấy danh mục trong thùng rác' });
+    res.json({ message: 'Khôi phục danh mục thành công' });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+ 
   // --- 2. CÁC THAO TÁC QUẢN TRỊ (ADMIN) ---
 
   create = async (req: Request, res: Response) => {
