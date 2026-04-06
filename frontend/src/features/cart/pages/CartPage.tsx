@@ -4,9 +4,50 @@ import { useCartStore } from '@/store/cartStore';
 import { useCheckoutSessionStore } from '@/store/checkoutSessionStore';
 import { productService } from '@/services/product.service';
 import toast from 'react-hot-toast';
-import { Trash2, Plus, Minus, ShoppingCart } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingCart, AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+
+const confirmToast = (message: string, onConfirm: () => void) => {
+  toast.custom(
+    (t) => (
+      <div
+        className={`${
+          t.visible ? 'animate-enter' : 'animate-leave'
+        } max-w-sm w-full bg-white shadow-2xl rounded-2xl pointer-events-auto border border-gray-100 overflow-hidden`}
+      >
+        <div className="p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-50 flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-red-500" />
+            </div>
+            <div className="flex-1 pt-0.5">
+              <p className="text-sm font-medium text-gray-900">{message}</p>
+            </div>
+          </div>
+          <div className="flex gap-2 mt-4 justify-end">
+            <button
+              onClick={() => toast.dismiss(t.id)}
+              className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Hủy
+            </button>
+            <button
+              onClick={() => {
+                toast.dismiss(t.id);
+                onConfirm();
+              }}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
+            >
+              Xóa
+            </button>
+          </div>
+        </div>
+      </div>
+    ),
+    { duration: Infinity, position: 'top-center' }
+  );
+};
 import {
   CART_QUANTITY_EXCEEDED_MESSAGE,
   getCartItemStockLimit,
@@ -86,9 +127,9 @@ export const CartPage = () => {
 
   const handleUpdateQuantity = (productId: number, newQuantity: number, stockQuantity: number, selectedVariantId?: number) => {
     if (newQuantity === 0) {
-      if (window.confirm('Bạn có muốn xóa sản phẩm này khỏi giỏ hàng không?')) {
+      confirmToast('Bạn có muốn xóa sản phẩm này khỏi giỏ hàng không?', () => {
         removeItem(productId, selectedVariantId);
-      }
+      });
     } else if (newQuantity > stockQuantity) {
       toast.error(CART_QUANTITY_EXCEEDED_MESSAGE);
     } else {
@@ -155,9 +196,9 @@ export const CartPage = () => {
   };
 
   const handleRemoveItem = (productId: number, selectedVariantId?: number) => {
-    if (window.confirm('Bạn có muốn xóa sản phẩm này khỏi giỏ hàng không?')) {
+    confirmToast('Bạn có muốn xóa sản phẩm này khỏi giỏ hàng không?', () => {
       removeItem(productId, selectedVariantId);
-    }
+    });
   };
 
   const handleRemoveSelectedItems = () => {
@@ -166,16 +207,15 @@ export const CartPage = () => {
     }
 
     const productLabel = selectedCount === 1 ? 'sản phẩm đã chọn này' : `${selectedCount} sản phẩm đã chọn`;
-    if (!window.confirm(`Bạn có muốn xóa ${productLabel} khỏi giỏ hàng không?`)) {
-      return;
-    }
-
-    removeSelectedItems();
-    toast.success(
-      selectedCount === 1
-        ? 'Đã xóa sản phẩm đã chọn khỏi giỏ hàng!'
-        : `Đã xóa ${selectedCount} sản phẩm khỏi giỏ hàng!`
-    );
+    const count = selectedCount;
+    confirmToast(`Bạn có muốn xóa ${productLabel} khỏi giỏ hàng không?`, () => {
+      removeSelectedItems();
+      toast.success(
+        count === 1
+          ? 'Đã xóa sản phẩm đã chọn khỏi giỏ hàng!'
+          : `Đã xóa ${count} sản phẩm khỏi giỏ hàng!`
+      );
+    });
   };
 
   if (items.length === 0) {
