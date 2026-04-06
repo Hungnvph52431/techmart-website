@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   CheckCircle,
   XCircle,
@@ -9,9 +9,12 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
-import { useCartStore } from "@/store/cartStore";
 import api from "@/services/api";
 import toast from "react-hot-toast";
+import {
+  applyPendingCheckoutCleanup,
+  consumePendingCheckoutCleanup,
+} from "@/features/orders/lib/checkoutSuccessCleanup";
 
 type ResultStatus = "loading" | "success" | "cancel" | "failed" | "error";
 
@@ -62,6 +65,7 @@ const RESULT_CONFIG: Record<
 };
 
 const REPAY_WINDOW_MINUTES = 10;
+const SUCCESS_REDIRECT_DELAY_MS = 1600;
 
 function DigitBlock({ value, label }: { value: string; label: string }) {
   const [prev, setPrev] = useState(value);
@@ -198,11 +202,13 @@ function ExpiredBanner() {
 }
 
 export const PaymentResultPage = () => {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [visible, setVisible] = useState(false);
   const [repaying, setRepaying] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0); // khởi tạo = 0
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const statusParam = (searchParams.get("status") as ResultStatus) || "error";
   const orderId = searchParams.get("orderId");
@@ -210,6 +216,8 @@ export const PaymentResultPage = () => {
 
   const canRepay =
     (statusParam === "cancel" || statusParam === "failed") && !!orderId;
+  const shouldAutoRedirectToOrder =
+    statusParam === "success" && !!orderId;
 
   const getStorageKey = (id: string) => `repay_expires_${id}`;
 
@@ -266,14 +274,39 @@ export const PaymentResultPage = () => {
     };
   }, [secondsLeft, orderId]);
 
+  useEffect(() => {
+    if (redirectTimerRef.current) {
+      clearTimeout(redirectTimerRef.current);
+      redirectTimerRef.current = null;
+    }
+
+    if (!shouldAutoRedirectToOrder || !orderId) {
+      return;
+    }
+
+    redirectTimerRef.current = setTimeout(() => {
+      navigate(`/orders/${orderId}`, { replace: true });
+    }, SUCCESS_REDIRECT_DELAY_MS);
+
+    return () => {
+      if (redirectTimerRef.current) {
+        clearTimeout(redirectTimerRef.current);
+        redirectTimerRef.current = null;
+      }
+    };
+  }, [navigate, orderId, shouldAutoRedirectToOrder]);
+
   // Effect xử lý success + animation
   useEffect(() => {
     if (statusParam === "success") {
-      useCartStore.getState().clearCart();
+      const cleanup = consumePendingCheckoutCleanup(orderId);
+      if (cleanup) {
+        applyPendingCheckoutCleanup(cleanup);
+      }
     }
     const timeout = setTimeout(() => setVisible(true), 100);
     return () => clearTimeout(timeout);
-  }, [statusParam]);
+  }, [orderId, statusParam]);
 
   const handleRepay = async () => {
     if (!orderId || secondsLeft <= 0) return;
@@ -332,6 +365,12 @@ export const PaymentResultPage = () => {
                 #{orderCode || orderId}
               </p>
             </div>
+          )}
+
+          {shouldAutoRedirectToOrder && (
+            <p className="mb-4 text-sm font-semibold text-emerald-600">
+              Đang chuyển tới chi tiết đơn hàng...
+            </p>
           )}
 
           <div className="space-y-2">

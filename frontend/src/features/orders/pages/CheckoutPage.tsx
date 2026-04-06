@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { useCartStore } from "@/store/cartStore";
@@ -10,6 +10,11 @@ import { type Address } from "@/services/address.service";
 import api from "@/services/api";
 import toast from "react-hot-toast";
 import { getCartSelectionKey } from "@/features/cart/lib/cartQuantity";
+import {
+  applyPendingCheckoutCleanup,
+  buildPendingCheckoutCleanup,
+  persistPendingCheckoutCleanup,
+} from "../lib/checkoutSuccessCleanup";
 
 // Sửa đường dẫn import: Đi lùi 1 cấp (../) để ra khỏi thư mục pages/, rồi vào components/ và hooks/
 import { useCheckoutAddress } from "../hooks/useCheckoutAddress";
@@ -104,9 +109,10 @@ const VoucherPopup = ({ open, onClose, onSelect, subtotal }: { open: boolean; on
 // ─── Main Checkout Page ──────────────────────────────────────────────────────────
 export const CheckoutPage = () => {
   const navigate = useNavigate();
-  const { items, clearCart, getSelectedItems, removeItemsBySelectionKeys } = useCartStore();
-  const { directItems, clearDirectCheckout } = useCheckoutSessionStore();
+  const { items, getSelectedItems } = useCartStore();
+  const { directItems } = useCheckoutSessionStore();
   const { user, updateUser } = useAuthStore();
+  const pendingSuccessOrderIdRef = useRef<number | null>(null);
 
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "vnpay" | "wallet">("cod");
   const [loading, setLoading] = useState(false);
@@ -173,7 +179,7 @@ export const CheckoutPage = () => {
   };
 
   useEffect(() => {
-    if (checkoutItems.length === 0) {
+    if (checkoutItems.length === 0 && !pendingSuccessOrderIdRef.current) {
       navigate('/cart', { replace: true });
     }
   }, [checkoutItems.length, navigate]);
@@ -223,29 +229,28 @@ export const CheckoutPage = () => {
       };
 
       const result = await orderService.create(orderData);
+      const cleanup = buildPendingCheckoutCleanup(
+        result.orderId,
+        checkoutSource,
+        checkoutItems,
+      );
+      pendingSuccessOrderIdRef.current = result.orderId;
 
       if (paymentMethod === 'vnpay') {
+        if (cleanup) {
+          persistPendingCheckoutCleanup(cleanup);
+        }
         const { data } = await api.post('/payment/vnpay/create', { orderId: result.orderId });
         window.location.href = data.paymentUrl;
         return;
       }
 
-      if (checkoutSource === 'direct') {
-        clearDirectCheckout();
-      } else if (checkoutSource === 'selected_cart') {
-        removeItemsBySelectionKeys(
-          checkoutItems.map((item) =>
-            getCartSelectionKey(item.product.productId, item.selectedVariantId)
-          )
-        );
-        clearDirectCheckout();
-      } else {
-        clearCart();
-        clearDirectCheckout();
+      if (cleanup) {
+        applyPendingCheckoutCleanup(cleanup);
       }
 
       toast.success("Đặt hàng thành công!");
-      navigate(`/orders/${result.orderId}`);
+      navigate(`/orders/${result.orderId}`, { replace: true });
     } catch (error) {
       toast.error("Đặt hàng thất bại, vui lòng thử lại!");
     } finally {
