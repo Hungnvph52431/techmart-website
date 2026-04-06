@@ -4,8 +4,11 @@ import {
   OrderDetail,
   OrderEvent,
   OrderListItem,
+  OrderActorRole,
   OrderReturn,
+  PaymentStatus,
   OrderStatus,
+  ReturnStatus,
 } from '../../domain/entities/Order';
 import {
   canCancelOrder,
@@ -19,6 +22,85 @@ const formatAddress = (order: Order) =>
   [order.shippingAddress, order.shippingWard, order.shippingDistrict, order.shippingCity]
     .filter(Boolean)
     .join(', ');
+
+const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  pending: 'Chờ xử lý',
+  confirmed: 'Đã xác nhận',
+  shipping: 'Đang giao',
+  delivered: 'Đã giao',
+  completed: 'Hoàn thành',
+  cancelled: 'Đã hủy',
+  returned: 'Đã hoàn/trả',
+};
+
+const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+  pending: 'Chờ thanh toán',
+  paid: 'Đã thanh toán',
+  failed: 'Thanh toán thất bại',
+  refunded: 'Đã hoàn tiền',
+};
+
+const RETURN_STATUS_LABELS: Record<ReturnStatus, string> = {
+  requested: 'Chờ duyệt',
+  approved: 'Đã duyệt',
+  rejected: 'Từ chối',
+  received: 'Đã nhận hàng',
+  refunded: 'Đã hoàn tiền',
+  closed: 'Đã đóng',
+};
+
+const EVENT_LABELS: Record<OrderEvent['eventType'], string> = {
+  order_created: 'Đơn hàng được tạo',
+  status_changed: 'Thay đổi trạng thái đơn hàng',
+  payment_status_changed: 'Thay đổi trạng thái thanh toán',
+  order_cancelled: 'Đơn hàng bị hủy',
+  return_requested: 'Yêu cầu hoàn trả được tạo',
+  return_approved: 'Yêu cầu hoàn trả được duyệt',
+  return_rejected: 'Yêu cầu hoàn trả bị từ chối',
+  return_received: 'Đã nhận hàng hoàn trả',
+  return_refunded: 'Đã hoàn tiền hoàn trả',
+  return_closed: 'Yêu cầu hoàn trả đã đóng',
+};
+
+const ACTOR_ROLE_LABELS: Record<OrderActorRole, string> = {
+  customer: 'Khách hàng',
+  admin: 'Quản trị viên',
+  staff: 'Nhân viên',
+  warehouse: 'Kho vận',
+  system: 'Hệ thống',
+};
+
+const toEventStatusLabel = (eventType: OrderEvent['eventType'], value?: string) => {
+  if (!value) {
+    return undefined;
+  }
+
+  if (eventType === 'payment_status_changed') {
+    return PAYMENT_STATUS_LABELS[value as PaymentStatus] || value;
+  }
+
+  if (eventType.startsWith('return_')) {
+    return RETURN_STATUS_LABELS[value as ReturnStatus] || value;
+  }
+
+  return ORDER_STATUS_LABELS[value as OrderStatus] || value;
+};
+
+const toActorDisplayName = (event: OrderEvent) => {
+  if (event.actorName) {
+    return event.actorName;
+  }
+
+  if (event.actorRole) {
+    return ACTOR_ROLE_LABELS[event.actorRole];
+  }
+
+  if (event.actorEmail) {
+    return event.actorEmail;
+  }
+
+  return 'Không xác định';
+};
 
 const toCustomer = (order: OrderListItem | OrderAggregate['order'], aggregate?: OrderAggregate) => ({
   userId: aggregate?.customer?.userId ?? order.userId,
@@ -60,10 +142,18 @@ const toLineItem = (item: OrderDetail) => ({
 const toTimelineEvent = (event: OrderEvent, actor: 'admin' | 'customer') => ({
   orderEventId: event.orderEventId,
   eventType: event.eventType,
+  eventLabel: EVENT_LABELS[event.eventType] || event.eventType,
   fromStatus: event.fromStatus,
+  fromLabel: toEventStatusLabel(event.eventType, event.fromStatus),
   toStatus: event.toStatus,
+  toLabel: toEventStatusLabel(event.eventType, event.toStatus),
   actorRole: event.actorRole,
+  actorName: actor === 'admin' ? event.actorName : undefined,
+  actorEmail: actor === 'admin' ? event.actorEmail : undefined,
+  actorDisplayName: toActorDisplayName(event),
+  actorDisplayRole: event.actorRole ? ACTOR_ROLE_LABELS[event.actorRole] : undefined,
   note: event.note,
+  displayNote: event.note,
   metadata: actor === 'admin' ? event.metadata || {} : undefined,
   createdAt: event.createdAt,
 });
@@ -198,3 +288,8 @@ export const toOrderDetail = (
   timeline: aggregate.timeline.map((item) => toTimelineEvent(item, actorRole)),
   returns: aggregate.returns.map((item) => toReturn(item, actorRole)),
 });
+
+export const toOrderTimeline = (
+  timeline: OrderEvent[],
+  actorRole: 'admin' | 'customer'
+) => timeline.map((item) => toTimelineEvent(item, actorRole));

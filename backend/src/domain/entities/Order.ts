@@ -102,6 +102,8 @@ export interface OrderEvent {
   toStatus?: string;
   actorUserId?: number;
   actorRole?: OrderActorRole;
+  actorName?: string;
+  actorEmail?: string;
   note?: string;
   metadata?: Record<string, any>;
   createdAt: Date;

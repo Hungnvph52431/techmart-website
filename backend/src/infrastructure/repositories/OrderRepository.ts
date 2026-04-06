@@ -1,7 +1,8 @@
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { PoolConnection } from 'mysql2/promise';
 import pool from '../database/connection';
-import { IOrderRepository, OrderStats } from '../../domain/repositories/IOrderRepository';import {
+import { IOrderRepository, OrderStats } from '../../domain/repositories/IOrderRepository';
+import {
   AdminOrderListFilters,
   CancelOrderDTO,
   CloseOrderReturnDTO,
@@ -9,6 +10,7 @@ import { IOrderRepository, OrderStats } from '../../domain/repositories/IOrderRe
   CreateOrderReturnDTO,
   Order,
   OrderAggregate,
+  OrderCustomerSnapshot,
   OrderDetail,
   OrderEvent,
   OrderListItem,
@@ -164,7 +166,11 @@ export class OrderRepository implements IOrderRepository {
 
   async getOrderTimeline(orderId: number): Promise<OrderEvent[]> {
     const [rows] = await pool.execute<RowDataPacket[]>(
-      'SELECT * FROM order_events WHERE order_id = ? ORDER BY created_at ASC',
+      `SELECT oe.*, u.name AS actor_name, u.email AS actor_email
+       FROM order_events oe
+       LEFT JOIN users u ON u.user_id = oe.actor_user_id
+       WHERE oe.order_id = ?
+       ORDER BY oe.created_at ASC`,
       [orderId]
     );
     return rows.map((row) => this.mapRowToOrderEvent(row));
@@ -1155,12 +1161,37 @@ export class OrderRepository implements IOrderRepository {
       order = await this.findById(options.orderId);
     }
     if (!order) return null;
-    const [items, timeline, returns] = await Promise.all([
+    const [customer, items, timeline, returns] = await Promise.all([
+      this.getOrderCustomerSnapshot(order.userId),
       this.getOrderDetails(order.orderId),
       this.getOrderTimeline(order.orderId),
       this.listReturns(order.orderId),
     ]);
-    return { order, items, timeline, returns };
+    return { order, customer, items, timeline, returns };
+  }
+
+  private async getOrderCustomerSnapshot(
+    userId: number,
+  ): Promise<OrderCustomerSnapshot | undefined> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT user_id, name, email, phone
+       FROM users
+       WHERE user_id = ?
+       LIMIT 1`,
+      [userId],
+    );
+
+    const row = rows[0];
+    if (!row) {
+      return undefined;
+    }
+
+    return {
+      userId: row.user_id,
+      name: row.name,
+      email: row.email,
+      phone: row.phone ?? undefined,
+    };
   }
 
   private async getOrderDetailsWithExecutor(executor: SqlExecutor, id: number): Promise<OrderDetail[]> {
@@ -1267,6 +1298,8 @@ export class OrderRepository implements IOrderRepository {
       toStatus: row.to_status ?? undefined,
       actorUserId: row.actor_user_id ?? undefined,
       actorRole: row.actor_role ?? undefined,
+      actorName: row.actor_name ?? undefined,
+      actorEmail: row.actor_email ?? undefined,
       note: row.note ?? undefined,
       metadata,
       createdAt: row.created_at,
