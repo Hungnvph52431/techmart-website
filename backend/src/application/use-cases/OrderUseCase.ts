@@ -17,8 +17,6 @@ import {
 } from '../policies/OrderLifecycle';
 import { sendOrderCancelledEmail, sendPaymentSuccessEmail, sendOrderCreatedEmail } from '../services/EmailService';
 import { VietnamAdministrativeService } from '../services/VietnamAdministrativeService';
-import pool from '../../infrastructure/database/connection';
-import { RowDataPacket } from 'mysql2';
 
 export class OrderUseCase {
   constructor(
@@ -191,10 +189,75 @@ export class OrderUseCase {
     // Nếu đúng chủ sở hữu, trả về lịch sử sự kiện
     return this.orderRepository.getOrderTimeline(orderId);
   }
+
+  async lookupGuestOrder(orderCode: string, email: string) {
+    const normalizedOrderCode = orderCode.trim().toUpperCase();
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedOrderCode) {
+      throw new Error('Vui lòng nhập mã đơn hàng');
+    }
+
+    if (!normalizedEmail) {
+      throw new Error('Vui lòng nhập email đặt hàng');
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      throw new Error('Email đặt hàng không hợp lệ');
+    }
+
+    return this.orderRepository.findGuestDetailByCode(
+      normalizedOrderCode,
+      normalizedEmail,
+    );
+  }
+
+  async getGuestOrderByCode(orderCode: string, email: string) {
+    const normalizedOrderCode = orderCode.trim().toUpperCase();
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedOrderCode) {
+      throw new Error('Vui lòng nhập mã đơn hàng');
+    }
+
+    if (!normalizedEmail) {
+      throw new Error('Vui lòng nhập email đặt hàng');
+    }
+
+    return this.orderRepository.findGuestByCode(
+      normalizedOrderCode,
+      normalizedEmail,
+    );
+  }
   // --- LOGIC TẠO ĐƠN HÀNG ---
   async createOrder(orderData: CreateOrderDTO) {
     if (!orderData.items.length) {
       throw new Error('Đơn hàng phải có ít nhất một sản phẩm');
+    }
+
+    orderData.shippingName = orderData.shippingName?.trim();
+    orderData.shippingPhone = orderData.shippingPhone?.trim();
+    orderData.shippingAddress = orderData.shippingAddress?.trim();
+    orderData.customerName = orderData.customerName?.trim() || orderData.shippingName;
+    orderData.customerPhone = orderData.customerPhone?.trim() || orderData.shippingPhone;
+    orderData.customerEmail = orderData.customerEmail?.trim().toLowerCase();
+
+    if (!orderData.shippingName || !orderData.shippingPhone || !orderData.shippingAddress || !orderData.shippingCity) {
+      throw new Error('Vui lòng điền đầy đủ thông tin giao hàng');
+    }
+
+    if (!orderData.customerEmail) {
+      throw new Error('Vui lòng nhập email đặt hàng');
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(orderData.customerEmail)) {
+      throw new Error('Email đặt hàng không hợp lệ');
+    }
+
+    if (!orderData.userId && orderData.paymentMethod !== 'vnpay') {
+      throw new Error('Khách vãng lai hiện chỉ hỗ trợ thanh toán qua VNPay');
     }
 
     // Validate tỉnh/thành phố — ward chỉ validate ở frontend (backend data không đủ 11k+ phường/xã)
@@ -243,7 +306,7 @@ export class OrderUseCase {
     }
 
     // Wallet: thanh toán ngay → tự động chuyển sang shipping
-    if (orderData.paymentMethod === 'wallet' && newOrder) {
+    if (orderData.paymentMethod === 'wallet' && newOrder && orderData.userId) {
       try {
         // Mark as paid
         await this.updateOrderPaymentStatus(newOrder.orderId, 'paid', orderData.userId, 'customer', 'Thanh toán qua ví TechMart');
@@ -369,6 +432,53 @@ export class OrderUseCase {
     return result;
   }
 
+  async confirmDeliveredByGuest(orderCode: string, email: string) {
+    const aggregate = await this.orderRepository.findGuestDetailByCode(
+      orderCode,
+      email,
+    );
+    if (!aggregate) return null;
+
+    const order = aggregate.order;
+    let result: any;
+
+    if (order.status === 'shipping') {
+      await this.orderRepository.transitionStatus({
+        orderId: order.orderId,
+        currentStatus: 'shipping',
+        nextStatus: 'delivered',
+        actorUserId: null,
+        actorRole: 'customer',
+        note: 'Khách vãng lai xác nhận đã nhận hàng',
+      });
+      result = await this.orderRepository.transitionStatus({
+        orderId: order.orderId,
+        currentStatus: 'delivered',
+        nextStatus: 'completed',
+        actorUserId: null,
+        actorRole: 'customer',
+        note: 'Tự động hoàn thành sau khi khách vãng lai xác nhận nhận hàng',
+      });
+    } else if (order.status === 'delivered') {
+      result = await this.orderRepository.transitionStatus({
+        orderId: order.orderId,
+        currentStatus: 'delivered',
+        nextStatus: 'completed',
+        actorUserId: null,
+        actorRole: 'customer',
+        note: 'Khách vãng lai xác nhận đã nhận hàng',
+      });
+    } else if (order.status === 'completed') {
+      return order;
+    } else {
+      throw new Error(
+        `Chỉ có thể xác nhận đã nhận hàng khi đơn đang giao hoặc đã giao (hiện tại: ${order.status})`,
+      );
+    }
+
+    return result;
+  }
+
   async cancelOrder(
     orderId: number,
     actorUserId: number,
@@ -442,6 +552,52 @@ export class OrderUseCase {
     });
   }
 
+  async requestReturnByGuest(
+    orderCode: string,
+    email: string,
+    payload: Omit<CreateOrderReturnDTO, 'orderId' | 'requestedBy'>,
+  ) {
+    const aggregate = await this.orderRepository.findGuestDetailByCode(
+      orderCode,
+      email,
+    );
+    if (!aggregate) return null;
+
+    if (!canRequestReturn(aggregate.order.status)) {
+      throw new Error('Chỉ có thể yêu cầu trả hàng cho đơn đã giao thành công');
+    }
+
+    const deliveredAt = aggregate.order.deliveredAt;
+    if (deliveredAt) {
+      const deadline = new Date(deliveredAt);
+      deadline.setDate(deadline.getDate() + RETURN_DEADLINE_DAYS);
+      if (new Date() > deadline) {
+        throw new Error(
+          `Đã quá thời hạn ${RETURN_DEADLINE_DAYS} ngày để yêu cầu hoàn trả`,
+        );
+      }
+    }
+
+    const existingReturns = await this.orderRepository.listReturns(
+      aggregate.order.orderId,
+    );
+    const hasActiveReturn = existingReturns.some(
+      (item) => !['closed', 'rejected'].includes(item.status),
+    );
+    if (hasActiveReturn) {
+      throw new Error('Đơn hàng này đã có yêu cầu hoàn trả đang xử lý');
+    }
+
+    return this.orderRepository.createReturn({
+      orderId: aggregate.order.orderId,
+      requestedBy: null,
+      reason: payload.reason.trim(),
+      customerNote: payload.customerNote?.trim(),
+      items: payload.items,
+      evidenceImages: payload.evidenceImages,
+    });
+  }
+
   // Các hàm duyệt và xử lý hoàn trả dành cho Admin
   async reviewReturn(orderId: number, orderReturnId: number, actorUserId: number, actorRole: OrderActorRole, decision: 'approved' | 'rejected', adminNote?: string) {
     const orderReturn = await this.orderRepository.getReturnById(orderId, orderReturnId);
@@ -469,19 +625,16 @@ export class OrderUseCase {
       if (!aggregate) return;
 
       const order = aggregate.order;
-
-      const [userRows] = await pool.execute<RowDataPacket[]>(
-        'SELECT name, email FROM users WHERE user_id = ?',
-        [order.userId]
-      );
-      const user = userRows[0];
-      if (!user?.email) return;
+      if (!order.customerEmail) return;
 
       await sendOrderCreatedEmail({
-        customerName: user.name,
-        customerEmail: user.email,
+        customerName: order.customerName || order.shippingName,
+        customerEmail: order.customerEmail,
         orderCode: order.orderCode,
         orderId: order.orderId,
+        orderUrl: order.userId
+          ? undefined
+          : `${process.env.FRONTEND_URL || 'http://localhost:5173'}/orders/lookup/${encodeURIComponent(order.orderCode)}`,
         total: order.total,
         paymentMethod: order.paymentMethod,
         items: aggregate.items.map((item) => ({
@@ -508,13 +661,7 @@ export class OrderUseCase {
       if (!aggregate) return;
 
       const order = aggregate.order;
-
-      const [userRows] = await pool.execute<RowDataPacket[]>(
-        'SELECT name, email FROM users WHERE user_id = ?',
-        [order.userId]
-      );
-      const user = userRows[0];
-      if (!user?.email || !order.cancelReason) return;
+      if (!order.customerEmail || !order.cancelReason) return;
 
       const refundMessage = order.paymentStatus === 'refunded'
         ? `Số tiền ${order.total.toLocaleString('vi-VN')}đ đã được hoàn vào ví TechMart của bạn.`
@@ -523,10 +670,13 @@ export class OrderUseCase {
           : undefined;
 
       await sendOrderCancelledEmail({
-        customerName: user.name,
-        customerEmail: user.email,
+        customerName: order.customerName || order.shippingName,
+        customerEmail: order.customerEmail,
         orderCode: order.orderCode,
         orderId: order.orderId,
+        orderUrl: order.userId
+          ? undefined
+          : `${process.env.FRONTEND_URL || 'http://localhost:5173'}/orders/lookup/${encodeURIComponent(order.orderCode)}`,
         cancelReason: order.cancelReason,
         refundMessage,
       });
@@ -547,20 +697,16 @@ export class OrderUseCase {
 
       // Wallet: email đặt hàng đã đủ thông tin, không gửi thêm
       if (order.paymentMethod === 'wallet') return;
-
-      // Lấy thông tin user (email, name)
-      const [userRows] = await pool.execute<RowDataPacket[]>(
-        'SELECT name, email FROM users WHERE user_id = ?',
-        [order.userId]
-      );
-      const user = userRows[0];
-      if (!user?.email) return;
+      if (!order.customerEmail) return;
 
       await sendPaymentSuccessEmail({
-        customerName: user.name,
-        customerEmail: user.email,
+        customerName: order.customerName || order.shippingName,
+        customerEmail: order.customerEmail,
         orderCode: order.orderCode,
         orderId: order.orderId,
+        orderUrl: order.userId
+          ? undefined
+          : `${process.env.FRONTEND_URL || 'http://localhost:5173'}/orders/lookup/${encodeURIComponent(order.orderCode)}`,
         total: order.total,
         paymentMethod: order.paymentMethod,
         items: aggregate.items.map((item) => ({

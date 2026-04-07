@@ -1,11 +1,12 @@
 import api from './api';
+import { buildGuestOrderHeaders } from '@/features/orders/lib/guestOrderAccess';
 
 export interface Review {
   reviewId: number;
   productId: number;
   productName?: string;
   variantName?: string;
-  userId: number;
+  userId: number | null;
   userName: string;
   userAvatar?: string;
   orderId?: number;
@@ -46,6 +47,7 @@ export interface ProductReviewResponse {
 
 export interface CreateReviewPayload {
   productId: number;
+  orderCode?: string;
   orderId?: number;
   orderDetailId?: number;
   rating: number;
@@ -119,8 +121,53 @@ export const reviewService = {
     return res.data;
   },
 
+  createGuest: async (
+    payload: CreateReviewPayload & { orderCode: string },
+    accessToken: string,
+  ): Promise<Review> => {
+    const res = await api.post(
+      '/reviews/guest',
+      payload,
+      {
+        headers: buildGuestOrderHeaders(accessToken),
+        ...( { skipAuthRedirect: true } as any ),
+      },
+    );
+    return res.data;
+  },
+
+  updateGuest: async (
+    reviewId: number,
+    payload: UpdateReviewPayload & { orderCode: string },
+    accessToken: string,
+  ): Promise<Review> => {
+    const res = await api.patch(
+      `/reviews/guest/${reviewId}`,
+      payload,
+      {
+        headers: buildGuestOrderHeaders(accessToken),
+        ...( { skipAuthRedirect: true } as any ),
+      },
+    );
+    return res.data;
+  },
+
   getOrderSummary: async (orderId: number): Promise<OrderReviewSummary> => {
     const res = await api.get(`/reviews/orders/${orderId}/summary`);
+    return res.data;
+  },
+
+  getGuestOrderSummary: async (
+    orderCode: string,
+    accessToken: string,
+  ): Promise<OrderReviewSummary> => {
+    const res = await api.get(
+      `/reviews/guest/orders/${encodeURIComponent(orderCode)}/summary`,
+      {
+        headers: buildGuestOrderHeaders(accessToken),
+        ...( { skipAuthRedirect: true } as any ),
+      },
+    );
     return res.data;
   },
 

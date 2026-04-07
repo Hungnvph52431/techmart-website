@@ -1,10 +1,26 @@
 import { Router } from 'express';
 import { OrderController } from '../controllers/OrderController';
 import { authMiddleware, adminMiddleware, staffMiddleware } from '../middlewares/auth.middleware';
+import { guestOrderAccessMiddleware } from '../middlewares/guest-order.middleware';
 import { uploadReturnEvidence } from '../middlewares/upload.middleware';
 
 export const createOrderRoutes = (orderController: OrderController) => {
   const router = Router();
+
+  // --- 0. ROUTES CÔNG KHAI CHO KHÁCH VÃNG LAI ---
+  router.post('/guest', orderController.createGuest);
+  router.post('/lookup', orderController.lookupGuest);
+  router.post(
+    '/lookup/:orderCode/confirm-delivered',
+    guestOrderAccessMiddleware,
+    orderController.confirmDeliveredGuest,
+  );
+  router.post(
+    '/lookup/:orderCode/returns',
+    guestOrderAccessMiddleware,
+    uploadReturnEvidence.array('evidenceImages', 5),
+    orderController.createGuestReturn,
+  );
 
   // --- 1. ROUTES DÀNH CHO ADMIN (Quản trị & Thống kê) ---
   // Route thống kê phải đặt trên cùng để tránh nhầm lẫn với tham số :id

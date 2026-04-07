@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
   Package,
@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { RepayButton } from "../components/RepayButton";
 import { orderService } from "@/services/order.service";
+import { useAuthStore } from "@/store/authStore";
 // Đã xóa dòng import api thừa
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -70,6 +71,8 @@ const FILTERS: Array<{ value: FilterStatus; label: string }> = [
 ];
 
 export const OrdersPage = () => {
+  const navigate = useNavigate();
+  const authenticated = useAuthStore((state) => state.isAuthenticated)();
   const [orders, setOrders] = useState<any[]>([]);
   const [filter, setFilter] = useState<FilterStatus>("all");
   const [loading, setLoading] = useState(true);
@@ -77,6 +80,8 @@ export const OrdersPage = () => {
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [guestOrderCode, setGuestOrderCode] = useState("");
+  const [guestEmail, setGuestEmail] = useState("");
 
   const [summary, setSummary] = useState({
     total: 0,
@@ -86,6 +91,12 @@ export const OrdersPage = () => {
   });
 
   const fetchOrders = async (status: FilterStatus = filter) => {
+    if (!authenticated) {
+      setOrders([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const data = (await orderService.getMyOrders(status)) as any[];
@@ -99,6 +110,16 @@ export const OrdersPage = () => {
 
   // Lấy summary 1 lần (all) để hiển thị số đếm
   const fetchSummary = async () => {
+    if (!authenticated) {
+      setSummary({
+        total: 0,
+        pending: 0,
+        shipping: 0,
+        delivered: 0,
+      });
+      return;
+    }
+
     try {
       const all = (await orderService.getMyOrders("all")) as any[];
       setSummary({
@@ -114,10 +135,31 @@ export const OrdersPage = () => {
 
   useEffect(() => {
     void fetchSummary();
-  }, []);
+  }, [authenticated]);
   useEffect(() => {
     void fetchOrders(filter);
-  }, [filter]);
+  }, [authenticated, filter]);
+
+  const handleGuestLookup = (event: React.FormEvent) => {
+    event.preventDefault();
+
+    const normalizedCode = guestOrderCode.trim().toUpperCase();
+    const normalizedEmail = guestEmail.trim().toLowerCase();
+
+    if (!normalizedCode) {
+      toast.error("Vui lòng nhập mã đơn hàng");
+      return;
+    }
+
+    if (!normalizedEmail) {
+      toast.error("Vui lòng nhập email đặt hàng");
+      return;
+    }
+
+    navigate(`/orders/lookup/${encodeURIComponent(normalizedCode)}`, {
+      state: { email: normalizedEmail },
+    });
+  };
 
   // Xác nhận đã nhận hàng ngay từ danh sách
   const handleConfirmDelivered = async (
@@ -148,6 +190,64 @@ export const OrdersPage = () => {
         );
       })
     : orders;
+
+  if (!authenticated) {
+    return (
+      <div className="container mx-auto max-w-4xl px-4 py-8">
+        <div className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm">
+          <div className="mb-8 space-y-2">
+            <h1 className="text-2xl font-black uppercase tracking-tight text-gray-800">
+              Tra cứu đơn hàng
+            </h1>
+            <p className="text-sm font-medium text-gray-500">
+              Khách vãng lai nhập mã đơn hàng đã được gửi qua Gmail và email đặt hàng để xem đơn của mình.
+            </p>
+          </div>
+
+          <form onSubmit={handleGuestLookup} className="grid gap-4 md:grid-cols-[1.1fr_1fr_auto]">
+            <div>
+              <label className="mb-1 block text-xs font-black uppercase tracking-widest text-gray-400">
+                Mã đơn hàng
+              </label>
+              <input
+                type="text"
+                value={guestOrderCode}
+                onChange={(event) => setGuestOrderCode(event.target.value.toUpperCase())}
+                placeholder="Ví dụ: ORD-XXXX-XXXX"
+                className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm font-bold uppercase text-gray-700 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-black uppercase tracking-widest text-gray-400">
+                Email đặt hàng
+              </label>
+              <input
+                type="email"
+                value={guestEmail}
+                onChange={(event) => setGuestEmail(event.target.value)}
+                placeholder="email@example.com"
+                className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm font-bold text-gray-700 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+
+            <div className="flex items-end">
+              <button
+                type="submit"
+                className="inline-flex h-[50px] items-center justify-center rounded-2xl bg-slate-900 px-6 text-sm font-black uppercase tracking-wider text-white transition-colors hover:bg-slate-800"
+              >
+                Tra cứu
+              </button>
+            </div>
+          </form>
+
+          <div className="mt-8 rounded-2xl border border-dashed border-blue-200 bg-blue-50 px-5 py-4 text-sm font-medium text-blue-700">
+            Nếu bạn vừa đặt hàng xong, hãy kiểm tra email xác nhận từ TechMart để lấy đúng mã đơn hàng.
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading && orders.length === 0) {
     return (

@@ -231,7 +231,7 @@ CREATE TABLE category_attributes (
 CREATE TABLE reviews (
     review_id INT AUTO_INCREMENT PRIMARY KEY,
     product_id INT NOT NULL,
-    user_id INT NOT NULL,
+    user_id INT NULL,
     order_id INT,
     order_detail_id INT,
     rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
@@ -306,7 +306,12 @@ CREATE TABLE cart (
 CREATE TABLE orders (
     order_id INT AUTO_INCREMENT PRIMARY KEY,
     order_code VARCHAR(50) NOT NULL UNIQUE,
-    user_id INT NOT NULL,
+    user_id INT NULL,
+
+    -- Thông tin người đặt đơn
+    customer_name VARCHAR(255),
+    customer_email VARCHAR(255),
+    customer_phone VARCHAR(20),
     
     -- Thông tin người nhận
     shipping_name VARCHAR(255) NOT NULL,
@@ -353,6 +358,7 @@ CREATE TABLE orders (
     FOREIGN KEY (coupon_id) REFERENCES coupons(coupon_id) ON DELETE SET NULL,
     INDEX idx_order_code (order_code),
     INDEX idx_user (user_id),
+    INDEX idx_customer_email (customer_email),
     INDEX idx_status (status),
     INDEX idx_payment_status (payment_status),
     INDEX idx_order_date (order_date)
@@ -420,7 +426,7 @@ CREATE TABLE order_returns (
     order_return_id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT NOT NULL,
     request_code VARCHAR(50) NOT NULL UNIQUE,
-    requested_by INT NOT NULL,
+    requested_by INT NULL,
     status ENUM('requested', 'approved', 'rejected', 'received', 'refunded', 'closed') DEFAULT 'requested',
     reason TEXT NOT NULL,
     customer_note TEXT,
@@ -434,7 +440,7 @@ CREATE TABLE order_returns (
     closed_at TIMESTAMP NULL,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE,
-    FOREIGN KEY (requested_by) REFERENCES users(user_id) ON DELETE RESTRICT,
+    FOREIGN KEY (requested_by) REFERENCES users(user_id) ON DELETE SET NULL,
     INDEX idx_order (order_id),
     INDEX idx_status (status),
     INDEX idx_requested_at (requested_at)

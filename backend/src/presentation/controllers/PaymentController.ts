@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { AuthRequest } from "../middlewares/auth.middleware";
+import { GuestOrderRequest } from "../middlewares/guest-order.middleware";
 import { OrderUseCase } from "../../application/use-cases/OrderUseCase";
 import {
   createPaymentUrl,
@@ -16,6 +17,14 @@ export class PaymentController {
   ) {}
 
   // ─── 1. Tạo URL thanh toán ───────────────────────────────────────────────
+  private getIpAddress(req: Request) {
+    return (
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() ||
+      req.socket.remoteAddress?.replace("::ffff:", "") ||
+      "127.0.0.1"
+    );
+  }
+
   createVNPayUrl = async (req: AuthRequest, res: Response) => {
     try {
       const { orderId } = req.body;
@@ -23,10 +32,7 @@ export class PaymentController {
         return res.status(400).json({ message: "Thiếu orderId" });
       }
 
-      const ipAddr =
-        (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() ||
-        req.socket.remoteAddress?.replace("::ffff:", "") ||
-        "127.0.0.1";
+      const ipAddr = this.getIpAddress(req);
 
       const order = await this.orderUseCase.getOrderById(Number(orderId));
       if (!order) {
@@ -52,6 +58,48 @@ export class PaymentController {
       return res.json({ paymentUrl });
     } catch (error: any) {
       console.error("[Payment] createVNPayUrl error:", error);
+      return res.status(500).json({ message: error.message });
+    }
+  };
+
+  createGuestVNPayUrl = async (req: GuestOrderRequest, res: Response) => {
+    try {
+      const { orderCode } = req.body;
+      if (!orderCode) {
+        return res.status(400).json({ message: "Thiếu mã đơn hàng" });
+      }
+
+      if (!req.guestOrder || req.guestOrder.orderCode !== String(orderCode).trim().toUpperCase()) {
+        return res.status(403).json({ message: "Không có quyền" });
+      }
+
+      const order = await this.orderUseCase.getGuestOrderByCode(
+        req.guestOrder.orderCode,
+        req.guestOrder.email,
+      );
+      if (!order) {
+        return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
+      }
+      if (order.paymentMethod !== "vnpay") {
+        return res.status(400).json({ message: "Khách vãng lai chỉ hỗ trợ VNPay" });
+      }
+      if (order.paymentStatus === "paid") {
+        return res.status(400).json({ message: "Đơn đã thanh toán" });
+      }
+      if (order.status === "cancelled") {
+        return res.status(400).json({ message: "Đơn đã bị hủy" });
+      }
+
+      const paymentUrl = createPaymentUrl({
+        orderId: order.orderId,
+        orderCode: order.orderCode,
+        amount: order.total,
+        ipAddr: this.getIpAddress(req),
+      });
+
+      return res.json({ paymentUrl });
+    } catch (error: any) {
+      console.error("[Payment] createGuestVNPayUrl error:", error);
       return res.status(500).json({ message: error.message });
     }
   };
@@ -280,10 +328,7 @@ export class PaymentController {
         );
       }
 
-      const ipAddr =
-        (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() ||
-        req.socket.remoteAddress?.replace("::ffff:", "") ||
-        "127.0.0.1";
+      const ipAddr = this.getIpAddress(req);
 
       const paymentUrl = createPaymentUrl({
         orderId: order.orderId,
@@ -295,6 +340,65 @@ export class PaymentController {
       return res.json({ paymentUrl });
     } catch (error: any) {
       console.error("[Payment] repay error:", error);
+      return res.status(500).json({ message: error.message });
+    }
+  };
+
+  repayGuest = async (req: GuestOrderRequest, res: Response) => {
+    try {
+      const { orderCode } = req.body;
+      if (!orderCode) {
+        return res.status(400).json({ message: "Thiếu mã đơn hàng" });
+      }
+
+      if (!req.guestOrder || req.guestOrder.orderCode !== String(orderCode).trim().toUpperCase()) {
+        return res.status(403).json({ message: "Không có quyền thực hiện thao tác này" });
+      }
+
+      const order = await this.orderUseCase.getGuestOrderByCode(
+        req.guestOrder.orderCode,
+        req.guestOrder.email,
+      );
+      if (!order) {
+        return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
+      }
+      if (order.paymentMethod !== "vnpay") {
+        return res.status(400).json({ message: "Chỉ hỗ trợ thanh toán lại cho đơn VNPay" });
+      }
+      if (order.paymentStatus === "paid") {
+        return res.status(400).json({ message: "Đơn hàng này đã được thanh toán" });
+      }
+      if (order.status === "cancelled") {
+        return res.status(400).json({ message: "Đơn hàng đã bị hủy, không thể thanh toán lại" });
+      }
+      if (!["pending", "failed"].includes(order.paymentStatus)) {
+        return res
+          .status(400)
+          .json({
+            message: `Không thể thanh toán lại với trạng thái: ${order.paymentStatus}`,
+          });
+      }
+
+      if (order.paymentStatus === "failed") {
+        await this.orderUseCase.updateOrderPaymentStatus(
+          order.orderId,
+          "pending",
+          null,
+          "customer",
+          "Khách vãng lai yêu cầu thanh toán lại",
+        );
+      }
+
+      const paymentUrl = createPaymentUrl({
+        orderId: order.orderId,
+        orderCode: order.orderCode,
+        amount: order.total,
+        ipAddr: this.getIpAddress(req),
+      });
+
+      return res.json({ paymentUrl });
+    } catch (error: any) {
+      console.error("[Payment] repayGuest error:", error);
       return res.status(500).json({ message: error.message });
     }
   };

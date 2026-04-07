@@ -5,6 +5,7 @@ import { locationService, type VietnamProvince, type VietnamWard } from "@/servi
 import { resolveProvinceByCityName, resolveWardByName } from "@/features/locations/lib/vietnamLocation";
 
 export interface DeliveryForm {
+  customerEmail: string;
   shippingName: string;
   shippingPhone: string;
   shippingAddress: string;
@@ -14,7 +15,7 @@ export interface DeliveryForm {
   customerNote: string;
 }
 
-export const useCheckoutAddress = (user: any) => {
+export const useCheckoutAddress = (user: any, isAuthenticated: boolean) => {
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
   const [provinces, setProvinces] = useState<VietnamProvince[]>([]);
   const [wards, setWards] = useState<VietnamWard[]>([]);
@@ -29,6 +30,7 @@ export const useCheckoutAddress = (user: any) => {
   const [hasAutoApplied, setHasAutoApplied] = useState(false);
 
   const [deliveryForm, setDeliveryForm] = useState<DeliveryForm>({
+    customerEmail: user?.email || "",
     shippingName: user?.fullName || "",
     shippingPhone: user?.phone || "",
     shippingAddress: "",
@@ -58,12 +60,26 @@ export const useCheckoutAddress = (user: any) => {
 
   // 2. ĐỘC LẬP: Tải danh sách địa chỉ đã lưu (Sửa lỗi ở đây, gọi ngay lập tức)
   useEffect(() => {
+    if (!isAuthenticated) {
+      setSavedAddresses([]);
+      return;
+    }
+
     addressService.getMyAddresses()
       .then(addrs => {
         setSavedAddresses(addrs); // Có data phát là nhét vào Modal ngay
       })
       .catch(() => {});
-  }, []); 
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    setDeliveryForm((prev) => ({
+      ...prev,
+      customerEmail: user?.email || prev.customerEmail,
+      shippingName: user?.fullName || prev.shippingName,
+      shippingPhone: user?.phone || prev.shippingPhone,
+    }));
+  }, [user?.email, user?.fullName, user?.phone]);
 
   // 3. Tự động áp dụng địa chỉ mặc định khi CẢ 2 dữ liệu trên đã tải xong
   useEffect(() => {

@@ -15,6 +15,8 @@ import {
   applyPendingCheckoutCleanup,
   consumePendingCheckoutCleanup,
 } from "@/features/orders/lib/checkoutSuccessCleanup";
+import { getGuestOrderAccess } from "@/features/orders/lib/guestOrderAccess";
+import { orderService } from "@/services/order.service";
 
 type ResultStatus = "loading" | "success" | "cancel" | "failed" | "error";
 
@@ -213,11 +215,12 @@ export const PaymentResultPage = () => {
   const statusParam = (searchParams.get("status") as ResultStatus) || "error";
   const orderId = searchParams.get("orderId");
   const orderCode = searchParams.get("orderCode");
+  const guestOrderAccess = orderCode ? getGuestOrderAccess(orderCode) : null;
 
   const canRepay =
     (statusParam === "cancel" || statusParam === "failed") && !!orderId;
   const shouldAutoRedirectToOrder =
-    statusParam === "success" && !!orderId;
+    statusParam === "success" && !!(orderId || orderCode);
 
   const getStorageKey = (id: string) => `repay_expires_${id}`;
 
@@ -280,12 +283,22 @@ export const PaymentResultPage = () => {
       redirectTimerRef.current = null;
     }
 
-    if (!shouldAutoRedirectToOrder || !orderId) {
+    if (!shouldAutoRedirectToOrder || (!orderId && !orderCode)) {
       return;
     }
 
     redirectTimerRef.current = setTimeout(() => {
-      navigate(`/orders/${orderId}`, { replace: true });
+      if (guestOrderAccess && orderCode) {
+        navigate(`/orders/lookup/${orderCode}`, {
+          replace: true,
+          state: { email: guestOrderAccess.email },
+        });
+        return;
+      }
+
+      if (orderId) {
+        navigate(`/orders/${orderId}`, { replace: true });
+      }
     }, SUCCESS_REDIRECT_DELAY_MS);
 
     return () => {
@@ -294,7 +307,7 @@ export const PaymentResultPage = () => {
         redirectTimerRef.current = null;
       }
     };
-  }, [navigate, orderId, shouldAutoRedirectToOrder]);
+  }, [guestOrderAccess, navigate, orderCode, orderId, shouldAutoRedirectToOrder]);
 
   // Effect xử lý success + animation
   useEffect(() => {
@@ -309,10 +322,19 @@ export const PaymentResultPage = () => {
   }, [orderId, statusParam]);
 
   const handleRepay = async () => {
-    if (!orderId || secondsLeft <= 0) return;
+    if ((!orderId && !orderCode) || secondsLeft <= 0) return;
 
     try {
       setRepaying(true);
+      if (guestOrderAccess && orderCode) {
+        const paymentUrl = await orderService.repayGuestVNPay(
+          orderCode,
+          guestOrderAccess.accessToken,
+        );
+        window.location.href = paymentUrl;
+        return;
+      }
+
       const { data } = await api.post("/payment/vnpay/repay", {
         orderId: Number(orderId),
       });
@@ -367,7 +389,7 @@ export const PaymentResultPage = () => {
             </div>
           )}
 
-          {shouldAutoRedirectToOrder && (
+            {shouldAutoRedirectToOrder && (
             <p className="mb-4 text-sm font-semibold text-emerald-600">
               Đang chuyển tới chi tiết đơn hàng...
             </p>
@@ -392,9 +414,18 @@ export const PaymentResultPage = () => {
             {(statusParam === "success" ||
               statusParam === "cancel" ||
               statusParam === "failed") &&
-              orderId && (
+              (orderId || orderCode) && (
                 <Link
-                  to={`/orders/${orderId}`}
+                  to={
+                    guestOrderAccess && orderCode
+                      ? `/orders/lookup/${orderCode}`
+                      : `/orders/${orderId}`
+                  }
+                  state={
+                    guestOrderAccess && orderCode
+                      ? { email: guestOrderAccess.email }
+                      : undefined
+                  }
                   className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-800"
                 >
                   <ShoppingBag size={14} />

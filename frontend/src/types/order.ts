@@ -22,7 +22,7 @@ export type ReturnStatus =
 export type ReturnRestockAction = 'restock' | 'inspect' | 'discard';
 
 export interface OrderCustomerInfo {
-  userId: number;
+  userId?: number;
   name: string;
   email?: string;
   phone?: string;
@@ -80,10 +80,18 @@ export interface OrderLineItemView {
 export interface OrderTimelineEventView {
   orderEventId: number;
   eventType: string;
+  eventLabel?: string;
   fromStatus?: string;
+  fromLabel?: string;
   toStatus?: string;
+  toLabel?: string;
   actorRole?: string;
+  actorName?: string;
+  actorEmail?: string;
+  actorDisplayName?: string;
+  actorDisplayRole?: string;
   note?: string;
+  displayNote?: string;
   metadata?: Record<string, unknown>;
   createdAt: string;
 }
@@ -107,7 +115,7 @@ export interface OrderReturnView {
   orderReturnId: number;
   orderId: number;
   requestCode: string;
-  requestedBy: number;
+  requestedBy: number | null;
   status: ReturnStatus;
   reason: string;
   customerNote?: string;
@@ -154,6 +162,7 @@ export interface CreateOrderPayload {
     quantity: number;
     price: number;
   }>;
+  customerEmail: string;
   shippingName: string;
   shippingPhone: string;
   shippingAddress: string;

@@ -106,6 +106,38 @@ export class OrderRepository implements IOrderRepository {
     return rows.length > 0 ? this.mapRowToOrder(rows[0]) : null;
   }
 
+  async findGuestDetailByCode(orderCode: string, email: string): Promise<OrderAggregate | null> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT *
+       FROM orders
+       WHERE order_code = ?
+         AND user_id IS NULL
+         AND LOWER(TRIM(customer_email)) = LOWER(TRIM(?))
+       LIMIT 1`,
+      [orderCode, email]
+    );
+
+    if (rows.length === 0) {
+      return null;
+    }
+
+    return this.findAggregate({ orderId: Number(rows[0].order_id) });
+  }
+
+  async findGuestByCode(orderCode: string, email: string): Promise<Order | null> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT *
+       FROM orders
+       WHERE order_code = ?
+         AND user_id IS NULL
+         AND LOWER(TRIM(customer_email)) = LOWER(TRIM(?))
+       LIMIT 1`,
+      [orderCode, email]
+    );
+
+    return rows.length > 0 ? this.mapRowToOrder(rows[0]) : null;
+  }
+
   // --- ADMIN & LISTS ---
   async findAdminList(filters?: AdminOrderListFilters): Promise<PaginatedResult<OrderListItem>> {
     const page = Math.max(Number(filters?.page || 1), 1);
@@ -119,7 +151,10 @@ export class OrderRepository implements IOrderRepository {
     );
 
     const [rows] = await pool.execute<RowDataPacket[]>(
-      `SELECT o.*, u.name AS customer_name, u.email AS customer_email, u.phone AS customer_phone,
+      `SELECT o.*,
+          COALESCE(o.customer_name, u.name, o.shipping_name) AS customer_name,
+          COALESCE(o.customer_email, u.email) AS customer_email,
+          COALESCE(o.customer_phone, u.phone, o.shipping_phone) AS customer_phone,
           (SELECT COUNT(*) FROM order_details od WHERE od.order_id = o.order_id) AS item_count,
           (SELECT COUNT(*) FROM order_returns orr WHERE orr.order_id = o.order_id AND orr.status NOT IN ('closed', 'rejected')) AS open_return_count
        FROM orders o LEFT JOIN users u ON u.user_id = o.user_id
@@ -223,11 +258,34 @@ export class OrderRepository implements IOrderRepository {
       const depositAmount = (orderData as any).depositAmount || 0;
 
       const [orderResult] = await connection.execute<ResultSetHeader>(
-        `INSERT INTO orders (order_code, user_id, shipping_name, shipping_phone, shipping_address, shipping_city,
-         subtotal, shipping_fee, discount_amount, coupon_id, coupon_code, total, payment_method, payment_status, deposit_amount, status, order_date, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 'pending', ?, ?)`,
-        [orderCode, orderData.userId, orderData.shippingName, orderData.shippingPhone, orderData.shippingAddress,
-         orderData.shippingCity, subtotal, shippingFee, discountAmount, couponId, couponCode, total, orderData.paymentMethod, depositAmount, now, now]
+        `INSERT INTO orders (
+          order_code, user_id, customer_name, customer_email, customer_phone,
+          shipping_name, shipping_phone, shipping_address, shipping_city,
+          subtotal, shipping_fee, discount_amount, coupon_id, coupon_code, total,
+          payment_method, payment_status, deposit_amount, status, order_date, updated_at
+        )
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 'pending', ?, ?)`,
+        [
+          orderCode,
+          orderData.userId ?? null,
+          orderData.customerName ?? orderData.shippingName,
+          orderData.customerEmail,
+          orderData.customerPhone ?? orderData.shippingPhone,
+          orderData.shippingName,
+          orderData.shippingPhone,
+          orderData.shippingAddress,
+          orderData.shippingCity,
+          subtotal,
+          shippingFee,
+          discountAmount,
+          couponId,
+          couponCode,
+          total,
+          orderData.paymentMethod,
+          depositAmount,
+          now,
+          now,
+        ]
       );
 
       const orderId = orderResult.insertId;
@@ -260,11 +318,16 @@ export class OrderRepository implements IOrderRepository {
       }
 
       await this.appendEventWithConnection(connection, {
-        orderId, eventType: 'order_created', actorUserId: orderData.userId, actorRole: 'customer', toStatus: 'pending', note: orderData.customerNote
+        orderId,
+        eventType: 'order_created',
+        actorUserId: orderData.userId ?? null,
+        actorRole: 'customer',
+        toStatus: 'pending',
+        note: orderData.customerNote
       });
 
       // Nếu thanh toán bằng ví → trừ wallet_balance và đánh dấu paid ngay
-      if (orderData.paymentMethod === 'wallet') {
+      if (orderData.paymentMethod === 'wallet' && orderData.userId) {
         const [[walletRow]] = await connection.execute<RowDataPacket[]>(
           'SELECT wallet_balance FROM users WHERE user_id = ? FOR UPDATE',
           [orderData.userId]
@@ -297,7 +360,7 @@ export class OrderRepository implements IOrderRepository {
       }
 
       // Đặt cọc: trừ deposit_amount từ ví, phần còn lại COD khi nhận hàng
-      if (orderData.paymentMethod === 'deposit' && depositAmount > 0) {
+      if (orderData.paymentMethod === 'deposit' && depositAmount > 0 && orderData.userId) {
         const [[dWalletRow]] = await connection.execute<RowDataPacket[]>(
           'SELECT wallet_balance FROM users WHERE user_id = ? FOR UPDATE',
           [orderData.userId]
@@ -398,7 +461,7 @@ export class OrderRepository implements IOrderRepository {
       let refundNotificationMessage: string | undefined;
       if (order.paymentStatus === 'paid') {
         const totalRefund = Number(order.total);
-        if (totalRefund > 0) {
+        if (totalRefund > 0 && order.userId) {
           await connection.execute(
             'UPDATE users SET wallet_balance = wallet_balance + ? WHERE user_id = ?',
             [totalRefund, order.userId]
@@ -423,7 +486,7 @@ export class OrderRepository implements IOrderRepository {
       } else {
         // Hoàn tiền cọc nếu là đơn đặt cọc (deposit) chưa paid
         const depositAmt = Number((order as any).depositAmount ?? 0);
-        if (order.paymentMethod === 'deposit' && depositAmt > 0) {
+        if (order.paymentMethod === 'deposit' && depositAmt > 0 && order.userId) {
           await connection.execute(
             'UPDATE users SET wallet_balance = wallet_balance + ? WHERE user_id = ?',
             [depositAmt, order.userId]
@@ -447,7 +510,7 @@ export class OrderRepository implements IOrderRepository {
         );
       }
 
-      if (input.actorRole !== 'customer') {
+      if (input.actorRole !== 'customer' && order.userId) {
         await this.createNotificationWithConnection(connection, {
           userId: order.userId,
           title: `Đơn hàng #${order.orderCode} đã bị hủy`,
@@ -615,10 +678,12 @@ export class OrderRepository implements IOrderRepository {
 
   async listAllReturns(filters?: { status?: string }): Promise<OrderReturn[]> {
     let sql = `SELECT orr.*, o.order_code, o.total AS order_total, o.payment_method, o.payment_status,
-                      u.name AS customer_name, u.email AS customer_email, u.phone AS customer_phone
+                      COALESCE(u.name, o.customer_name, o.shipping_name) AS customer_name,
+                      COALESCE(u.email, o.customer_email) AS customer_email,
+                      COALESCE(u.phone, o.customer_phone, o.shipping_phone) AS customer_phone
                FROM order_returns orr
                JOIN orders o ON o.order_id = orr.order_id
-               JOIN users u ON u.user_id = orr.requested_by
+               LEFT JOIN users u ON u.user_id = orr.requested_by
                WHERE 1=1`;
     const params: any[] = [];
     if (filters?.status && filters.status !== 'all') {
@@ -1162,7 +1227,7 @@ export class OrderRepository implements IOrderRepository {
     }
     if (!order) return null;
     const [customer, items, timeline, returns] = await Promise.all([
-      this.getOrderCustomerSnapshot(order.userId),
+      this.getOrderCustomerSnapshot(order),
       this.getOrderDetails(order.orderId),
       this.getOrderTimeline(order.orderId),
       this.listReturns(order.orderId),
@@ -1171,14 +1236,23 @@ export class OrderRepository implements IOrderRepository {
   }
 
   private async getOrderCustomerSnapshot(
-    userId: number,
+    order: Order,
   ): Promise<OrderCustomerSnapshot | undefined> {
+    if (order.customerName || order.customerEmail || order.customerPhone || order.userId == null) {
+      return {
+        userId: order.userId ?? undefined,
+        name: order.customerName || order.shippingName,
+        email: order.customerEmail,
+        phone: order.customerPhone || order.shippingPhone,
+      };
+    }
+
     const [rows] = await pool.execute<RowDataPacket[]>(
       `SELECT user_id, name, email, phone
        FROM users
        WHERE user_id = ?
        LIMIT 1`,
-      [userId],
+      [order.userId],
     );
 
     const row = rows[0];
@@ -1189,7 +1263,7 @@ export class OrderRepository implements IOrderRepository {
     return {
       userId: row.user_id,
       name: row.name,
-      email: row.email,
+      email: row.email ?? undefined,
       phone: row.phone ?? undefined,
     };
   }
@@ -1213,9 +1287,20 @@ export class OrderRepository implements IOrderRepository {
   private buildListWhereClause(filters?: AdminOrderListFilters) {
     let whereClause = ''; const params: any[] = [];
     if (filters?.search) {
-      whereClause += ` AND (o.order_code LIKE ? OR o.shipping_name LIKE ? OR u.phone LIKE ?
-        OR EXISTS (SELECT 1 FROM order_details od JOIN products p ON p.product_id = od.product_id WHERE od.order_id = o.order_id AND p.name LIKE ?))`;
-      params.push(`%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`);
+      whereClause += ` AND (
+        o.order_code LIKE ?
+        OR o.shipping_name LIKE ?
+        OR COALESCE(u.phone, o.customer_phone, o.shipping_phone) LIKE ?
+        OR COALESCE(u.email, o.customer_email) LIKE ?
+        OR EXISTS (SELECT 1 FROM order_details od JOIN products p ON p.product_id = od.product_id WHERE od.order_id = o.order_id AND p.name LIKE ?)
+      )`;
+      params.push(
+        `%${filters.search}%`,
+        `%${filters.search}%`,
+        `%${filters.search}%`,
+        `%${filters.search}%`,
+        `%${filters.search}%`
+      );
     }
     if (filters?.status && filters.status !== 'all') { whereClause += ' AND o.status = ?'; params.push(filters.status); }
     if (filters?.paymentStatus && filters.paymentStatus !== 'all') { whereClause += ' AND o.payment_status = ?'; params.push(filters.paymentStatus); }
@@ -1227,7 +1312,10 @@ export class OrderRepository implements IOrderRepository {
     return {
       orderId: row.order_id,
       orderCode: row.order_code,
-      userId: row.user_id,
+      userId: row.user_id ?? null,
+      customerName: row.customer_name ?? undefined,
+      customerEmail: row.customer_email ?? undefined,
+      customerPhone: row.customer_phone ?? undefined,
       shippingName: row.shipping_name,
       shippingPhone: row.shipping_phone,
       shippingAddress: row.shipping_address,
@@ -1260,7 +1348,9 @@ export class OrderRepository implements IOrderRepository {
   private mapRowToOrderListItem(row: any): OrderListItem {
     return {
       ...this.mapRowToOrder(row),
-      customerName: row.customer_name,
+      customerName: row.customer_name ?? row.shipping_name ?? undefined,
+      customerEmail: row.customer_email ?? undefined,
+      customerPhone: row.customer_phone ?? row.shipping_phone ?? undefined,
       itemCount: Number(row.item_count),
       openReturnCount: Number(row.open_return_count),
       allReviewed: !!row.all_reviewed,
@@ -1319,7 +1409,7 @@ export class OrderRepository implements IOrderRepository {
       orderReturnId: row.order_return_id,
       orderId:       row.order_id,
       requestCode:   row.request_code,
-      requestedBy:   row.requested_by,
+      requestedBy:   row.requested_by ?? null,
       status:        row.status,
       reason:        row.reason,
       customerNote:  row.customer_note ?? undefined,

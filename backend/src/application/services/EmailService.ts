@@ -27,6 +27,7 @@ interface PaymentSuccessData {
   customerEmail: string;
   orderCode: string;
   orderId: number;
+  orderUrl?: string;
   total: number;
   paymentMethod: string;
   items: Array<{
@@ -70,7 +71,7 @@ export async function sendPaymentSuccessEmail(
   const fromName = process.env.SMTP_FROM_NAME || "TechMart";
   const fromEmail = process.env.SMTP_USER;
   const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-  const orderUrl = `${frontendUrl}/orders/${data.orderId}`;
+  const orderUrl = data.orderUrl || `${frontendUrl}/orders/${data.orderId}`;
 
   const voucherRowHtml = data.voucherCode && data.discountAmount
     ? `<tr>
@@ -171,6 +172,7 @@ interface OrderCreatedData {
   customerEmail: string;
   orderCode: string;
   orderId: number;
+  orderUrl?: string;
   total: number;
   paymentMethod: string;
   items: Array<{
@@ -192,6 +194,7 @@ interface OrderCancelledData {
   customerEmail: string;
   orderCode: string;
   orderId: number;
+  orderUrl?: string;
   cancelReason: string;
   refundMessage?: string;
 }
@@ -208,7 +211,7 @@ export async function sendOrderCreatedEmail(
   const fromEmail = process.env.SMTP_USER;
 
   const frontendUrl2 = process.env.FRONTEND_URL || "http://localhost:5173";
-  const orderUrl2 = `${frontendUrl2}/orders/${data.orderId}`;
+  const orderUrl2 = data.orderUrl || `${frontendUrl2}/orders/${data.orderId}`;
 
   const paymentNote =
     data.paymentMethod === "cod"
@@ -320,6 +323,8 @@ export async function sendOrderCancelledEmail(
 
   const fromName = process.env.SMTP_FROM_NAME || "TechMart";
   const fromEmail = process.env.SMTP_USER;
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+  const orderUrl = data.orderUrl || `${frontendUrl}/orders/${data.orderId}`;
   const refundHtml = data.refundMessage
     ? `<p style="margin:12px 0 0;color:#2563eb;font-weight:600;">${data.refundMessage}</p>`
     : "";
@@ -345,6 +350,12 @@ export async function sendOrderCancelledEmail(
       </table>
 
       ${refundHtml}
+
+      <div style="text-align:center;margin:28px 0;">
+        <a href="${orderUrl}" style="display:inline-block;background:#ef4444;color:#fff;font-weight:bold;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;">
+          Xem chi tiết đơn hàng
+        </a>
+      </div>
 
       <hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb;">
       <p style="font-size:13px;color:#6b7280;">

@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import { OrderUseCase } from "../../application/use-cases/OrderUseCase";
 import { AuthRequest } from "../middlewares/auth.middleware";
+import { createGuestOrderAccessToken } from "../../application/services/GuestOrderAccessService";
+import { GuestOrderRequest } from "../middlewares/guest-order.middleware";
 import {
   toOrderDetail,
   toOrderListItem,
@@ -8,6 +10,25 @@ import {
 
 export class OrderController {
   constructor(private orderUseCase: OrderUseCase) {}
+
+  private ensureGuestOrderAccess(
+    req: GuestOrderRequest,
+    orderCode: string,
+  ) {
+    const normalizedOrderCode = orderCode.trim().toUpperCase();
+    if (!req.guestOrder) {
+      throw new Error('Thiếu quyền truy cập đơn hàng');
+    }
+
+    if (req.guestOrder.orderCode !== normalizedOrderCode) {
+      throw new Error('Mã truy cập không khớp với đơn hàng');
+    }
+
+    return {
+      orderCode: normalizedOrderCode,
+      email: req.guestOrder.email,
+    };
+  }
 
   // --- DÀNH CHO KHÁCH HÀNG (MY ORDERS) ---
 
@@ -110,6 +131,9 @@ export class OrderController {
       const order = await this.orderUseCase.createOrder({
         ...req.body,
         userId: req.user.userId, // Lấy userId từ Token đã authenticate
+        customerName: req.body.customerName || req.body.shippingName,
+        customerEmail: req.body.customerEmail || req.user.email,
+        customerPhone: req.body.customerPhone || req.body.shippingPhone,
       });
       res.status(201).json(order);
     } catch (error: any) {
@@ -118,6 +142,74 @@ export class OrderController {
         error.message,
         error.stack?.split("\n").slice(0, 3).join("\n"),
       );
+      res.status(400).json({ message: error.message });
+    }
+  };
+
+  createGuest = async (req: Request, res: Response) => {
+    try {
+      const order = await this.orderUseCase.createOrder({
+        ...req.body,
+        userId: null,
+        customerName: req.body.customerName || req.body.shippingName,
+        customerEmail: req.body.customerEmail,
+        customerPhone: req.body.customerPhone || req.body.shippingPhone,
+      });
+      res.status(201).json({
+        ...order,
+        accessToken: createGuestOrderAccessToken({
+          orderCode: order.orderCode,
+          email: req.body.customerEmail,
+        }),
+      });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  };
+
+  lookupGuest = async (req: Request, res: Response) => {
+    try {
+      const aggregate = await this.orderUseCase.lookupGuestOrder(
+        req.body.orderCode || '',
+        req.body.email || '',
+      );
+
+      if (!aggregate) {
+        return res
+          .status(404)
+          .json({ message: 'Không tìm thấy đơn hàng phù hợp' });
+      }
+
+      res.json({
+        order: toOrderDetail(aggregate, 'guest'),
+        accessToken: createGuestOrderAccessToken({
+          orderCode: aggregate.order.orderCode,
+          email: req.body.email,
+        }),
+      });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  };
+
+  confirmDeliveredGuest = async (req: GuestOrderRequest, res: Response) => {
+    try {
+      const { orderCode, email } = this.ensureGuestOrderAccess(
+        req,
+        req.params.orderCode || '',
+      );
+
+      const order = await this.orderUseCase.confirmDeliveredByGuest(
+        orderCode,
+        email,
+      );
+
+      if (!order) {
+        return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
+      }
+
+      res.json(order);
+    } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
   };
@@ -179,6 +271,44 @@ export class OrderController {
       const orderReturn = await this.orderUseCase.requestReturn(
         Number(req.params.id),
         req.user.userId,
+        {
+          reason: req.body.reason,
+          customerNote: req.body.customerNote,
+          items,
+          evidenceImages:
+            evidenceImages.length > 0 ? evidenceImages : undefined,
+        },
+      );
+
+      if (!orderReturn) {
+        return res
+          .status(404)
+          .json({ message: "Yêu cầu trả hàng không hợp lệ" });
+      }
+
+      res.status(201).json(orderReturn);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  };
+
+  createGuestReturn = async (req: GuestOrderRequest, res: Response) => {
+    try {
+      const { orderCode, email } = this.ensureGuestOrderAccess(
+        req,
+        req.params.orderCode || '',
+      );
+      const files = (req.files as Express.Multer.File[]) || [];
+      const evidenceImages = files.map((f) => `/images/returns/${f.filename}`);
+
+      let items = req.body.items;
+      if (typeof items === "string") {
+        items = JSON.parse(items);
+      }
+
+      const orderReturn = await this.orderUseCase.requestReturnByGuest(
+        orderCode,
+        email,
         {
           reason: req.body.reason,
           customerNote: req.body.customerNote,

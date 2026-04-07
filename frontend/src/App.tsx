@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { useAuthStore } from '@/store/authStore';
 
 // --- PAGES CÔNG KHAI ---
 import { HomePage } from '@/pages/HomePage';
@@ -27,6 +28,7 @@ import { CustomerRouteGuard } from '@/features/orders/components/CustomerRouteGu
 import { CustomerOrdersLayout } from '@/features/orders/components/CustomerOrdersLayout';
 import { OrdersPage } from '@/features/orders/pages/OrdersPage';
 import { OrderDetailPage } from '@/features/orders/pages/OrderDetailPage';
+import { GuestOrderDetailPage } from '@/features/orders/pages/GuestOrderDetailPage';
 import { PaymentResultPage } from '@/features/payment/pages/PaymentResultPage';
 // --- QUẢN TRỊ (ADMIN) ---
 import { AdminReviews } from '@/features/admin/pages/AdminReviews';
@@ -45,6 +47,12 @@ import { AdminOrderDetail } from './features/admin/pages/AdminOrderDetail';
 import { AdminReturns } from '@/features/admin/pages/AdminReturns';
 import { WalletPage } from '@/features/wallet/pages/WalletPage';
 import { AdminWalletTopups } from '@/features/admin/pages/AdminWalletTopups';
+
+const CartRoute = () => {
+  const authenticated = useAuthStore((state) => state.isAuthenticated)();
+  return authenticated ? <CartPage /> : <Navigate to="/orders" replace />;
+};
+
 function App() {
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -64,16 +72,18 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/cart" element={<CartPage />} />
+        <Route path="/cart" element={<CartRoute />} />
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/payment/result" element={<PaymentResultPage />} />
-        {/* Bảo vệ các route cần đăng nhập (Đơn hàng & Profile) */}
-        <Route element={<CustomerRouteGuard />}>
-          <Route path="/orders" element={<CustomerOrdersLayout />}>
-            <Route index element={<OrdersPage />} />
+        <Route path="/orders" element={<CustomerOrdersLayout />}>
+          <Route index element={<OrdersPage />} />
+          <Route path="lookup/:orderCode" element={<GuestOrderDetailPage />} />
+          <Route element={<CustomerRouteGuard />}>
             <Route path=":id" element={<OrderDetailPage />} />
           </Route>
-
+        </Route>
+        {/* Bảo vệ các route cần đăng nhập */}
+        <Route element={<CustomerRouteGuard />}>
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/wallet" element={<WalletPage />} />
         </Route>
