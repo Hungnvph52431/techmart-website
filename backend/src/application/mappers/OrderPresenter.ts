@@ -103,15 +103,15 @@ const toActorDisplayName = (event: OrderEvent) => {
 };
 
 const toCustomer = (order: OrderListItem | OrderAggregate['order'], aggregate?: OrderAggregate) => ({
-  userId: aggregate?.customer?.userId ?? order.userId,
+  userId: aggregate?.customer?.userId ?? order.userId ?? undefined,
   name:
     aggregate?.customer?.name ||
-    ('customerName' in order ? order.customerName : undefined) ||
+    order.customerName ||
     order.shippingName,
-  email: aggregate?.customer?.email || ('customerEmail' in order ? order.customerEmail : undefined),
+  email: aggregate?.customer?.email || order.customerEmail,
   phone:
     aggregate?.customer?.phone ||
-    ('customerPhone' in order ? order.customerPhone : undefined) ||
+    order.customerPhone ||
     order.shippingPhone,
 });
 
@@ -139,7 +139,7 @@ const toLineItem = (item: OrderDetail) => ({
   createdAt: item.createdAt,
 });
 
-const toTimelineEvent = (event: OrderEvent, actor: 'admin' | 'customer') => ({
+const toTimelineEvent = (event: OrderEvent, actor: 'admin' | 'customer' | 'guest') => ({
   orderEventId: event.orderEventId,
   eventType: event.eventType,
   eventLabel: EVENT_LABELS[event.eventType] || event.eventType,
@@ -158,7 +158,7 @@ const toTimelineEvent = (event: OrderEvent, actor: 'admin' | 'customer') => ({
   createdAt: event.createdAt,
 });
 
-const toReturn = (item: OrderReturn, actor: 'admin' | 'customer') => ({
+const toReturn = (item: OrderReturn, actor: 'admin' | 'customer' | 'guest') => ({
   orderReturnId: item.orderReturnId,
   orderId: item.orderId,
   requestCode: item.requestCode,
@@ -213,11 +213,22 @@ const getReturnWindowMeta = (order: Order | OrderListItem) => {
 
 const toLifecycleFlags = (
   order: Order | OrderListItem,
-  actorRole: 'admin' | 'customer'
+  actorRole: 'admin' | 'customer' | 'guest'
 ) => {
   const returnWindow = getReturnWindowMeta(order);
   const withinReturnWindow =
     !returnWindow.returnWindowExpired || !returnWindow.returnDeadlineAt;
+
+  if (actorRole === 'guest') {
+    return {
+      canCancel: false,
+      canRequestReturn: canRequestReturn(order.status) && withinReturnWindow,
+      returnDeadlineAt: returnWindow.returnDeadlineAt,
+      returnWindowDays: returnWindow.returnWindowDays,
+      returnWindowExpired: returnWindow.returnWindowExpired,
+      allowedNextStatuses: [],
+    };
+  }
 
   return {
     canCancel: canCancelOrder(order.status, actorRole),
@@ -235,7 +246,7 @@ const toLifecycleFlags = (
 
 export const toOrderListItem = (
   order: OrderListItem,
-  actorRole: 'admin' | 'customer'
+  actorRole: 'admin' | 'customer' | 'guest'
 ) => ({
   orderId: order.orderId,
   orderCode: order.orderCode,
@@ -259,7 +270,7 @@ export const toOrderListItem = (
 
 export const toOrderDetail = (
   aggregate: OrderAggregate,
-  actorRole: 'admin' | 'customer'
+  actorRole: 'admin' | 'customer' | 'guest'
 ) => ({
   order: {
     ...toOrderListItem(
@@ -291,5 +302,5 @@ export const toOrderDetail = (
 
 export const toOrderTimeline = (
   timeline: OrderEvent[],
-  actorRole: 'admin' | 'customer'
+  actorRole: 'admin' | 'customer' | 'guest'
 ) => timeline.map((item) => toTimelineEvent(item, actorRole));

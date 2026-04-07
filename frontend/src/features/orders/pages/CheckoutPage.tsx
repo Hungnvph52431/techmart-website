@@ -15,6 +15,7 @@ import {
   buildPendingCheckoutCleanup,
   persistPendingCheckoutCleanup,
 } from "../lib/checkoutSuccessCleanup";
+import { persistGuestOrderAccess } from "../lib/guestOrderAccess";
 
 // Sửa đường dẫn import: Đi lùi 1 cấp (../) để ra khỏi thư mục pages/, rồi vào components/ và hooks/
 import { useCheckoutAddress } from "../hooks/useCheckoutAddress";
@@ -111,10 +112,13 @@ export const CheckoutPage = () => {
   const navigate = useNavigate();
   const { items, getSelectedItems } = useCartStore();
   const { directItems } = useCheckoutSessionStore();
-  const { user, updateUser } = useAuthStore();
+  const { user, updateUser, isAuthenticated } = useAuthStore();
   const pendingSuccessOrderIdRef = useRef<number | null>(null);
+  const authenticated = isAuthenticated();
 
-  const [paymentMethod, setPaymentMethod] = useState<"cod" | "vnpay" | "wallet">("cod");
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "vnpay" | "wallet">(
+    authenticated ? "cod" : "vnpay",
+  );
   const [loading, setLoading] = useState(false);
   
   // Voucher states
@@ -127,15 +131,28 @@ export const CheckoutPage = () => {
     provinces, wards, selectedProvinceCode, selectedWardCode,
     loadingProvinces, loadingWards, locationError,
     handleProvinceChange, handleWardChange, isLocationSelected
-  } = useCheckoutAddress(user);
+  } = useCheckoutAddress(user, authenticated);
 
   // State quản lý Modals
   const [showListModal, setShowListModal] = useState(false);
   const [showFormModal, setShowFormModal] = useState(false);
 
   useEffect(() => {
-    walletService.getBalance().then((balance) => updateUser({ walletBalance: balance })).catch(() => {});
-  }, []);
+    if (!authenticated) {
+      return;
+    }
+
+    walletService
+      .getBalance()
+      .then((balance) => updateUser({ walletBalance: balance }))
+      .catch(() => {});
+  }, [authenticated, updateUser]);
+
+  useEffect(() => {
+    if (!authenticated && paymentMethod !== "vnpay") {
+      setPaymentMethod("vnpay");
+    }
+  }, [authenticated, paymentMethod]);
 
   const selectedItems = getSelectedItems();
   const checkoutSource = directItems.length > 0
@@ -179,10 +196,19 @@ export const CheckoutPage = () => {
   };
 
   useEffect(() => {
-    if (checkoutItems.length === 0 && !pendingSuccessOrderIdRef.current) {
-      navigate('/cart', { replace: true });
+    if (pendingSuccessOrderIdRef.current) {
+      return;
     }
-  }, [checkoutItems.length, navigate]);
+
+    if (!authenticated && checkoutSource !== 'direct') {
+      navigate('/orders', { replace: true });
+      return;
+    }
+
+    if (checkoutItems.length === 0) {
+      navigate(authenticated ? '/cart' : '/orders', { replace: true });
+    }
+  }, [authenticated, checkoutItems.length, checkoutSource, navigate]);
 
   const subtotal = checkoutItems.reduce(
     (sum, item) => sum + getCheckoutItemUnitPrice(item) * item.quantity,
@@ -202,8 +228,11 @@ export const CheckoutPage = () => {
   };
 
   const handleSubmit = async () => {
-    if (!deliveryForm.shippingName || !deliveryForm.shippingPhone || !deliveryForm.shippingAddress || !deliveryForm.shippingCity) {
+    if (!deliveryForm.shippingName || !deliveryForm.shippingPhone || !deliveryForm.customerEmail || !deliveryForm.shippingAddress || !deliveryForm.shippingCity) {
       toast.error("Vui lòng điền đầy đủ thông tin giao hàng!"); return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(deliveryForm.customerEmail.trim())) {
+      toast.error("Email đặt hàng không hợp lệ!"); return;
     }
     if (!isLocationSelected) {
       toast.error("Vui lòng chọn khu vực giao hàng hợp lệ!"); return;
@@ -228,7 +257,9 @@ export const CheckoutPage = () => {
         couponCode: voucher?.code || undefined,
       };
 
-      const result = await orderService.create(orderData);
+      const result = authenticated
+        ? await orderService.create(orderData)
+        : await orderService.createGuest(orderData);
       const cleanup = buildPendingCheckoutCleanup(
         result.orderId,
         checkoutSource,
@@ -237,12 +268,34 @@ export const CheckoutPage = () => {
       pendingSuccessOrderIdRef.current = result.orderId;
 
       if (paymentMethod === 'vnpay') {
-        if (cleanup) {
-          persistPendingCheckoutCleanup(cleanup);
+        if (authenticated) {
+          if (cleanup) {
+            persistPendingCheckoutCleanup(cleanup);
+          }
+          const paymentUrl = (
+            await api.post('/payment/vnpay/create', { orderId: result.orderId })
+          ).data.paymentUrl;
+          window.location.href = paymentUrl;
+          return;
+        } else {
+          const guestResult = result as Awaited<
+            ReturnType<typeof orderService.createGuest>
+          >;
+          persistGuestOrderAccess({
+            orderCode: guestResult.orderCode,
+            email: deliveryForm.customerEmail.trim(),
+            accessToken: guestResult.accessToken,
+          });
+          if (cleanup) {
+            persistPendingCheckoutCleanup(cleanup);
+          }
+          const paymentUrl = await orderService.createGuestVNPayPaymentUrl(
+            guestResult.orderCode,
+            guestResult.accessToken,
+          );
+          window.location.href = paymentUrl;
+          return;
         }
-        const { data } = await api.post('/payment/vnpay/create', { orderId: result.orderId });
-        window.location.href = data.paymentUrl;
-        return;
       }
 
       if (cleanup) {
@@ -250,7 +303,14 @@ export const CheckoutPage = () => {
       }
 
       toast.success("Đặt hàng thành công!");
-      navigate(`/orders/${result.orderId}`, { replace: true });
+      if (authenticated) {
+        navigate(`/orders/${result.orderId}`, { replace: true });
+      } else {
+        navigate(`/orders/lookup/${result.orderCode}`, {
+          replace: true,
+          state: { email: deliveryForm.customerEmail.trim() },
+        });
+      }
     } catch (error) {
       toast.error("Đặt hàng thất bại, vui lòng thử lại!");
     } finally {
@@ -270,7 +330,7 @@ export const CheckoutPage = () => {
             <DeliveryAddressSummary 
                form={deliveryForm} 
                onNoteChange={updateNote}
-               onChangeClick={() => setShowListModal(true)} 
+               onChangeClick={() => authenticated ? setShowListModal(true) : setShowFormModal(true)}
             />
 
             {/* VOUCHER */}
@@ -299,34 +359,54 @@ export const CheckoutPage = () => {
             {/* PHƯƠNG THỨC THANH TOÁN */}
             <div className="bg-white rounded-3xl border-2 border-gray-100 p-8">
               <h2 className="text-lg font-black uppercase tracking-widest text-gray-700 mb-6">Phương thức thanh toán</h2>
+              {!authenticated && (
+                <p className="mb-4 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700">
+                  Khách vãng lai không dùng giỏ hàng và chỉ hỗ trợ thanh toán qua VNPay.
+                </p>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button onClick={() => setPaymentMethod("cod")} className={`flex items-center gap-4 p-5 rounded-2xl border-2 transition-all ${paymentMethod === "cod" ? "border-blue-600 bg-blue-50" : "border-gray-100 hover:border-gray-300"}`}>
-                  <span className="text-3xl">💵</span>
-                  <div className="text-left">
-                    <p className="font-black text-sm uppercase tracking-widest">COD</p>
-                    <p className="text-xs text-gray-400 font-bold">Thanh toán khi nhận hàng</p>
-                  </div>
-                  {paymentMethod === "cod" && <span className="ml-auto text-blue-600 font-black text-lg">✓</span>}
-                </button>
+                {authenticated && (
+                  <button onClick={() => setPaymentMethod("cod")} className={`flex items-center gap-4 p-5 rounded-2xl border-2 transition-all ${paymentMethod === "cod" ? "border-blue-600 bg-blue-50" : "border-gray-100 hover:border-gray-300"}`}>
+                    <span className="text-3xl">💵</span>
+                    <div className="text-left">
+                      <p className="font-black text-sm uppercase tracking-widest">COD</p>
+                      <p className="text-xs text-gray-400 font-bold">Thanh toán khi nhận hàng</p>
+                    </div>
+                    {paymentMethod === "cod" && <span className="ml-auto text-blue-600 font-black text-lg">✓</span>}
+                  </button>
+                )}
 
-                <button onClick={() => setPaymentMethod("wallet")} className={`flex items-center gap-4 p-5 rounded-2xl border-2 transition-all ${paymentMethod === "wallet" ? "border-orange-500 bg-orange-50" : "border-gray-100 hover:border-gray-300"}`}>
-                  <span className="text-3xl">👛</span>
-                  <div className="text-left flex-1">
-                    <p className="font-black text-sm uppercase tracking-widest text-orange-600">Ví TechMart</p>
-                    <p className="text-xs font-bold mt-0.5">Số dư: <span className={`${(user?.walletBalance ?? 0) >= total ? "text-green-600" : "text-red-500"}`}>{(user?.walletBalance ?? 0).toLocaleString("vi-VN")}₫</span></p>
-                    {(user?.walletBalance ?? 0) > 0 && (user?.walletBalance ?? 0) < total && <p className="text-[10px] text-red-400 font-bold mt-0.5">Không đủ số dư</p>}
-                  </div>
-                  {paymentMethod === "wallet" && <span className="ml-auto text-orange-500 font-black text-lg">✓</span>}
-                </button>
+                {authenticated ? (
+                  <>
+                    <button onClick={() => setPaymentMethod("wallet")} className={`flex items-center gap-4 p-5 rounded-2xl border-2 transition-all ${paymentMethod === "wallet" ? "border-orange-500 bg-orange-50" : "border-gray-100 hover:border-gray-300"}`}>
+                      <span className="text-3xl">👛</span>
+                      <div className="text-left flex-1">
+                        <p className="font-black text-sm uppercase tracking-widest text-orange-600">Ví TechMart</p>
+                        <p className="text-xs font-bold mt-0.5">Số dư: <span className={`${(user?.walletBalance ?? 0) >= total ? "text-green-600" : "text-red-500"}`}>{(user?.walletBalance ?? 0).toLocaleString("vi-VN")}₫</span></p>
+                        {(user?.walletBalance ?? 0) > 0 && (user?.walletBalance ?? 0) < total && <p className="text-[10px] text-red-400 font-bold mt-0.5">Không đủ số dư</p>}
+                      </div>
+                      {paymentMethod === "wallet" && <span className="ml-auto text-orange-500 font-black text-lg">✓</span>}
+                    </button>
 
-                <button onClick={() => setPaymentMethod("vnpay")} className={`flex items-center gap-4 p-5 rounded-2xl border-2 transition-all ${paymentMethod === "vnpay" ? "border-[#005BAA] bg-blue-50" : "border-gray-100 hover:border-gray-300"}`}>
-                  <div className="w-10 h-10 rounded-xl bg-[#005BAA] flex items-center justify-center flex-shrink-0"><span className="text-white font-black text-xs">VN</span></div>
-                  <div className="text-left">
-                    <p className="font-black text-sm uppercase tracking-widest text-[#005BAA]">VNPay</p>
-                    <p className="text-xs text-gray-400 font-bold">Thanh toán qua cổng VNPay</p>
-                  </div>
-                  {paymentMethod === "vnpay" && <span className="ml-auto text-[#005BAA] font-black text-lg">✓</span>}
-                </button>
+                    <button onClick={() => setPaymentMethod("vnpay")} className={`flex items-center gap-4 p-5 rounded-2xl border-2 transition-all ${paymentMethod === "vnpay" ? "border-[#005BAA] bg-blue-50" : "border-gray-100 hover:border-gray-300"}`}>
+                      <div className="w-10 h-10 rounded-xl bg-[#005BAA] flex items-center justify-center flex-shrink-0"><span className="text-white font-black text-xs">VN</span></div>
+                      <div className="text-left">
+                        <p className="font-black text-sm uppercase tracking-widest text-[#005BAA]">VNPay</p>
+                        <p className="text-xs text-gray-400 font-bold">Thanh toán qua cổng VNPay</p>
+                      </div>
+                      {paymentMethod === "vnpay" && <span className="ml-auto text-[#005BAA] font-black text-lg">✓</span>}
+                    </button>
+                  </>
+                ) : (
+                  <button onClick={() => setPaymentMethod("vnpay")} className="flex items-center gap-4 p-5 rounded-2xl border-2 border-[#005BAA] bg-blue-50 transition-all">
+                    <div className="w-10 h-10 rounded-xl bg-[#005BAA] flex items-center justify-center flex-shrink-0"><span className="text-white font-black text-xs">VN</span></div>
+                    <div className="text-left">
+                      <p className="font-black text-sm uppercase tracking-widest text-[#005BAA]">VNPay</p>
+                      <p className="text-xs text-gray-400 font-bold">Thanh toán qua cổng VNPay</p>
+                    </div>
+                    <span className="ml-auto text-[#005BAA] font-black text-lg">✓</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -395,8 +475,11 @@ export const CheckoutPage = () => {
         loadingProvinces={loadingProvinces} loadingWards={loadingWards} locationError={locationError}
         onProvinceChange={handleProvinceChange} onWardChange={handleWardChange}
         onSubmit={() => {
-           if(!isLocationSelected || !deliveryForm.shippingName || !deliveryForm.shippingPhone || !deliveryForm.shippingAddress) {
+           if(!isLocationSelected || !deliveryForm.shippingName || !deliveryForm.shippingPhone || !deliveryForm.customerEmail || !deliveryForm.shippingAddress) {
               toast.error("Vui lòng điền đủ thông tin"); return;
+           }
+           if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(deliveryForm.customerEmail.trim())) {
+              toast.error("Email đặt hàng không hợp lệ"); return;
            }
            setShowFormModal(false);
            toast.success("Đã áp dụng địa chỉ mới");

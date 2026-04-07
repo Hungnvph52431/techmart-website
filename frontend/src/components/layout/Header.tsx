@@ -268,63 +268,72 @@ export const Header = () => {
           {/* Actions */}
           <div className="flex items-center space-x-6">
 
-            {/* --- KHỐI GIỎ HÀNG (MINI CART DROP DOWN) --- */}
-            <div className="relative group">
-              <Link to="/cart" className="relative p-2 hover:bg-gray-50 rounded-full transition-colors flex items-center">
-                <ShoppingCart className="h-6 w-6 text-gray-700" />
-                {getTotalItems() > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black rounded-full h-5 w-5 flex items-center justify-center border-2 border-white shadow-sm">
-                    {getTotalItems()}
-                  </span>
-                )}
-              </Link>
+            {authenticated ? (
+              <div className="relative group">
+                <Link to="/cart" className="relative p-2 hover:bg-gray-50 rounded-full transition-colors flex items-center">
+                  <ShoppingCart className="h-6 w-6 text-gray-700" />
+                  {getTotalItems() > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black rounded-full h-5 w-5 flex items-center justify-center border-2 border-white shadow-sm">
+                      {getTotalItems()}
+                    </span>
+                  )}
+                </Link>
 
-              {/* Dropdown xem nhanh giỏ hàng */}
-              <div className="absolute right-0 top-full mt-1 w-80 bg-white rounded-[24px] shadow-2xl py-2 hidden group-hover:block border border-gray-100 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                {items.length === 0 ? (
-                  <div className="text-center py-8">
-                    <ShoppingCart className="mx-auto h-12 w-12 text-gray-100 mb-3" />
-                    <p className="text-gray-400 font-bold uppercase italic text-[10px] tracking-widest">Giỏ hàng trống</p>
-                  </div>
-                ) : (
-                  <>
-                    <h3 className="px-5 py-3 font-black text-gray-800 uppercase italic text-xs border-b border-gray-50">Sản phẩm mới thêm</h3>
-                    <div className="max-h-64 overflow-y-auto px-5 py-2">
-                      {items.slice(-3).reverse().map((item) => (
-                        <div key={item.product.productId} className="flex gap-4 py-4 border-b border-gray-50 last:border-0">
-                          <img 
-                            src={getImageUrl(item.product.mainImage)} 
-                            alt={item.product.name} 
-                            className="w-12 h-12 object-contain bg-gray-50 rounded-xl" 
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold text-gray-900 truncate uppercase">{item.product.name}</p>
-                            <p className="text-xs text-gray-400 font-bold mt-1 uppercase">Số lượng: {item.quantity}</p>
+                <div className="absolute right-0 top-full mt-1 w-80 bg-white rounded-[24px] shadow-2xl py-2 hidden group-hover:block border border-gray-100 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                  {items.length === 0 ? (
+                    <div className="text-center py-8">
+                      <ShoppingCart className="mx-auto h-12 w-12 text-gray-100 mb-3" />
+                      <p className="text-gray-400 font-bold uppercase italic text-[10px] tracking-widest">Giỏ hàng trống</p>
+                    </div>
+                  ) : (
+                    <>
+                      <h3 className="px-5 py-3 font-black text-gray-800 uppercase italic text-xs border-b border-gray-50">Sản phẩm mới thêm</h3>
+                      <div className="max-h-64 overflow-y-auto px-5 py-2">
+                        {items.slice(-3).reverse().map((item) => (
+                          <div key={item.product.productId} className="flex gap-4 py-4 border-b border-gray-50 last:border-0">
+                            <img
+                              src={getImageUrl(item.product.mainImage)}
+                              alt={item.product.name}
+                              className="w-12 h-12 object-contain bg-gray-50 rounded-xl"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-bold text-gray-900 truncate uppercase">{item.product.name}</p>
+                              <p className="text-xs text-gray-400 font-bold mt-1 uppercase">Số lượng: {item.quantity}</p>
+                            </div>
+                            <p className="text-xs font-black text-red-600">
+                              {(item.product.salePrice || item.product.price).toLocaleString('vi-VN')}₫
+                            </p>
                           </div>
-                          <p className="text-xs font-black text-red-600">
-                            {(item.product.salePrice || item.product.price).toLocaleString('vi-VN')}₫
-                          </p>
+                        ))}
+                      </div>
+                      <div className="px-5 py-4 bg-gray-50/50 rounded-b-[24px] border-t border-gray-100">
+                        <div className="flex justify-between mb-4">
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tạm tính:</span>
+                          <span className="font-black text-red-600 text-sm">{getTotalPrice().toLocaleString('vi-VN')}₫</span>
                         </div>
-                      ))}
-                    </div>
-                    <div className="px-5 py-4 bg-gray-50/50 rounded-b-[24px] border-t border-gray-100">
-                      <div className="flex justify-between mb-4">
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tạm tính:</span>
-                        <span className="font-black text-red-600 text-sm">{getTotalPrice().toLocaleString('vi-VN')}₫</span>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button onClick={() => navigate('/cart')} className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-blue-600 bg-white border-2 border-blue-600 hover:bg-blue-50 rounded-xl transition-all">
+                            Giỏ hàng
+                          </button>
+                          <button onClick={() => { clearDirectCheckout(); navigate('/checkout'); }} className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-100 rounded-xl transition-all">
+                            Thanh toán
+                          </button>
+                        </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <button onClick={() => navigate('/cart')} className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-blue-600 bg-white border-2 border-blue-600 hover:bg-blue-50 rounded-xl transition-all">
-                          Giỏ hàng
-                        </button>
-                        <button onClick={() => { clearDirectCheckout(); navigate('/checkout'); }} className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-100 rounded-xl transition-all">
-                          Thanh toán
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                )}
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
+            ) : (
+              <Link
+                to="/orders"
+                className="relative p-2 hover:bg-gray-50 rounded-full transition-colors flex items-center"
+                aria-label="Tra cứu đơn hàng"
+                title="Tra cứu đơn hàng"
+              >
+                <Package className="h-6 w-6 text-gray-700" />
+              </Link>
+            )}
 
             {/* --- KHỐI TÀI KHOẢN (USER MENU) --- */}
             {isAuthenticated() ? (

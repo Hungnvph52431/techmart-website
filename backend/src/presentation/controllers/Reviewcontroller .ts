@@ -2,6 +2,7 @@
 
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { GuestOrderRequest } from '../middlewares/guest-order.middleware';
 import pool from '../../infrastructure/database/connection';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { ReviewUseCase } from '../../application/use-cases/ReviewUseCase';
@@ -16,6 +17,21 @@ const EMPTY_STATS = {
 
 export class ReviewController {
   constructor(private reviewUseCase?: ReviewUseCase) {}
+
+  private ensureGuestOrderAccess(
+    req: GuestOrderRequest,
+    orderCode: string,
+  ) {
+    const normalizedOrderCode = orderCode.trim().toUpperCase();
+    if (!req.guestOrder || req.guestOrder.orderCode !== normalizedOrderCode) {
+      throw new Error('Mã truy cập đơn hàng không hợp lệ');
+    }
+
+    return {
+      orderCode: normalizedOrderCode,
+      email: req.guestOrder.email,
+    };
+  }
 
   private getPositiveInteger(
     rawValue: unknown,
@@ -109,9 +125,11 @@ export class ReviewController {
   ) {
     let query = `
       SELECT r.*, u.name AS user_name, NULL AS user_avatar, p.name AS product_name,
+             COALESCE(u.name, o.customer_name, o.shipping_name) AS customer_name,
              od.variant_name AS variant_name
       FROM reviews r
       LEFT JOIN users u ON u.user_id = r.user_id
+      LEFT JOIN orders o ON o.order_id = r.order_id
       LEFT JOIN products p ON p.product_id = r.product_id
       LEFT JOIN order_details od ON od.order_detail_id = r.order_detail_id
       WHERE r.product_id = ? AND r.status = 'approved'
@@ -159,9 +177,11 @@ export class ReviewController {
 
     const [rows] = await pool.execute<RowDataPacket[]>(
       `SELECT r.*, u.name AS user_name, NULL AS user_avatar, p.name AS product_name,
+              COALESCE(u.name, o.customer_name, o.shipping_name) AS customer_name,
               od.variant_name AS variant_name
        FROM reviews r
        LEFT JOIN users u ON u.user_id = r.user_id
+       LEFT JOIN orders o ON o.order_id = r.order_id
        LEFT JOIN products p ON p.product_id = r.product_id
        LEFT JOIN order_details od ON od.order_detail_id = r.order_detail_id
        WHERE r.product_id <> ?
@@ -369,6 +389,34 @@ export class ReviewController {
     }
   };
 
+  getGuestOrderSummary = async (req: GuestOrderRequest, res: Response) => {
+    try {
+      const { orderCode, email } = this.ensureGuestOrderAccess(
+        req,
+        req.params.orderCode || '',
+      );
+
+      if (!this.reviewUseCase) {
+        return res.status(500).json({ message: 'ReviewUseCase chưa được khởi tạo' });
+      }
+
+      const summary = await this.reviewUseCase.getGuestOrderReviewSummary(
+        orderCode,
+        email,
+      );
+
+      if (!summary) {
+        return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
+      }
+
+      return res.json(summary);
+    } catch (error: any) {
+      return res
+        .status(this.resolveCustomerErrorStatus(error.message || 'Unknown error'))
+        .json({ message: error.message });
+    }
+  };
+
   // ── CUSTOMER: Kiểm tra xem user đã mua sản phẩm này chưa ─────────────────
   // GET /api/reviews/can-review/:productId
   checkCanReview = async (req: AuthRequest, res: Response) => {
@@ -528,6 +576,85 @@ export class ReviewController {
     }
   };
 
+  createGuest = async (req: GuestOrderRequest, res: Response) => {
+    try {
+      const { orderCode, email } = this.ensureGuestOrderAccess(
+        req,
+        req.body.orderCode || '',
+      );
+      const { orderDetailId, rating, title, comment } = req.body;
+
+      if (!orderDetailId || !rating || rating < 1 || rating > 5) {
+        return res.status(400).json({ message: 'Thiếu thông tin hoặc rating không hợp lệ (1-5)' });
+      }
+
+      if (!this.reviewUseCase) {
+        return res.status(500).json({ message: 'ReviewUseCase chưa được khởi tạo' });
+      }
+
+      const review = await this.reviewUseCase.submitProductReviewAsGuest(
+        orderCode,
+        email,
+        Number(orderDetailId),
+        {
+          rating: Number(rating),
+          title,
+          comment,
+        }
+      );
+
+      if (!review) {
+        return res.status(404).json({ message: 'Không tìm thấy đơn hàng hoặc sản phẩm trong đơn' });
+      }
+
+      return res.status(201).json(this.mapReviewEntity(review));
+    } catch (error: any) {
+      return res
+        .status(this.resolveCustomerErrorStatus(error.message || 'Unknown error'))
+        .json({ message: error.message });
+    }
+  };
+
+  updateGuest = async (req: GuestOrderRequest, res: Response) => {
+    try {
+      const reviewId = Number(req.params.reviewId);
+      if (!Number.isInteger(reviewId) || reviewId <= 0) {
+        return res.status(400).json({ message: 'reviewId không hợp lệ' });
+      }
+
+      const { orderCode, email } = this.ensureGuestOrderAccess(
+        req,
+        req.body.orderCode || '',
+      );
+      const { rating, title, comment } = req.body;
+
+      if (!this.reviewUseCase) {
+        return res.status(500).json({ message: 'ReviewUseCase chưa được khởi tạo' });
+      }
+
+      const review = await this.reviewUseCase.updateProductReviewAfterReturnAsGuest(
+        reviewId,
+        orderCode,
+        email,
+        {
+          rating: Number(rating),
+          title,
+          comment,
+        }
+      );
+
+      if (!review) {
+        return res.status(404).json({ message: 'Không tìm thấy đánh giá cần sửa' });
+      }
+
+      return res.json(this.mapReviewEntity(review));
+    } catch (error: any) {
+      return res
+        .status(this.resolveCustomerErrorStatus(error.message || 'Unknown error'))
+        .json({ message: error.message });
+    }
+  };
+
   // ── CUSTOMER: Đánh dấu hữu ích ───────────────────────────────────────────
   markHelpful = async (req: Request, res: Response) => {
     try {
@@ -568,8 +695,10 @@ export class ReviewController {
 
       const [rows] = await pool.execute<RowDataPacket[]>(
         `SELECT r.*, u.name AS user_name, p.name AS product_name
+         , COALESCE(u.name, o.customer_name, o.shipping_name) AS customer_name
          FROM reviews r
          LEFT JOIN users u ON u.user_id = r.user_id
+         LEFT JOIN orders o ON o.order_id = r.order_id
          LEFT JOIN products p ON p.product_id = r.product_id
          ${where} ORDER BY r.created_at DESC LIMIT ${limit} OFFSET ${offset}`,
         params
@@ -577,6 +706,7 @@ export class ReviewController {
       const [countRows] = await pool.execute<RowDataPacket[]>(
         `SELECT COUNT(*) AS total FROM reviews r
          LEFT JOIN users u ON u.user_id = r.user_id
+         LEFT JOIN orders o ON o.order_id = r.order_id
          LEFT JOIN products p ON p.product_id = r.product_id ${where}`,
         params
       );
@@ -612,7 +742,7 @@ export class ReviewController {
       productName: row.product_name,
       variantName: row.variant_name || undefined,
       userId: row.user_id,
-      userName: row.user_name || 'Ẩn danh',
+      userName: row.user_name || row.customer_name || 'Ẩn danh',
       userAvatar: row.user_avatar,
       orderId: row.order_id,
       orderDetailId: row.order_detail_id,

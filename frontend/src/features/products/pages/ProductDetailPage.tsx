@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
 import { useCheckoutSessionStore } from "@/store/checkoutSessionStore";
+import { useAuthStore } from "@/store/authStore";
 import toast from "react-hot-toast";
 import { ProductReviews } from "../components/ProductReviews";
 import {
@@ -102,6 +103,7 @@ export const ProductDetailPage = () => {
 
   const { addItem, items } = useCartStore();
   const { startDirectCheckout } = useCheckoutSessionStore();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   const variants = (product as any)?.variants ?? [];
   const selectedVariant = variants.find(
@@ -654,25 +656,27 @@ export const ProductDetailPage = () => {
               )}
 
               {/* ── Action Buttons ── */}
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                <button
-                  onClick={handleAddToCart}
-                  disabled={isDisabled || quantity <= 0}
-                  className={`flex items-center justify-center gap-2 py-3.5 px-5 rounded-xl text-sm font-semibold border transition-all duration-150 ${
-                    isDisabled || quantity <= 0
-                      ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed"
-                      : "bg-white text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300 active:scale-[0.98]"
-                  }`}
-                >
-                  <ShoppingCart size={16} />
-                  {isInactive
-                    ? "Ngừng bán"
-                    : isOutOfStock
-                      ? "Hết hàng"
-                      : isMaxReached
-                        ? "Đã có trong giỏ"
-                        : "Thêm vào giỏ"}
-                </button>
+              <div className={`grid gap-3 pt-1 ${isAuthenticated() ? "grid-cols-2" : "grid-cols-1"}`}>
+                {isAuthenticated() && (
+                  <button
+                    onClick={handleAddToCart}
+                    disabled={isDisabled || quantity <= 0}
+                    className={`flex items-center justify-center gap-2 py-3.5 px-5 rounded-xl text-sm font-semibold border transition-all duration-150 ${
+                      isDisabled || quantity <= 0
+                        ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed"
+                        : "bg-white text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300 active:scale-[0.98]"
+                    }`}
+                  >
+                    <ShoppingCart size={16} />
+                    {isInactive
+                      ? "Ngừng bán"
+                      : isOutOfStock
+                        ? "Hết hàng"
+                        : isMaxReached
+                          ? "Đã có trong giỏ"
+                          : "Thêm vào giỏ"}
+                  </button>
+                )}
 
                 <button
                   onClick={handleBuyNow}

@@ -1,9 +1,10 @@
 import { useState, type MouseEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Heart, ShoppingCart, Star } from "lucide-react";
 import { Product } from "@/types";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
+import { useCheckoutSessionStore } from "@/store/checkoutSessionStore";
 import { useWishlistStore } from "@/store/wishlistStore";
 import { productService } from "@/services/product.service";
 import toast from "react-hot-toast";
@@ -22,8 +23,12 @@ interface ProductCardProps {
 }
 
 export const ProductCard = ({ product }: ProductCardProps) => {
+  const navigate = useNavigate();
   const { addItem, items } = useCartStore();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const startDirectCheckout = useCheckoutSessionStore(
+    (state) => state.startDirectCheckout,
+  );
   const toggleWishlist = useWishlistStore((state) => state.toggleWishlist);
   const isFavorite = useWishlistStore((state) =>
     state.productIds.includes(product.productId)
@@ -62,6 +67,20 @@ export const ProductCard = ({ product }: ProductCardProps) => {
 
   const handleAddToCart = async () => {
     if (isDisabled || loadingVariants) {
+      return;
+    }
+
+    if (!isAuthenticated()) {
+      if (hasVariants) {
+        toast('Vui lòng chọn phiên bản sản phẩm trước khi mua ngay', {
+          icon: '🛍️',
+        });
+        navigate(`/products/${product.slug}`);
+        return;
+      }
+
+      startDirectCheckout(product, 1);
+      navigate('/checkout');
       return;
     }
 
@@ -267,7 +286,15 @@ export const ProductCard = ({ product }: ProductCardProps) => {
               ) : (
                 <>
                   <ShoppingCart size={14} />
-                  {isOutOfStock ? 'Hết hàng' : isMaxReached ? 'Đã đủ số lượng' : 'Thêm vào giỏ'}
+                  {isOutOfStock
+                    ? 'Hết hàng'
+                    : isMaxReached
+                      ? 'Đã đủ số lượng'
+                      : !isAuthenticated()
+                        ? hasVariants
+                          ? 'Chọn phiên bản'
+                          : 'Mua ngay'
+                        : 'Thêm vào giỏ'}
                 </>
               )}
             </button>

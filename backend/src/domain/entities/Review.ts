@@ -16,7 +16,7 @@ export interface OrderFeedback {
 export interface ProductReview {
   reviewId: number;
   productId: number;
-  userId: number;
+  userId: number | null;
   orderId?: number;
   orderDetailId?: number;
   rating: number;
@@ -72,7 +72,7 @@ export interface CreateProductReviewDTO {
   orderId: number;
   orderDetailId: number;
   productId: number;
-  userId: number;
+  userId: number | null;
   rating: number;
   title?: string;
   comment?: string;
@@ -80,7 +80,8 @@ export interface CreateProductReviewDTO {
 
 export interface UpdateProductReviewDTO {
   reviewId: number;
-  userId: number;
+  userId: number | null;
+  orderId?: number;
   rating: number;
   title?: string;
   comment?: string;

@@ -52,6 +52,16 @@ export const AddressFormModal: React.FC<Props> = ({
               className="w-full border-2 border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold focus:border-blue-500 outline-none"
             />
           </div>
+          <div className="md:col-span-2">
+            <label className="text-xs font-black uppercase text-gray-400 mb-1 block">Email *</label>
+            <input
+              type="email"
+              value={form.customerEmail}
+              onChange={(e) => updateForm('customerEmail', e.target.value)}
+              placeholder="Email nhận thông tin đơn hàng"
+              className="w-full border-2 border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold focus:border-blue-500 outline-none"
+            />
+          </div>
           
           <div className="md:col-span-2 mt-2">
              <VietnamLocationPicker

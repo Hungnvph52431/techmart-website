@@ -8,7 +8,12 @@ interface Props {
 }
 
 export const DeliveryAddressSummary: React.FC<Props> = ({ form, onChangeClick, onNoteChange }) => {
-  const hasAddress = form.shippingName && form.shippingAddress && form.shippingCity;
+  const hasAddress =
+    form.shippingName &&
+    form.shippingPhone &&
+    form.customerEmail &&
+    form.shippingAddress &&
+    form.shippingCity;
 
   return (
     <div className="bg-white rounded-3xl border-2 border-gray-100 p-8 shadow-sm relative overflow-hidden">
@@ -28,9 +33,14 @@ export const DeliveryAddressSummary: React.FC<Props> = ({ form, onChangeClick, o
       </div>
 
       {hasAddress ? (
-        <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-6 text-gray-800">
-          <div className="font-black whitespace-nowrap text-base">
-            {form.shippingName} {form.shippingPhone && `(+84) ${form.shippingPhone.replace(/^0/, '')}`}
+        <div className="space-y-2 text-gray-800">
+          <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-6">
+            <div className="font-black whitespace-nowrap text-base">
+              {form.shippingName} {form.shippingPhone && `(+84) ${form.shippingPhone.replace(/^0/, '')}`}
+            </div>
+            <div className="text-sm font-medium text-gray-500">
+              {form.customerEmail}
+            </div>
           </div>
           <div className="text-sm font-medium text-gray-600">
             {`${form.shippingAddress}, ${form.shippingWard}, ${form.shippingDistrict ? form.shippingDistrict + ', ' : ''}${form.shippingCity}`}
@@ -38,7 +48,7 @@ export const DeliveryAddressSummary: React.FC<Props> = ({ form, onChangeClick, o
         </div>
       ) : (
         <div className="text-red-500 text-sm font-bold italic">
-          Vui lòng chọn hoặc thêm địa chỉ giao hàng!
+          Vui lòng điền đầy đủ họ tên, số điện thoại, email và địa chỉ giao hàng!
         </div>
       )}
 
