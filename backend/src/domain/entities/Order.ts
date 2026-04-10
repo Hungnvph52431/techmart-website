@@ -12,7 +12,7 @@ export type PaymentMethod = 'cod' | 'bank_transfer' | 'momo' | 'vnpay' | 'zalopa
 
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 
-export type OrderActorRole = 'customer' | 'admin' | 'staff' | 'warehouse' | 'system';
+export type OrderActorRole = 'customer' | 'admin' | 'staff' | 'warehouse' | 'shipper' | 'system';
 
 export type OrderEventType =
   | 'order_created'
@@ -64,11 +64,20 @@ export interface Order {
   customerNote?: string;
   adminNote?: string;
   cancelReason?: string;
+  // Shipper delivery fields
+  shipperId?: number | null;
+  deliveryStatus: import('./DeliveryAttempt').DeliveryStatus;
+  codAmount: number;
+  codCollected: boolean;
+  failReason?: import('./DeliveryAttempt').DeliveryFailReason | null;
+  deliveryPhotoUrl?: string | null;
+  attemptCount: number;
   orderDate: Date;
   confirmedAt?: Date;
   shippedAt?: Date;
   deliveredAt?: Date;
   cancelledAt?: Date;
+  warehouseReceivedAt?: Date;
   updatedAt: Date;
 }
 
@@ -199,6 +208,7 @@ export interface AdminOrderListFilters {
   status?: OrderStatus | 'all';
   paymentStatus?: PaymentStatus | 'all';
   userId?: number;
+  shipperId?: number;
   dateFrom?: string;
   dateTo?: string;
   page?: number;
@@ -213,6 +223,7 @@ export interface TransitionOrderStatusDTO {
   actorUserId: number | null;
   actorRole: OrderActorRole;
   note?: string;
+  shipperId?: number | null;   // gán shipper khi chuyển sang 'shipping'
 }
 
 export interface UpdatePaymentStatusDTO {

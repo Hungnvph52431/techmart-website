@@ -60,6 +60,21 @@ export const adminOrderService = {
     return response.data;
   },
 
+  getAvailableShippers: async () => {
+    const response = await api.get('/admin/orders/shippers/available');
+    return response.data;
+  },
+
+  confirmAndAssign: async (orderId: number | string, shipperId: number) => {
+    const response = await api.patch(`/admin/orders/${orderId}/confirm`, { shipperId });
+    return response.data;
+  },
+
+  confirmWarehouseReceipt: async (orderId: number | string) => {
+    const response = await api.patch(`/admin/orders/${orderId}/confirm-warehouse-receipt`);
+    return response.data;
+  },
+
   getStats: async (startDate?: string, endDate?: string) => {
     const params: Record<string, string> = {};
     if (startDate) params.startDate = startDate;

@@ -921,6 +921,9 @@ export const OrderDetailPage = () => {
       await loadData();
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Không thể hủy đơn hàng");
+      setShowCancelForm(false);
+      setCancelReason("");
+      await loadData();
     } finally {
       setSubmitting(null);
     }

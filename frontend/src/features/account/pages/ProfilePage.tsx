@@ -30,7 +30,7 @@ const MEMBERSHIP = {
   platinum: { label: 'Platinum', color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-200', icon: <Crown size={13} /> },
 };
 const ROLE_LABELS: Record<string, string> = {
-  admin: 'Quản trị viên', staff: 'Nhân viên', warehouse: 'Kho hàng', customer: 'Khách hàng',
+  admin: 'Quản trị viên', staff: 'Nhân viên', warehouse: 'Kho hàng', shipper: 'Shipper', customer: 'Khách hàng',
 };
 
 // ─── VN Admin API types ───────────────────────────────────────────────────────
@@ -143,42 +143,30 @@ const LocationDropdown = ({
 
 // ─── Map Preview ──────────────────────────────────────────────────────────────
 const MapPreview = ({ address }: { address: string }) => {
-  const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [debouncedAddress, setDebouncedAddress] = useState('');
 
   useEffect(() => {
-    if (!address || address.length < 10) { setCoords(null); return; }
-    const timer = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&accept-language=vi`);
-        const data = await res.json();
-        if (data[0]) setCoords({ lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) });
-        else setCoords(null);
-      } catch { setCoords(null); }
-      finally { setLoading(false); }
-    }, 1000);
-    return () => clearTimeout(timer);
+    const t = setTimeout(() => setDebouncedAddress(address), 800);
+    return () => clearTimeout(t);
   }, [address]);
 
-  if (!address || address.length < 10) return null;
+  if (!debouncedAddress || debouncedAddress.length < 10) return null;
+
+  const src = `https://maps.google.com/maps?q=${encodeURIComponent(debouncedAddress)}&output=embed&hl=vi&z=16`;
 
   return (
     <div className="rounded-2xl overflow-hidden border-2 border-slate-200 mt-3">
-      {loading ? (
-        <div className="h-32 flex items-center justify-center bg-slate-50 gap-2">
-          <Loader2 size={16} className="text-blue-400 animate-spin" />
-          <span className="text-xs text-slate-400">Đang tìm trên bản đồ...</span>
-        </div>
-      ) : coords ? (
-        <iframe
-          title="map"
-          width="100%" height="160"
-          frameBorder="0" scrolling="no"
-          src={`https://www.openstreetmap.org/export/embed.html?bbox=${coords.lon - 0.003},${coords.lat - 0.003},${coords.lon + 0.003},${coords.lat + 0.003}&layer=mapnik&marker=${coords.lat},${coords.lon}`}
-          className="w-full"
-        />
-      ) : null}
+      <iframe
+        title="map"
+        width="100%"
+        height="180"
+        frameBorder="0"
+        scrolling="no"
+        src={src}
+        className="w-full"
+        loading="lazy"
+        referrerPolicy="no-referrer-when-downgrade"
+      />
     </div>
   );
 };
@@ -256,11 +244,47 @@ const AddressModal = ({ editing, onSave, onClose }: {
   const [selectedWard, setSelectedWard] = useState<VNUnit | null>(null);
   const [loadingUnits, setLoadingUnits] = useState(false);
 
-  // Load provinces on mount
+  // Load provinces on mount, sau đó restore selection nếu đang sửa
   useEffect(() => {
     fetch('https://provinces.open-api.vn/api/p/')
       .then(r => r.json())
-      .then((data: { code: string; name: string }[]) => setProvinces(data.map(p => ({ code: String(p.code), name: p.name }))))
+      .then(async (data: { code: string; name: string }[]) => {
+        const provinceList: VNUnit[] = data.map(p => ({ code: String(p.code), name: p.name }));
+        setProvinces(provinceList);
+
+        // Nếu đang sửa → tự restore province/district/ward
+        if (!editing?.city) return;
+        const matchedProvince = provinceList.find(p =>
+          p.name === editing.city || editing.city.includes(p.name) || p.name.includes(editing.city)
+        );
+        if (!matchedProvince) return;
+        setSelectedProvince(matchedProvince);
+
+        if (!editing.district) return;
+        try {
+          const res = await fetch(`https://provinces.open-api.vn/api/p/${matchedProvince.code}?depth=2`);
+          const pData = await res.json();
+          const distList: VNUnit[] = (pData.districts || []).map((d: any) => ({ code: String(d.code), name: d.name }));
+          setDistricts(distList);
+
+          const matchedDistrict = distList.find(d =>
+            d.name === editing.district || editing.district.includes(d.name) || d.name.includes(editing.district)
+          );
+          if (!matchedDistrict) return;
+          setSelectedDistrict(matchedDistrict);
+
+          if (!editing.ward) return;
+          const dRes = await fetch(`https://provinces.open-api.vn/api/d/${matchedDistrict.code}?depth=2`);
+          const dData = await dRes.json();
+          const wardList: VNUnit[] = (dData.wards || []).map((w: any) => ({ code: String(w.code), name: w.name }));
+          setWards(wardList);
+
+          const matchedWard = wardList.find(w =>
+            w.name === editing.ward || editing.ward.includes(w.name) || w.name.includes(editing.ward)
+          );
+          if (matchedWard) setSelectedWard(matchedWard);
+        } catch { /* bỏ qua nếu không restore được */ }
+      })
       .catch(() => toast.error('Không thể tải danh sách tỉnh/thành'));
   }, []);
 

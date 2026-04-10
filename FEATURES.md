@@ -15,7 +15,6 @@
 6. [API Endpoints](#6-api-endpoints)
 7. [Cơ sở dữ liệu](#7-cơ-sở-dữ-liệu)
 8. [Hướng dẫn cài đặt & chạy Docker](#8-hướng-dẫn-cài-đặt--chạy-docker)
-9. [Tính năng còn thiếu / cần hoàn thiện](#9-tính-năng-còn-thiếu--cần-hoàn-thiện)
 
 ---
 
@@ -51,7 +50,7 @@
 ## 2. Tính năng khách hàng
 
 ### 2.1 Trang chủ (`/`)
-- Banner slider quảng cáo (tự động xoay)
+- Banner slider quảng cáo (tự động xoay, lấy dữ liệu động từ API)
 - Sản phẩm nổi bật, bán chạy, mới nhất
 - Săn deal giá sốc (sản phẩm đang giảm giá)
 - Danh mục sản phẩm
@@ -115,7 +114,9 @@
 - Thông tin đầy đủ: Sản phẩm, số lượng, giá, biến thể
 - Địa chỉ giao hàng
 - Phương thức & trạng thái thanh toán (highlight màu)
-- Timeline trạng thái đơn hàng
+- Timeline trạng thái đơn hàng (badge màu theo từng trạng thái, nhãn tiếng Việt)
+- Hiển thị giá gốc khi đơn hoàn trả có voucher áp dụng
+- Nút **Thanh toán lại** cho đơn VNPay chưa thanh toán
 - Các thao tác:
   - **Xác nhận đã nhận hàng** (khi đơn ở trạng thái "Đã giao")
   - **Huỷ đơn** (khi đơn chưa giao)
@@ -134,6 +135,7 @@
 - Upload ảnh đánh giá
 - Chỉ đánh giá được khi đã mua & nhận hàng
 - Badge "Đã mua hàng" (verified purchase)
+- Đánh dấu đánh giá hữu ích
 
 ### 2.8 Tài khoản & Hồ sơ (`/profile`)
 - Xem/sửa thông tin cá nhân: Tên, email, SĐT (qua `PUT /api/users/me/profile`)
@@ -142,27 +144,39 @@
 - Quản lý địa chỉ giao hàng:
   - Thêm/sửa/xoá địa chỉ
   - Chọn Tỉnh/Quận/Phường (API địa chỉ Việt Nam)
+  - Tự động điền lại Tỉnh/Quận/Phường khi mở form sửa địa chỉ
+  - Xem preview bản đồ qua Google Maps embed
   - Đặt địa chỉ mặc định
 - Xem cấp thành viên: Đồng, Bạc, Vàng, Kim cương
 
 ### 2.9 Ví TechMart (`/wallet`)
 - Xem số dư ví
-- Nạp tiền qua VNPay (chọn nhanh: 50K, 100K, 200K, 500K, 1M, 2M)
+- Nạp tiền qua VNPay (chọn nhanh: 50K, 100K, 200K, 500K, 1M, 2M hoặc nhập tuỳ ý)
 - Lịch sử giao dịch:
   - Nạp ví | Thanh toán | Hoàn tiền | Điều chỉnh
   - Thời gian, số tiền, trạng thái
 
 ### 2.10 Đăng ký / Đăng nhập
-- **Đăng ký** (`/register`): Email, mật khẩu, họ tên, SĐT
-- **Đăng nhập** (`/login`): Email + mật khẩu → JWT token
-- Tự động chuyển hướng admin/customer theo vai trò
+- **Đăng ký** (`/register`):
+  - Nhập: Email, mật khẩu, họ tên, SĐT
+  - Validate real-time theo touched state (hiển thị lỗi khi rời khỏi ô)
+  - Hiển thị yêu cầu mật khẩu với màu động (đỏ/xanh)
+  - Thông báo "Mật khẩu khớp" khi xác nhận đúng
+- **Đăng nhập** (`/login`):
+  - Email + mật khẩu → JWT token
+  - Toggle hiển thị/ẩn mật khẩu (icon mắt)
+  - Link "Quên mật khẩu?" inline
+  - Tự động chuyển hướng admin/customer theo vai trò
+- **Quên mật khẩu** (`/forgot-password`):
+  - Nhập email → nhận OTP
+  - Xác thực OTP → đặt mật khẩu mới
 
-### 2.12 Kết quả thanh toán (`/payment/result`)
+### 2.11 Kết quả thanh toán (`/payment/result`)
 - Trang hiển thị kết quả sau khi VNPay redirect về
 - Hiển thị trạng thái: Thành công / Thất bại
 - Thông tin đơn hàng tương ứng
 
-### 2.11 Trang thông tin
+### 2.12 Trang thông tin
 | Trang | Đường dẫn | Nội dung |
 |-------|-----------|----------|
 | Giới thiệu | `/about` | Thông tin công ty, FAQ |
@@ -178,12 +192,13 @@
 ## 3. Tính năng quản trị
 
 ### 3.1 Dashboard (`/admin`)
-- Thống kê tổng quan:
-  - Tổng đơn hàng, tổng người dùng, tổng sản phẩm, tổng doanh thu
+- Thống kê tổng quan: Tổng đơn hàng, tổng người dùng, tổng sản phẩm, tổng doanh thu
+- Badge xu hướng: So sánh kỳ hiện tại với kỳ trước (tăng/giảm %)
 - Biểu đồ:
   - Donut chart: Phân bố trạng thái đơn hàng
-  - Line chart: Xu hướng doanh thu
-  - Bar chart: Xu hướng đơn hàng
+  - Line chart: Xu hướng doanh thu (hôm nay / 7 ngày / tháng / tuỳ chọn)
+  - Bar chart: Xu hướng số đơn hàng
+- Thống kê doanh thu theo phương thức thanh toán (COD / VNPay / Ví)
 - Cảnh báo sản phẩm sắp hết hàng
 - Đơn hàng gần đây
 - Top khách hàng & sản phẩm bán chạy
@@ -206,9 +221,13 @@
 
 ### 3.3 Quản lý danh mục (`/admin/categories`)
 - Cây danh mục phân cấp (cha - con)
-- Thêm/sửa/xoá danh mục
+- Thêm/sửa danh mục
 - Kéo thả sắp xếp thứ tự
 - Trường: Tên, slug, mô tả, ảnh, trạng thái
+- **Soft delete**: Xoá mềm (lưu `deleted_at`), không xoá hẳn khỏi DB
+- **Tab Thùng rác**: Xem danh mục đã xoá, khôi phục hoặc xoá vĩnh viễn
+- **Restore**: Khôi phục danh mục từ thùng rác về trạng thái hoạt động
+- **Hard delete**: Xoá vĩnh viễn từ thùng rác
 
 ### 3.4 Quản lý thương hiệu (`/admin/brands`)
 - Thêm/sửa/xoá thương hiệu
@@ -227,7 +246,7 @@
   - Chờ xử lý → Xác nhận
   - Xác nhận → Đang giao
   - Đang giao → Đã giao
-  - Huỷ đơn (trước khi giao)
+  - Huỷ đơn (trước khi giao) — **kèm lý do huỷ gửi thông báo cho khách**
 
 #### Chi tiết đơn hàng (`/admin/orders/:id`)
 - Thông tin khách hàng & địa chỉ
@@ -257,6 +276,7 @@
   - Giới hạn sử dụng (tổng & mỗi người)
   - Thời hạn hiệu lực (từ ngày - đến ngày)
   - Trạng thái: Hoạt động / Tắt
+- Coupon và Voucher dùng chung UI này (cùng logic, 2 bảng DB riêng)
 
 ### 3.9 Quản lý banner (`/admin/banners`)
 - Thêm/sửa/xoá banner quảng cáo
@@ -272,8 +292,10 @@
 - Xem ảnh đính kèm
 
 ### 3.11 Quản lý người dùng (`/admin/users`)
-- Danh sách: Tìm kiếm, lọc theo vai trò/trạng thái/cấp thành viên
-- Thêm/sửa/xoá người dùng
+- Danh sách: Tìm kiếm (debounce), lọc theo vai trò/trạng thái/cấp thành viên
+- **Phân trang** danh sách người dùng
+- Thêm/sửa người dùng
+- **Modal xác nhận xoá** trước khi xoá người dùng
 - Thay đổi vai trò (customer, admin, staff, warehouse)
 - Trạng thái: Hoạt động | Tắt | Cấm
 - Điều chỉnh điểm thưởng
@@ -304,7 +326,7 @@ Hoàn thành (completed)
 ```
 
 Ngoại lệ:
-- **Huỷ đơn** (cancelled): Có thể huỷ khi chưa giao hàng
+- **Huỷ đơn** (cancelled): Có thể huỷ khi chưa giao hàng, kèm lý do huỷ
 - **Hoàn trả** (returned): Sau khi nhận hàng, trong 7 ngày
 
 ### 4.2 Tự động chuyển trạng thái (Scheduler - chạy mỗi 5 phút)
@@ -357,7 +379,7 @@ Admin hoàn tiền vào ví (refunded)
 
 ### 5.4 Mã giảm giá
 - **Coupon**: Giảm theo % hoặc số tiền cố định
-- **Voucher**: Tương tự coupon, quản lý riêng
+- **Voucher**: Tương tự coupon, quản lý riêng (2 bảng, dùng chung UI admin)
 - Validate: Đơn tối thiểu, giới hạn sử dụng, thời hạn hiệu lực
 
 ---
@@ -370,6 +392,8 @@ Admin hoàn tiền vào ví (refunded)
 | POST | `/login` | Đăng nhập | Không |
 | POST | `/register` | Đăng ký | Không |
 | GET | `/profile` | Lấy thông tin cá nhân | Có |
+| POST | `/forgot-password` | Gửi OTP quên mật khẩu | Không |
+| POST | `/reset-password` | Đặt lại mật khẩu bằng OTP | Không |
 
 ### Người dùng (`/api/users`)
 | Method | Path | Mô tả | Auth |
@@ -377,7 +401,7 @@ Admin hoàn tiền vào ví (refunded)
 | POST | `/me/avatar` | Upload ảnh đại diện | Có |
 | POST | `/me/banner` | Upload ảnh bìa cá nhân | Có |
 | PUT | `/me/profile` | Tự cập nhật thông tin (tên, email, SĐT) | Có |
-| GET | `/` | Danh sách người dùng | Admin |
+| GET | `/` | Danh sách người dùng (có phân trang) | Admin |
 | GET | `/stats` | Thống kê người dùng | Admin |
 | GET | `/:id` | Chi tiết người dùng | Admin |
 | POST | `/` | Tạo người dùng | Admin |
@@ -395,9 +419,9 @@ Admin hoàn tiền vào ví (refunded)
 | GET | `/:id` | Chi tiết theo ID | Không |
 | GET | `/:id/variants` | Lấy biến thể | Không |
 | POST | `/validate-cart` | Kiểm tra giỏ hàng hợp lệ | Không |
-| POST | `/` | Tạo sản phẩm | Admin |
-| PUT | `/:id` | Sửa sản phẩm | Admin |
-| DELETE | `/:id` | Xoá sản phẩm | Admin |
+| POST | `/` | Tạo sản phẩm | Warehouse |
+| PUT | `/:id` | Sửa sản phẩm | Warehouse |
+| DELETE | `/:id` | Xoá sản phẩm | Warehouse |
 
 ### Đơn hàng (`/api/orders`)
 | Method | Path | Mô tả | Auth |
@@ -411,12 +435,12 @@ Admin hoàn tiền vào ví (refunded)
 | POST | `/my-orders/:id/returns` | Yêu cầu hoàn trả (tối đa 5 ảnh) | Có |
 | GET | `/my-orders/:id/returns` | Danh sách yêu cầu hoàn trả | Có |
 | GET | `/my-orders/:id/returns/:returnId` | Chi tiết yêu cầu hoàn trả | Có |
-| GET | `/stats` | Thống kê đơn hàng | Admin |
-| GET | `/` | Tất cả đơn hàng | Admin |
-| PATCH | `/:id/status` | Cập nhật trạng thái đơn / thanh toán | Admin |
-| GET | `/admin/returns` | Tất cả yêu cầu hoàn trả | Admin |
-| PATCH | `/:id/returns/:returnId/review` | Duyệt / Từ chối yêu cầu | Admin |
-| PATCH | `/:id/returns/:returnId/receive` | Xác nhận đã nhận hàng trả | Admin |
+| GET | `/stats` | Thống kê đơn hàng | Internal |
+| GET | `/` | Tất cả đơn hàng | Internal |
+| PATCH | `/:id/status` | Cập nhật trạng thái đơn / thanh toán | Internal |
+| GET | `/admin/returns` | Tất cả yêu cầu hoàn trả | Staff |
+| PATCH | `/:id/returns/:returnId/review` | Duyệt / Từ chối yêu cầu | Staff |
+| PATCH | `/:id/returns/:returnId/receive` | Xác nhận đã nhận hàng trả | Staff |
 | PATCH | `/:id/returns/:returnId/refund` | Hoàn tiền vào ví | Admin |
 
 ### Danh mục (`/api/categories`)
@@ -424,17 +448,20 @@ Admin hoàn tiền vào ví (refunded)
 |--------|------|--------|------|
 | GET | `/` | Danh sách danh mục | Không |
 | GET | `/tree` | Cây danh mục | Không |
-| POST | `/` | Tạo danh mục | Admin |
-| PUT | `/:id` | Sửa danh mục | Admin |
-| DELETE | `/:id` | Xoá danh mục | Admin |
+| GET | `/trashed` | Danh mục đã xoá mềm | Staff |
+| POST | `/` | Tạo danh mục | Staff |
+| PUT | `/:id` | Sửa danh mục | Staff |
+| DELETE | `/:id` | Xoá mềm danh mục | Staff |
+| PATCH | `/:id/restore` | Khôi phục danh mục | Staff |
+| DELETE | `/:id/hard` | Xoá vĩnh viễn danh mục | Admin |
 
 ### Thương hiệu (`/api/brands`)
 | Method | Path | Mô tả | Auth |
 |--------|------|--------|------|
 | GET | `/` | Danh sách | Không |
-| POST | `/` | Tạo | Admin |
-| PUT | `/:id` | Sửa | Admin |
-| DELETE | `/:id` | Xoá | Admin |
+| POST | `/` | Tạo | Staff |
+| PUT | `/:id` | Sửa | Staff |
+| DELETE | `/:id` | Xoá | Staff |
 
 ### Thanh toán (`/api/payment`)
 | Method | Path | Mô tả | Auth |
@@ -470,8 +497,8 @@ Admin hoàn tiền vào ví (refunded)
 | GET | `/api/reviews/orders/:orderId/summary` | Tóm tắt đánh giá theo đơn hàng | Có |
 | POST | `/api/reviews` | Viết đánh giá mới | Có |
 | PATCH | `/api/reviews/:reviewId` | Sửa đánh giá của mình | Có |
-| GET | `/api/admin/reviews` | Tất cả đánh giá | Admin |
-| PATCH | `/api/admin/reviews/:reviewId/status` | Duyệt / Từ chối đánh giá | Admin |
+| GET | `/api/admin/reviews` | Tất cả đánh giá | Staff |
+| PATCH | `/api/admin/reviews/:reviewId/status` | Duyệt / Từ chối đánh giá | Staff |
 
 ### Địa chỉ Việt Nam (`/api/locations`)
 | Method | Path | Mô tả | Auth |
@@ -496,6 +523,7 @@ Admin hoàn tiền vào ví (refunded)
 | POST | `/validate` | Kiểm tra mã giảm giá | Có |
 | GET | `/` | Danh sách (admin) | Admin |
 | POST | `/` | Tạo voucher | Admin |
+| PUT | `/:id` | Sửa voucher | Admin |
 | DELETE | `/:id` | Xoá voucher | Admin |
 
 ### Coupon (`/api/coupons`)
@@ -516,30 +544,30 @@ Admin hoàn tiền vào ví (refunded)
 
 ### Danh sách bảng (22 bảng)
 
-| Bảng | Mô tả |
-|------|--------|
-| `users` | Người dùng (khách hàng, admin) |
-| `user_addresses` | Địa chỉ giao hàng |
-| `products` | Sản phẩm |
-| `product_images` | Ảnh sản phẩm |
-| `product_variants` | Biến thể sản phẩm (màu, dung lượng) |
-| `product_attributes` | Thuộc tính sản phẩm |
-| `product_attribute_options` | Giá trị thuộc tính |
-| `category_attributes` | Gán thuộc tính vào danh mục |
-| `categories` | Danh mục sản phẩm |
-| `brands` | Thương hiệu |
-| `orders` | Đơn hàng |
-| `order_details` | Chi tiết đơn hàng (sản phẩm trong đơn) |
-| `order_events` | Lịch sử thay đổi đơn hàng |
-| `order_returns` | Yêu cầu hoàn trả |
-| `order_return_items` | Sản phẩm hoàn trả |
-| `coupons` | Mã giảm giá (coupon) |
-| `vouchers` | Mã giảm giá (voucher) |
-| `product_reviews` | Đánh giá sản phẩm |
-| `order_feedback` | Phản hồi đơn hàng |
-| `banners` | Banner quảng cáo |
-| `wallet_transactions` | Giao dịch ví |
-| `wallet_topup_requests` | Yêu cầu nạp ví |
+| Bảng | Mô tả | Ghi chú |
+|------|--------|---------|
+| `users` | Người dùng (khách hàng, admin) | |
+| `user_addresses` | Địa chỉ giao hàng | |
+| `products` | Sản phẩm | |
+| `product_images` | Ảnh sản phẩm | |
+| `product_variants` | Biến thể sản phẩm (màu, dung lượng) | |
+| `product_attributes` | Thuộc tính sản phẩm | |
+| `product_attribute_options` | Giá trị thuộc tính | |
+| `category_attributes` | Gán thuộc tính vào danh mục | |
+| `categories` | Danh mục sản phẩm | Có cột `deleted_at` (soft delete) |
+| `brands` | Thương hiệu | |
+| `orders` | Đơn hàng | Có cột `cancel_reason` |
+| `order_details` | Chi tiết đơn hàng (sản phẩm trong đơn) | |
+| `order_events` | Lịch sử thay đổi đơn hàng | |
+| `order_returns` | Yêu cầu hoàn trả | |
+| `order_return_items` | Sản phẩm hoàn trả | |
+| `coupons` | Mã giảm giá (coupon) | |
+| `vouchers` | Mã giảm giá (voucher) | |
+| `product_reviews` | Đánh giá sản phẩm | |
+| `order_feedback` | Phản hồi đơn hàng | |
+| `banners` | Banner quảng cáo | |
+| `wallet_transactions` | Giao dịch ví | |
+| `wallet_topup_requests` | Yêu cầu nạp ví | |
 
 ---
 
@@ -601,18 +629,4 @@ Truy cập:
 
 ---
 
-## 9. Tính năng còn thiếu / cần hoàn thiện
 
-### 9.1 Trang mồ côi (có code nhưng chưa dùng)
-| Trang | File | Ghi chú |
-|-------|------|---------|
-| Chuyển khoản ngân hàng | `BankTransferPage.tsx` (route: `/payment/bank-transfer/:orderId`) | Có route nhưng không có backend API |
-
-### 9.2 Coupon = Voucher
-- Hệ thống coupon (`/api/coupons`) và voucher (`/api/vouchers`) làm cùng một việc — coupon không cần UI admin riêng, dùng chung `AdminVouchers.tsx` là đủ
-
-### 9.3 Chức năng Admin theo role (đã implement)
-- **Staff**: vào `/admin`, thấy menu: Dashboard, Danh mục, Thương hiệu, Đơn hàng, Khách hàng, Đánh giá, Hoàn trả
-- **Warehouse**: vào `/admin`, thấy menu: Dashboard, Sản phẩm, Đơn hàng
-- Header hiển thị role label: "Admin" / "Nhân viên" / "Kho"
-- Middleware phân quyền: `staffMiddleware`, `warehouseMiddleware`, `internalMiddleware` (xem mục 1)

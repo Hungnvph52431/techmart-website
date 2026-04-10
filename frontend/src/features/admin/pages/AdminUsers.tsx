@@ -17,7 +17,8 @@ const roleLabels: Record<UserRole, string> = {
     admin: 'Quản trị viên',
     customer: 'Khách hàng',
     staff: 'Nhân viên',
-    warehouse: 'Kho',
+    warehouse: 'Kho (cũ)',
+    shipper: 'Shipper',
 };
 
 const membershipLabels: Record<MembershipLevel, string> = {
@@ -227,7 +228,8 @@ export const AdminUsers = () => {
                     <option value="">Tất cả vai trò</option>
                     <option value="customer">Khách hàng</option>
                     <option value="staff">Nhân viên</option>
-                    <option value="warehouse">Kho</option>
+                    <option value="shipper">Shipper</option>
+                    <option value="warehouse">Kho (cũ)</option>
                     <option value="admin">Quản trị viên</option>
                 </select>
 
@@ -515,7 +517,7 @@ const UserModal = ({ user, onClose, onSuccess }: { user: User | null; onClose: (
                                 <select value={formData.role} onChange={(e) => set('role', e.target.value)} className={inputCls}>
                                     <option value="customer">Khách hàng</option>
                                     <option value="staff">Nhân viên</option>
-                                    <option value="warehouse">Kho</option>
+                                    <option value="shipper">Shipper</option>
                                 </select>
                             )}
                         </div>

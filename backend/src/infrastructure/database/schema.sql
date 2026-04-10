@@ -17,8 +17,8 @@ CREATE TABLE users (
     password VARCHAR(255) NOT NULL,
     name VARCHAR(255) NOT NULL,
     phone VARCHAR(20),
-    role ENUM('customer', 'admin', 'staff', 'warehouse') DEFAULT 'customer',
-    status ENUM('active', 'inactive', 'banned') DEFAULT 'active',
+    role ENUM('customer', 'admin', 'staff', 'warehouse', 'shipper') DEFAULT 'customer',
+    status ENUM('active', 'inactive', 'bannesd') DEFAULT 'active',
     avatar_url VARCHAR(500),
     banner_url VARCHAR(500),
     points INT DEFAULT 0,
@@ -345,17 +345,36 @@ CREATE TABLE orders (
     admin_note TEXT,
     cancel_reason TEXT,
     
+    -- Thông tin giao hàng (Shipper)
+    shipper_id          INT NULL,
+    delivery_status     ENUM(
+                          'WAITING_PICKUP',
+                          'PICKED_UP',
+                          'IN_DELIVERY',
+                          'DELIVERED',
+                          'FAILED',
+                          'RETURNING',
+                          'RETURNED'
+                        ) NOT NULL DEFAULT 'WAITING_PICKUP',
+    cod_amount          DECIMAL(15,2) NOT NULL DEFAULT 0,
+    cod_collected       TINYINT(1) NOT NULL DEFAULT 0,
+    fail_reason         ENUM('VACANT','WRONG_ADDRESS','CUSTOMER_REFUSED','OTHER') NULL,
+    delivery_photo_url  TEXT NULL,
+    attempt_count       INT NOT NULL DEFAULT 0,
+
     -- Thời gian
     order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     confirmed_at TIMESTAMP NULL,
     shipped_at TIMESTAMP NULL,
     delivered_at TIMESTAMP NULL,
     cancelled_at TIMESTAMP NULL,
+    warehouse_received_at TIMESTAMP NULL,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL DEFAULT NULL,
 
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (coupon_id) REFERENCES coupons(coupon_id) ON DELETE SET NULL,
+    FOREIGN KEY (shipper_id) REFERENCES users(user_id) ON DELETE SET NULL,
     INDEX idx_order_code (order_code),
     INDEX idx_user (user_id),
     INDEX idx_customer_email (customer_email),
@@ -407,7 +426,7 @@ CREATE TABLE order_events (
     from_status VARCHAR(50),
     to_status VARCHAR(50),
     actor_user_id INT,
-    actor_role ENUM('customer', 'admin', 'staff', 'warehouse', 'system'),
+    actor_role ENUM('customer', 'admin', 'staff', 'warehouse', 'shipper', 'system'),
     note TEXT,
     metadata JSON,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -733,6 +752,48 @@ CREATE TABLE wallet_transactions (
     INDEX idx_user (user_id),
     INDEX idx_type (type),
     INDEX idx_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==================================================
+-- BẢNG DELIVERY_ATTEMPTS - Lịch sử lần giao hàng
+-- ==================================================
+CREATE TABLE delivery_attempts (
+    id            INT AUTO_INCREMENT PRIMARY KEY,
+    order_id      INT NOT NULL,
+    shipper_id    INT NOT NULL,
+    status        ENUM('SUCCESS','FAILED') NOT NULL,
+    fail_reason   ENUM('VACANT','WRONG_ADDRESS','CUSTOMER_REFUSED','OTHER') NULL,
+    photo_url     TEXT NULL,
+    note          TEXT NULL,
+    attempted_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id)   REFERENCES orders(order_id)  ON DELETE CASCADE,
+    FOREIGN KEY (shipper_id) REFERENCES users(user_id)    ON DELETE CASCADE,
+    INDEX idx_order (order_id),
+    INDEX idx_shipper (shipper_id),
+    INDEX idx_attempted_at (attempted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==================================================
+-- BẢNG PAYMENTS - Theo dõi vòng đời thanh toán COD
+-- ==================================================
+CREATE TABLE IF NOT EXISTS payments (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    order_id        INT NOT NULL UNIQUE,
+    method          ENUM('cod','banking','momo','vnpay','wallet','deposit') NOT NULL DEFAULT 'cod',
+    amount          DECIMAL(15,2) NOT NULL DEFAULT 0,
+    status          ENUM('pending','collected','pending_settlement','settled') NOT NULL DEFAULT 'pending',
+    shipper_id      INT NULL,
+    collected_at    TIMESTAMP NULL,
+    submitted_at    TIMESTAMP NULL,
+    settled_at      TIMESTAMP NULL,
+    note            TEXT NULL,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id)   REFERENCES orders(order_id) ON DELETE CASCADE,
+    FOREIGN KEY (shipper_id) REFERENCES users(user_id)   ON DELETE SET NULL,
+    INDEX idx_order   (order_id),
+    INDEX idx_shipper (shipper_id),
+    INDEX idx_status  (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================

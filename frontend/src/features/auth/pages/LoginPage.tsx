@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { authService } from '@/services/auth.service';
 import { useAuthStore } from '@/store/authStore';
@@ -8,6 +9,7 @@ import toast from 'react-hot-toast';
 export const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { setAuth } = useAuthStore();
   const navigate = useNavigate();
@@ -26,7 +28,9 @@ export const LoginPage = () => {
       // LOGIC ĐIỀU HƯỚNG THÔNG MINH:
       // 1. Nếu là Admin/Staff -> Vào thẳng trang quản trị
       // 2. Nếu là Khách -> Quay lại trang trước đó (ví dụ: Checkout) hoặc vào trang Đơn hàng
-      if (result.user.role !== 'customer') {
+      if (result.user.role === 'shipper') {
+        navigate('/shipper');
+      } else if (result.user.role !== 'customer') {
         navigate('/admin');
       } else {
         const redirectTarget = (location.state as any)?.from || '/';
@@ -66,19 +70,30 @@ export const LoginPage = () => {
             </div>
 
             <div>
-              <label htmlFor="password" className="text-[10px] font-black text-gray-400 uppercase ml-1">
-                Mật khẩu bảo mật
-              </label>
-              <input
-                type="password"
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                required
-                className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                placeholder="••••••••"
-              />
+              <div className="flex items-center justify-between mb-1">
+                <label htmlFor="password" className="text-[10px] font-black text-gray-400 uppercase ml-1">
+                  Mật khẩu bảo mật
+                </label>
+                <Link to="/forgot-password" className="text-[10px] font-bold text-blue-500 hover:text-blue-700 uppercase">
+                  Quên mật khẩu?
+                </Link>
+              </div>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                  className="w-full px-5 py-4 pr-12 bg-gray-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                  placeholder="••••••••"
+                />
+                <button type="button" onClick={() => setShowPassword(v => !v)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
             <button
@@ -95,13 +110,6 @@ export const LoginPage = () => {
               Chưa có tài khoản TechMart?{' '}
               <Link to="/register" className="text-blue-600 hover:text-blue-700 font-bold underline-offset-4 hover:underline">
                 Đăng ký ngay
-              </Link>
-              <br />
-              <Link
-                to="/forgot-password"
-                className="text-blue-600 hover:text-blue-700 font-bold underline-offset-4 hover:underline"
-              >
-                Quên mật khẩu?
               </Link>
             </p>
           </div>

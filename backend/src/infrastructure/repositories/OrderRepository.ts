@@ -17,7 +17,6 @@ import {
   OrderReturn,
   OrderReturnItem,
   PaginatedResult,
-  PaymentStatus,
   ReceiveOrderReturnDTO,
   RefundOrderReturnDTO,
   ReviewOrderReturnDTO,
@@ -257,14 +256,16 @@ export class OrderRepository implements IOrderRepository {
 
       const depositAmount = (orderData as any).depositAmount || 0;
 
+      const codAmount = orderData.paymentMethod === 'cod' ? total : 0;
+
       const [orderResult] = await connection.execute<ResultSetHeader>(
         `INSERT INTO orders (
           order_code, user_id, customer_name, customer_email, customer_phone,
           shipping_name, shipping_phone, shipping_address, shipping_city,
           subtotal, shipping_fee, discount_amount, coupon_id, coupon_code, total,
-          payment_method, payment_status, deposit_amount, status, order_date, updated_at
+          payment_method, payment_status, deposit_amount, cod_amount, status, order_date, updated_at
         )
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 'pending', ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, 'pending', ?, ?)`,
         [
           orderCode,
           orderData.userId ?? null,
@@ -283,6 +284,7 @@ export class OrderRepository implements IOrderRepository {
           total,
           orderData.paymentMethod,
           depositAmount,
+          codAmount,
           now,
           now,
         ]
@@ -406,6 +408,20 @@ export class OrderRepository implements IOrderRepository {
           'UPDATE orders SET status = ?, delivered_at = ?, updated_at = ? WHERE order_id = ?',
           [input.nextStatus, now, now, input.orderId]
         );
+      } else if (input.nextStatus === 'shipping' && input.shipperId !== undefined) {
+        await connection.execute(
+          'UPDATE orders SET status = ?, shipper_id = ?, updated_at = ? WHERE order_id = ?',
+          [input.nextStatus, input.shipperId, now, input.orderId]
+        );
+        // Auto-sync payment record cho đơn COD
+        if (input.shipperId !== null) {
+          await connection.execute(`
+            INSERT INTO payments (order_id, method, amount, status, shipper_id)
+            SELECT order_id, 'cod', cod_amount, 'pending', ?
+            FROM orders WHERE order_id = ? AND payment_method = 'cod' AND cod_amount > 0
+            ON DUPLICATE KEY UPDATE shipper_id = VALUES(shipper_id)
+          `, [input.shipperId, input.orderId]);
+        }
       } else {
         await connection.execute(
           'UPDATE orders SET status = ?, updated_at = ? WHERE order_id = ?',
@@ -445,6 +461,106 @@ export class OrderRepository implements IOrderRepository {
       await connection.commit();
       return this.findById(input.orderId);
     } catch (error) { await connection.rollback(); throw error; } finally { connection.release(); }
+  }
+
+  async assignShipper(orderId: number, shipperId: number | null): Promise<Order | null> {
+    await pool.query(
+      'UPDATE orders SET shipper_id = ?, updated_at = NOW() WHERE order_id = ?',
+      [shipperId, orderId]
+    );
+    // Nếu gán shipper cho đơn COD → tạo payment record nếu chưa có
+    if (shipperId !== null) {
+      await pool.query(`
+        INSERT INTO payments (order_id, method, amount, status, shipper_id)
+        SELECT order_id, 'cod', cod_amount, 'pending', ?
+        FROM orders
+        WHERE order_id = ? AND payment_method = 'cod' AND cod_amount > 0
+        ON DUPLICATE KEY UPDATE shipper_id = VALUES(shipper_id)
+      `, [shipperId, orderId]);
+    }
+    return this.findById(orderId);
+  }
+
+  async reassignShipper(orderId: number, newShipperId: number): Promise<Order | null> {
+    await pool.query(
+      `UPDATE orders
+       SET shipper_id = ?,
+           delivery_status = 'WAITING_PICKUP',
+           status = 'shipping',
+           attempt_count = 0,
+           updated_at = NOW()
+       WHERE order_id = ?
+         AND delivery_status NOT IN ('PICKED_UP', 'IN_DELIVERY')`,
+      [newShipperId, orderId]
+    );
+    return this.findById(orderId);
+  }
+
+  async confirmAndAssignShipper(orderId: number, shipperId: number, actorUserId: number): Promise<Order | null> {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Lock row để tránh race condition
+      const [rows] = await connection.execute<RowDataPacket[]>(
+        `SELECT order_id, status, payment_method, cod_amount FROM orders WHERE order_id = ? FOR UPDATE`,
+        [orderId]
+      );
+      const order = rows[0];
+      if (!order || order.status !== 'pending') {
+        await connection.rollback();
+        return null;
+      }
+
+      // Confirm + assign shipper + set delivery_status trong 1 câu
+      await connection.execute(
+        `UPDATE orders SET
+           status          = 'shipping',
+           delivery_status = 'WAITING_PICKUP',
+           shipper_id      = ?,
+           updated_at      = NOW()
+         WHERE order_id = ?`,
+        [shipperId, orderId]
+      );
+
+      // Tạo payment record COD nếu chưa có
+      if (order.payment_method === 'cod' && order.cod_amount > 0) {
+        await connection.execute(`
+          INSERT INTO payments (order_id, method, amount, status, shipper_id)
+          VALUES (?, 'cod', ?, 'pending', ?)
+          ON DUPLICATE KEY UPDATE shipper_id = VALUES(shipper_id)
+        `, [orderId, order.cod_amount, shipperId]);
+      }
+
+      // Log sự kiện vào order_events
+      await connection.execute(`
+        INSERT INTO order_events (order_id, event_type, from_status, to_status, actor_user_id, actor_role, note)
+        VALUES (?, 'status_changed', 'pending', 'shipping', ?, 'admin', 'Admin xác nhận và phân công shipper')
+      `, [orderId, actorUserId]);
+
+      await connection.commit();
+      return this.findById(orderId);
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async logEvent(orderId: number, actorUserId: number, actorRole: string, eventType: string, fromStatus: string, toStatus: string, note: string): Promise<void> {
+    await pool.query(
+      `INSERT INTO order_events (order_id, event_type, from_status, to_status, actor_user_id, actor_role, note)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [orderId, eventType, fromStatus, toStatus, actorUserId, actorRole, note]
+    );
+  }
+
+  async updateWarehouseReceivedAt(orderId: number): Promise<void> {
+    await pool.query(
+      `UPDATE orders SET warehouse_received_at = NOW() WHERE order_id = ? AND warehouse_received_at IS NULL`,
+      [orderId]
+    );
   }
 
   async cancel(input: CancelOrderDTO): Promise<Order | null> {
@@ -1304,6 +1420,7 @@ export class OrderRepository implements IOrderRepository {
     }
     if (filters?.status && filters.status !== 'all') { whereClause += ' AND o.status = ?'; params.push(filters.status); }
     if (filters?.paymentStatus && filters.paymentStatus !== 'all') { whereClause += ' AND o.payment_status = ?'; params.push(filters.paymentStatus); }
+    if (filters?.shipperId) { whereClause += ' AND o.shipper_id = ?'; params.push(filters.shipperId); }
     return { whereClause, params };
   }
 
@@ -1336,11 +1453,20 @@ export class OrderRepository implements IOrderRepository {
       customerNote: row.customer_note ?? undefined,
       adminNote: row.admin_note ?? undefined,
       cancelReason: row.cancel_reason ?? undefined,
+      // Shipper delivery fields — default values for rows without shipper data
+      shipperId: row.shipper_id ?? null,
+      deliveryStatus: row.delivery_status ?? 'WAITING_PICKUP',
+      codAmount: Number(row.cod_amount ?? 0),
+      codCollected: Boolean(row.cod_collected),
+      failReason: row.fail_reason ?? null,
+      deliveryPhotoUrl: row.delivery_photo_url ?? null,
+      attemptCount: Number(row.attempt_count ?? 0),
       orderDate: row.order_date,
       confirmedAt: row.confirmed_at ?? undefined,
       shippedAt: row.shipped_at ?? undefined,
       deliveredAt: row.delivered_at ?? undefined,
       cancelledAt: row.cancelled_at ?? undefined,
+      warehouseReceivedAt: row.warehouse_received_at ?? undefined,
       updatedAt: row.updated_at,
     };
   }

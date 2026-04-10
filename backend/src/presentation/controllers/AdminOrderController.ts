@@ -5,13 +5,14 @@ import { toOrderDetail, toOrderListItem, toOrderTimeline } from '../../applicati
 export class AdminOrderController {
   constructor(private orderUseCase: OrderUseCase) {}
 
-  getAll = async (req: Request, res: Response) => {
+  getAll = async (req: any, res: Response) => {
     try {
       const orders = await this.orderUseCase.getAdminOrders({
         search: req.query.search as string | undefined,
         status: (req.query.status as any) || 'all',
         paymentStatus: (req.query.paymentStatus as any) || 'all',
         userId: req.query.userId ? Number(req.query.userId) : undefined,
+        shipperId: req.user?.role === 'shipper' ? req.user.userId : undefined,
         dateFrom: req.query.dateFrom as string | undefined,
         dateTo: req.query.dateTo as string | undefined,
         page: req.query.page ? Number(req.query.page) : undefined,
@@ -26,11 +27,16 @@ export class AdminOrderController {
     }
   };
 
-  getById = async (req: Request, res: Response) => {
+  getById = async (req: any, res: Response) => {
     try {
       const aggregate = await this.orderUseCase.getAdminOrderDetail(Number(req.params.id));
       if (!aggregate) {
         return res.status(404).json({ message: 'Order not found' });
+      }
+
+      // Shipper chỉ xem được đơn của mình
+      if (req.user?.role === 'shipper' && aggregate.order.shipperId !== req.user.userId) {
+        return res.status(403).json({ message: 'Bạn không có quyền xem đơn này' });
       }
 
       res.json(toOrderDetail(aggregate, 'admin'));
@@ -63,7 +69,8 @@ export class AdminOrderController {
         req.body.status,
         req.user.userId,
         req.user.role,
-        req.body.note
+        req.body.note,
+        req.body.shipperId !== undefined ? (req.body.shipperId === null ? null : Number(req.body.shipperId)) : undefined
       );
 
       if (!order) {
@@ -73,6 +80,63 @@ export class AdminOrderController {
       res.json(order);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
+    }
+  };
+
+  assignShipper = async (req: any, res: Response) => {
+    try {
+      const orderId = Number(req.params.id);
+      const shipperId = req.body.shipperId !== undefined
+        ? (req.body.shipperId === null ? null : Number(req.body.shipperId))
+        : undefined;
+
+      if (shipperId === undefined) {
+        return res.status(400).json({ message: 'Thiếu shipperId (truyền null để bỏ gán)' });
+      }
+
+      const order = await this.orderUseCase.assignShipper(orderId, shipperId);
+      if (!order) return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
+
+      res.json({ success: true, data: order });
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  };
+
+  reassignShipper = async (req: any, res: Response) => {
+    try {
+      const orderId = Number(req.params.id);
+      const { newShipperId } = req.body;
+      if (!newShipperId) return res.status(400).json({ message: 'Thiếu newShipperId' });
+
+      const order = await this.orderUseCase.reassignShipper(orderId, Number(newShipperId));
+      if (!order) return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
+
+      res.json({ success: true, data: order });
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  };
+
+  confirmWarehouseReceipt = async (req: any, res: Response) => {
+    try {
+      const result = await this.orderUseCase.confirmWarehouseReceipt(Number(req.params.id), req.user.userId);
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  };
+
+  confirmAndAssignShipper = async (req: any, res: Response) => {
+    try {
+      const orderId = Number(req.params.id);
+      const shipperId = Number(req.body.shipperId);
+      if (!shipperId) return res.status(400).json({ message: 'Vui lòng chọn shipper' });
+
+      const order = await this.orderUseCase.confirmAndAssignShipper(orderId, shipperId, req.user.userId);
+      res.json({ success: true, data: order });
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
     }
   };
 

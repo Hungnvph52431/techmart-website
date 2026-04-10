@@ -321,13 +321,63 @@ export class OrderUseCase {
     return newOrder;
   }
 
+  // --- XÁC NHẬN + GÁN SHIPPER (1 bước) ---
+  async confirmAndAssignShipper(orderId: number, shipperId: number, actorUserId: number) {
+    const order = await this.orderRepository.findById(orderId);
+    if (!order) throw new Error('Không tìm thấy đơn hàng');
+    if (order.status !== 'pending') throw new Error('Đơn hàng không ở trạng thái chờ xử lý');
+    if (!shipperId) throw new Error('Vui lòng chọn shipper để giao đơn này');
+
+    const result = await this.orderRepository.confirmAndAssignShipper(orderId, shipperId, actorUserId);
+    if (!result) throw new Error('Đơn hàng vừa được xử lý bởi người khác');
+    return result;
+  }
+
+  // --- XÁC NHẬN NHẬP KHO (Admin) ---
+  async confirmWarehouseReceipt(orderId: number, adminId: number) {
+    const order = await this.orderRepository.findById(orderId);
+    if (!order) throw new Error('Không tìm thấy đơn hàng');
+    const deliveryStatus = (order as any).deliveryStatus as string | undefined;
+    if (deliveryStatus !== 'RETURNED') {
+      throw new Error('Đơn hàng chưa được shipper xác nhận trả về kho');
+    }
+    if (order.warehouseReceivedAt) {
+      throw new Error(`Đơn hàng đã được xác nhận nhập kho lúc ${order.warehouseReceivedAt.toLocaleString('vi-VN')}`);
+    }
+    await this.orderRepository.updateWarehouseReceivedAt(orderId);
+    await this.orderRepository.logEvent(orderId, adminId, 'admin', 'status_changed', 'returned', 'returned', 'Admin xác nhận nhập kho');
+    return { success: true, orderId, message: 'Đã xác nhận nhập kho' };
+  }
+
   // --- QUẢN LÝ TRẠNG THÁI & HỦY ĐƠN ---
+  async assignShipper(orderId: number, shipperId: number | null) {
+    const order = await this.orderRepository.findById(orderId);
+    if (!order) throw new Error('Không tìm thấy đơn hàng');
+    return this.orderRepository.assignShipper(orderId, shipperId);
+  }
+
+  async reassignShipper(orderId: number, newShipperId: number) {
+    const order = await this.orderRepository.findById(orderId);
+    if (!order) throw new Error('Không tìm thấy đơn hàng');
+
+    const deliveryStatus = (order as any).deliveryStatus as string | undefined;
+    const blockedStatuses = ['PICKED_UP', 'IN_DELIVERY'];
+    if (deliveryStatus && blockedStatuses.includes(deliveryStatus)) {
+      throw new Error(
+        `Không thể đổi shipper khi đang giao hàng (delivery_status=${deliveryStatus}). Vui lòng liên hệ shipper hiện tại.`
+      );
+    }
+
+    return this.orderRepository.reassignShipper(orderId, newShipperId);
+  }
+
   async transitionOrderStatus(
     orderId: number,
     status: OrderStatus,
     actorUserId: number,
     actorRole: OrderActorRole,
-    note?: string
+    note?: string,
+    shipperId?: number | null
   ) {
     if (status === 'cancelled') {
       throw new Error('Vui lòng dùng chức năng hủy đơn và nhập lý do hủy');
@@ -351,6 +401,7 @@ export class OrderUseCase {
       actorUserId,
       actorRole,
       note,
+      shipperId,
     });
 
     // Khi chuyển sang completed, tự động cập nhật payment_status → paid nếu chưa paid
