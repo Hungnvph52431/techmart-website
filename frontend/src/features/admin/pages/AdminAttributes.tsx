@@ -242,7 +242,8 @@ export const AdminAttributes = () => {
       setLoading(true);
       const [attrData, catData] = await Promise.all([adminAttributeService.getAll(), adminCategoryService.getAll()]);
       setAttributes(attrData); setCategories(catData);
-      if (catData[0]) setSelectedCategoryId(catData[0].categoryId);
+      const firstParent = catData.find(c => !c.parentId);
+      if (firstParent) setSelectedCategoryId(firstParent.categoryId);
     } catch { toast.error('Không thể tải dữ liệu'); }
     finally { setLoading(false); }
   };
@@ -368,7 +369,7 @@ export const AdminAttributes = () => {
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wide shrink-0">Chọn danh mục:</label>
               <select value={selectedCategoryId || ''} onChange={(e) => setSelectedCategoryId(Number(e.target.value))}
                 className="border-2 border-slate-200 rounded-xl px-4 py-2 text-sm font-semibold focus:border-violet-400 focus:outline-none bg-white">
-                {categories.map((cat) => (
+                {categories.filter(cat => !cat.parentId).map((cat) => (
                   <option key={cat.categoryId} value={cat.categoryId}>{cat.name}</option>
                 ))}
               </select>

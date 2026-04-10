@@ -1,15 +1,11 @@
 import { Router } from 'express';
 import { ProductController } from '../controllers/ProductController';
-import { authMiddleware, adminMiddleware } from '../middlewares/auth.middleware';
+import { authMiddleware, adminMiddleware, staffMiddleware, warehouseMiddleware } from '../middlewares/auth.middleware';
 
 export const createProductRoutes = (productController: ProductController) => {
   const router = Router();
- router.get(
-    '/stats',
-    authMiddleware,
-    adminMiddleware,
-    productController.getStats
-  );
+  // Staff + Warehouse + Admin: xem thống kê sản phẩm (dùng cho Dashboard)
+  router.get('/stats', authMiddleware, productController.getStats);
 
   // Validate giỏ hàng — kiểm tra trạng thái & tồn kho SP
   router.post('/validate-cart', productController.validateCart);

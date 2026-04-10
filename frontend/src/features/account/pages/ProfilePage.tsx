@@ -1,15 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { useAuthStore } from '@/store/authStore';
+import { useWishlistStore } from '@/store/wishlistStore';
 import { useNavigate } from 'react-router-dom';
-import { userService, type UpdateUserPayload } from '@/services/user.service';
+import { userService } from '@/services/user.service';
 import { addressService, type Address } from '@/services/address.service';
+import { FavoriteProductsSection } from '@/features/account/components/FavoriteProductsSection';
 import api from '@/services/api';
 import toast from 'react-hot-toast';
 import {
   User, Mail, Phone, MapPin, Shield, LogOut, Pencil, Check, X,
   Navigation, Star, Loader2, Crown, Award,
   Plus, Trash2, Home, CheckCircle2, Camera, ChevronRight, Search,
+  Eye, EyeOff,
 } from 'lucide-react';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -188,6 +191,49 @@ interface AddressFormData {
 }
 const EMPTY_FORM: AddressFormData = { fullName: '', phone: '', addressLine: '', ward: '', district: '', city: '', isDefault: false };
 
+interface ChangePasswordFormData {
+  oldPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+const EMPTY_PASSWORD_FORM: ChangePasswordFormData = {
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: '',
+};
+
+const passwordRules = [
+  {
+    label: 'Mật khẩu phải từ 8 đến 20 ký tự',
+    test: (p: string) => p.length >= 8 && p.length <= 20,
+  },
+  {
+    label: 'Chứa ít nhất 1 chữ số, 1 chữ hoa và 1 chữ thường',
+    test: (p: string) => /[0-9]/.test(p) && /[A-Z]/.test(p) && /[a-z]/.test(p),
+  },
+  {
+    label: 'Chứa ít nhất 1 ký tự đặc biệt (!@#$^*()_)',
+    test: (p: string) => /[!@#$^*()_]/.test(p),
+  },
+];
+
+const getNewPasswordValidationMessage = (password: string) => {
+  if (!password.trim()) {
+    return 'Vui lòng nhập mật khẩu mới';
+  }
+
+  if (password.length < 6) {
+    return 'Mật khẩu mới phải có ít nhất 6 ký tự';
+  }
+
+  if (!/[A-Z]/.test(password)) {
+    return 'Mật khẩu mới phải có ít nhất 1 chữ in hoa';
+  }
+
+  return '';
+};
+
 // ─── Address Modal ────────────────────────────────────────────────────────────
 const AddressModal = ({ editing, onSave, onClose }: {
   editing?: Address; onSave: (data: AddressFormData) => Promise<void>; onClose: () => void;
@@ -356,6 +402,29 @@ const AddressModal = ({ editing, onSave, onClose }: {
             matchedProvince = await searchProvince(candidate);
             if (matchedProvince) break;
           }
+
+          // Fallback: dùng ISO3166-2 code nếu không match được từ text
+          if (!matchedProvince && addr['ISO3166-2-lvl4']) {
+            const isoMap: Record<string, string> = {
+              'VN-01':'01','VN-02':'68','VN-03':'75','VN-04':'77','VN-05':'89','VN-06':'26',
+              'VN-07':'27','VN-09':'95','VN-11':'56','VN-12':'58','VN-13':'22','VN-14':'30',
+              'VN-15':'04','VN-17':'06','VN-18':'10','VN-19':'08','VN-20':'24','VN-21':'35',
+              'VN-22':'37','VN-23':'38','VN-24':'40','VN-25':'42','VN-26':'44','VN-27':'45',
+              'VN-28':'46','VN-29':'48','VN-30':'51','VN-31':'49','VN-32':'52','VN-33':'54',
+              'VN-34':'60','VN-35':'62','VN-36':'64','VN-37':'66','VN-38':'67','VN-39':'70',
+              'VN-40':'72','VN-41':'74','VN-42':'79','VN-43':'80','VN-44':'82','VN-45':'83',
+              'VN-46':'84','VN-47':'86','VN-49':'87','VN-50':'89','VN-51':'91','VN-52':'93',
+              'VN-53':'94','VN-54':'96','VN-55':'15','VN-56':'17','VN-57':'19','VN-58':'25',
+              'VN-59':'20','VN-60':'33','VN-61':'34','VN-62':'36','VN-63':'14',
+              'VN-CT':'92','VN-DN':'48','VN-HN':'01','VN-HP':'31','VN-SG':'79',
+            };
+            const isoCode = addr['ISO3166-2-lvl4'];
+            const provinceCode = isoMap[isoCode];
+            if (provinceCode) {
+              matchedProvince = provinces.find(p => p.code === provinceCode);
+            }
+          }
+
           console.log('✅ Province:', matchedProvince);
 
           if (!matchedProvince) {
@@ -379,18 +448,25 @@ const AddressModal = ({ editing, onSave, onClose }: {
             setDistricts(distList);
             setWards([]);
 
-            // Thử match quận từ các field Nominatim
+            // Thử match quận từ các field Nominatim (thêm suburb, city để cover nhiều vùng hơn)
             let matchedDistrict = await searchDistrict(
               distList,
               allFields.county, allFields.district, allFields.city_district,
-              allFields.town, allFields.municipality
+              allFields.town, allFields.municipality, allFields.suburb,
+              // city có thể chứa tên quận (Nominatim VN hay làm vậy), nhưng bỏ qua nếu trùng tỉnh
+              ...(matchedProvince && normalize(allFields.city) !== normalize(matchedProvince.name) ? [allFields.city] : [])
             );
 
             // ── Nếu không match được quận → tìm ngược từ phường ──
             // Nominatim VN hay bỏ cấp quận, chỉ trả city = "Phường X"
             // => Load depth=3 toàn tỉnh, tìm phường nằm trong quận nào
             if (!matchedDistrict) {
-              const wardHint = allFields.city || allFields.suburb || allFields.quarter || allFields.neighbourhood || allFields.village || '';
+              // Thử nhiều field, loại city nếu trùng tỉnh
+              const wardCandidates = [allFields.suburb, allFields.quarter, allFields.neighbourhood, allFields.village, allFields.hamlet, allFields.town];
+              if (allFields.city && matchedProvince && normalize(allFields.city) !== normalize(matchedProvince.name)) {
+                wardCandidates.unshift(allFields.city);
+              }
+              const wardHint = wardCandidates.find(v => v) || '';
               if (wardHint) {
                 console.log('🔍 Quận không tìm thấy, thử tìm ngược từ phường:', wardHint);
                 try {
@@ -402,7 +478,10 @@ const AddressModal = ({ editing, onSave, onClose }: {
                     const foundWard = (dist.wards || []).find((w: any) =>
                       normalize(w.name) === normalize(wardHint) ||
                       normalize(w.name) === normalize(cleanedHint) ||
-                      normalize(stripPrefix(w.name)) === normalize(cleanedHint)
+                      normalize(stripPrefix(w.name)) === normalize(cleanedHint) ||
+                      // Partial match: tên phường chứa hint hoặc ngược lại
+                      normalize(w.name).includes(normalize(cleanedHint)) ||
+                      normalize(cleanedHint).includes(normalize(stripPrefix(w.name)))
                     );
                     if (foundWard) {
                       matchedDistrict = { code: String(dist.code), name: dist.name };
@@ -424,6 +503,45 @@ const AddressModal = ({ editing, onSave, onClose }: {
                 } catch (e) { console.warn('depth=3 search failed:', e); }
               }
 
+              // Fallback: dùng provinces.open-api.vn ward search API
+              // Nominatim VN đôi khi trả tên phường không chính xác, search API có thể tìm đúng hơn
+              try {
+                const allHints = [wardHint, allFields.hamlet, allFields.city, allFields.suburb, allFields.quarter, allFields.village].filter(Boolean);
+                for (const hint of allHints) {
+                  const searchQ = stripPrefix(hint);
+                  if (!searchQ) continue;
+                  const wSearchRes = await fetch(`https://provinces.open-api.vn/api/w/search/?q=${encodeURIComponent(searchQ)}&p=${matchedProvince.code}`);
+                  const wSearchData = await wSearchRes.json();
+                  if (Array.isArray(wSearchData) && wSearchData.length > 0) {
+                    // Tìm ward match chính xác nhất
+                    const bestWard = wSearchData.find((w: any) =>
+                      normalize(w.name) === normalize(hint) ||
+                      normalize(w.name) === normalize(searchQ) ||
+                      normalize(stripPrefix(w.name)) === normalize(searchQ)
+                    ) || wSearchData[0];
+
+                    // Tra ngược quận từ depth=3 data
+                    const deepRes2 = await fetch(`https://provinces.open-api.vn/api/p/${matchedProvince.code}?depth=3`);
+                    const deepData2 = await deepRes2.json();
+                    for (const dist of (deepData2.districts || [])) {
+                      const fw = (dist.wards || []).find((w: any) => String(w.code) === String(bestWard.code));
+                      if (fw) {
+                        matchedDistrict = { code: String(dist.code), name: dist.name };
+                        const wList: VNUnit[] = (dist.wards || []).map((w: any) => ({ code: String(w.code), name: w.name }));
+                        setDistricts(distList);
+                        setWards(wList);
+                        setSelectedDistrict(matchedDistrict);
+                        setSelectedWard({ code: String(fw.code), name: fw.name });
+                        setForm(prev => ({ ...prev, district: matchedDistrict!.name, ward: fw.name }));
+                        console.log('✅ Found via ward search API — District:', matchedDistrict.name, 'Ward:', fw.name);
+                        toast.success('Đã tự động điền đầy đủ địa chỉ từ GPS');
+                        return;
+                      }
+                    }
+                  }
+                }
+              } catch (e) { console.warn('Ward search API fallback failed:', e); }
+
               // Nếu vẫn không tìm được
               setForm(prev => ({ ...prev, district: allFields.county || allFields.district || stripPrefix(allFields.city), ward: allFields.suburb || allFields.quarter || '' }));
               toast('Đã điền tỉnh/thành từ GPS, vui lòng chọn quận/huyện', { icon: '⚠️' });
@@ -440,11 +558,12 @@ const AddressModal = ({ editing, onSave, onClose }: {
             const wardList: VNUnit[] = (wardData.wards || []).map((w: any) => ({ code: String(w.code), name: w.name }));
             setWards(wardList);
 
-            // Thử match phường — thử cả allFields.city vì Nominatim hay cho phường vào field city
+            // Thử match phường — thử nhiều field, city chỉ khi không trùng tỉnh
             const matchedWard = searchWard(
               wardList,
               allFields.quarter, allFields.suburb, allFields.neighbourhood,
-              allFields.village, allFields.hamlet, allFields.city
+              allFields.village, allFields.hamlet, allFields.town,
+              ...(matchedProvince && normalize(allFields.city) !== normalize(matchedProvince.name) ? [allFields.city] : [])
             );
             console.log('✅ Ward:', matchedWard);
 
@@ -686,15 +805,161 @@ const EditableField = ({ label, value, icon, onSave, type = 'text', placeholder,
   );
 };
 
+const ChangePasswordCard = ({
+  loading,
+  onSubmit,
+}: {
+  loading: boolean;
+  onSubmit: (payload: { oldPassword: string; newPassword: string }) => Promise<boolean>;
+}) => {
+  const [form, setForm] = useState<ChangePasswordFormData>(EMPTY_PASSWORD_FORM);
+  const [submitted, setSubmitted] = useState(false);
+  const [showOld, setShowOld] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const getRuleStyle = (passes: boolean) => {
+    if (!form.newPassword && !submitted) return 'text-gray-400';
+    if (passes) return 'text-green-500';
+    if (submitted) return 'text-red-500';
+    return 'text-gray-400';
+  };
+
+  const getRuleIcon = (passes: boolean) => {
+    if (!form.newPassword && !submitted) return <Check size={13} />;
+    if (passes) return <Check size={13} />;
+    if (submitted) return <X size={13} />;
+    return <Check size={13} />;
+  };
+
+  const handleChange = (field: keyof ChangePasswordFormData, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitted(true);
+
+    if (!form.oldPassword.trim()) {
+      toast.error('Vui lòng nhập mật khẩu hiện tại');
+      return;
+    }
+
+    const allRulesPass = passwordRules.every((r) => r.test(form.newPassword));
+    if (!allRulesPass) return;
+
+    if (form.newPassword !== form.confirmPassword) return;
+
+    const changed = await onSubmit({
+      oldPassword: form.oldPassword,
+      newPassword: form.newPassword,
+    });
+
+    if (changed) {
+      setForm(EMPTY_PASSWORD_FORM);
+      setSubmitted(false);
+    }
+  };
+
+  const inputClassName =
+    'w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:border-blue-400 focus:outline-none transition-colors';
+
+  return (
+    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="px-6 py-4 border-b border-slate-100">
+        <h2 className="text-sm font-bold text-slate-700">Đổi mật khẩu</h2>
+      </div>
+
+      <form onSubmit={handleSubmit} noValidate className="px-6 py-5 space-y-4">
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Mật khẩu hiện tại</label>
+          <div className="relative">
+            <input
+              type={showOld ? 'text' : 'password'}
+              value={form.oldPassword}
+              onChange={(e) => handleChange('oldPassword', e.target.value)}
+              className={inputClassName}
+              placeholder="Nhập mật khẩu hiện tại"
+              autoComplete="current-password"
+            />
+            <button type="button" onClick={() => setShowOld(!showOld)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+              {showOld ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Mật khẩu mới</label>
+          <div className="relative">
+            <input
+              type={showNew ? 'text' : 'password'}
+              value={form.newPassword}
+              onChange={(e) => handleChange('newPassword', e.target.value)}
+              className={inputClassName}
+              placeholder="Nhập mật khẩu mới"
+              autoComplete="new-password"
+            />
+            <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+              {showNew ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+          <ul className="mt-2 space-y-1">
+            {passwordRules.map((rule) => {
+              const passes = rule.test(form.newPassword);
+              return (
+                <li key={rule.label} className={`flex items-center gap-1.5 text-sm ${getRuleStyle(passes)}`}>
+                  {getRuleIcon(passes)}
+                  {rule.label}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Xác nhận mật khẩu mới</label>
+          <div className="relative">
+            <input
+              type={showConfirm ? 'text' : 'password'}
+              value={form.confirmPassword}
+              onChange={(e) => handleChange('confirmPassword', e.target.value)}
+              className={inputClassName}
+              placeholder="Nhập lại mật khẩu mới"
+              autoComplete="new-password"
+            />
+            <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+              {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+          {submitted && form.confirmPassword && form.newPassword !== form.confirmPassword && (
+            <p className="mt-1 text-sm text-red-500 flex items-center gap-1"><X size={13} /> Mật khẩu xác nhận không khớp</p>
+          )}
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-3 rounded-2xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+        >
+          {loading ? <Loader2 size={14} className="animate-spin" /> : <Shield size={14} />}
+          {loading ? 'Đang cập nhật...' : 'Cập nhật mật khẩu'}
+        </button>
+      </form>
+    </div>
+  );
+};
+
 // ─── Main ProfilePage ─────────────────────────────────────────────────────────
 export const ProfilePage = () => {
   const { user, setAuth, clearAuth } = useAuthStore();
+  const clearWishlist = useWishlistStore((state) => state.clearWishlist);
   const navigate = useNavigate();
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loadingAddresses, setLoadingAddresses] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingAddress, setEditingAddress] = useState<Address | undefined>();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState('');
   const [bannerUrl, setBannerUrl] = useState('');
 
@@ -718,8 +983,10 @@ export const ProfilePage = () => {
 
   const updateField = async (field: string, value: string) => {
     try {
-      const updated = await userService.updateUser(u.userId, { [field]: value } as UpdateUserPayload);
-      setAuth({ ...user, ...updated } as typeof user, useAuthStore.getState().token!);
+      const fieldMap: Record<string, string> = { name: 'fullName', email: 'email', phone: 'phone' };
+      const apiField = fieldMap[field] || field;
+      await userService.updateMyProfile({ [apiField]: value });
+      setAuth({ ...user, [field]: value } as typeof user, useAuthStore.getState().token!);
       toast.success('Cập nhật thành công');
     } catch { toast.error('Không thể cập nhật'); throw new Error('failed'); }
   };
@@ -740,12 +1007,27 @@ export const ProfilePage = () => {
   };
 
   const handleSaveAddress = async (data: AddressFormData) => {
+    const others = editingAddress
+      ? addresses.filter(a => a.addressId !== editingAddress.addressId)
+      : addresses;
+
+    const nameInput = data.fullName.trim().toLowerCase();
+    const phoneInput = data.phone.trim();
+    const dupName = others.some(a => a.fullName.trim().toLowerCase() === nameInput);
+    const dupPhone = others.some(a => a.phone.trim() === phoneInput);
+
+    if (dupName) toast.error('Tên người nhận đã tồn tại');
+    if (dupPhone) toast.error('Số điện thoại đã tồn tại');
+    if (dupName || dupPhone) return;
+
     try {
       if (editingAddress) { await addressService.update(editingAddress.addressId, data); toast.success('Đã cập nhật địa chỉ'); }
       else { await addressService.create(data); toast.success('Đã thêm địa chỉ mới'); }
       setShowModal(false); setEditingAddress(undefined);
       setAddresses(await addressService.getMyAddresses());
-    } catch { toast.error('Không thể lưu địa chỉ'); }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Không thể lưu địa chỉ');
+    }
   };
 
   const handleDeleteAddress = async (id: number) => {
@@ -761,7 +1043,23 @@ export const ProfilePage = () => {
 
   const handleLogout = async () => {
     setLoggingOut(true); await new Promise(r => setTimeout(r, 400));
+    clearWishlist();
     clearAuth(); toast.success('Đã đăng xuất'); navigate('/login');
+  };
+
+  const handleChangePassword = async ({ oldPassword, newPassword }: { oldPassword: string; newPassword: string }) => {
+    setChangingPassword(true);
+
+    try {
+      await userService.changePassword(oldPassword, newPassword);
+      toast.success('Đổi mật khẩu thành công');
+      return true;
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Không thể đổi mật khẩu');
+      return false;
+    } finally {
+      setChangingPassword(false);
+    }
   };
 
 
@@ -830,6 +1128,10 @@ export const ProfilePage = () => {
               <EditableField label="Vai trò" value={ROLE_LABELS[userRole] || 'Khách hàng'} icon={<Shield size={15} />} readOnly />
             </div>
           </div>
+
+          <ChangePasswordCard loading={changingPassword} onSubmit={handleChangePassword} />
+
+          <FavoriteProductsSection userId={u.userId} />
 
           {/* ── Địa chỉ ── */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">

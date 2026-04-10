@@ -3,6 +3,7 @@ import type { CartItem, Product, ProductVariant } from '@/types';
 type VariantLike = Partial<ProductVariant> & {
   id?: number;
   stock?: number;
+  availableStockQuantity?: number;
 };
 
 export const CART_QUANTITY_EXCEEDED_MESSAGE =
@@ -31,7 +32,7 @@ export const getCartItemStockLimit = (item: CartItem) => {
     return item.selectedVariantStock;
   }
 
-  return item.product.stockQuantity;
+  return Number(item.product.availableStockQuantity ?? item.product.stockQuantity ?? 0);
 };
 
 const getVariantId = (selectedVariant?: VariantLike | null) => {
@@ -43,13 +44,18 @@ const getVariantId = (selectedVariant?: VariantLike | null) => {
 };
 
 export const getProductPurchaseStockLimit = (
-  product: Pick<Product, 'stockQuantity'>,
+  product: Pick<Product, 'stockQuantity' | 'availableStockQuantity'>,
   selectedVariant?: VariantLike | null
 ) => {
   const variantStock = selectedVariant
-    ? Number(selectedVariant.stockQuantity ?? selectedVariant.stock ?? 0)
+    ? Number(
+        selectedVariant.availableStockQuantity ??
+          selectedVariant.stockQuantity ??
+          selectedVariant.stock ??
+          0
+      )
     : 0;
-  const productStock = Number(product.stockQuantity ?? 0);
+  const productStock = Number(product.availableStockQuantity ?? product.stockQuantity ?? 0);
 
   return selectedVariant ? (variantStock > 0 ? variantStock : productStock) : productStock;
 };
@@ -68,7 +74,7 @@ export const getCartSelectionQuantity = (
 
 export const getRemainingProductQuantity = (
   items: CartItem[],
-  product: Pick<Product, 'productId' | 'stockQuantity'>,
+  product: Pick<Product, 'productId' | 'stockQuantity' | 'availableStockQuantity'>,
   selectedVariant?: VariantLike | null
 ) => {
   const stockLimit = getProductPurchaseStockLimit(product, selectedVariant);

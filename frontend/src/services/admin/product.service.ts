@@ -91,4 +91,5 @@ export const adminProductService = {
   },
 
   archive: async (id: number) => await api.patch(`/admin/products/${id}/archive`),
+  restore: async (id: number) => await api.patch(`/admin/products/${id}/restore`),
 };

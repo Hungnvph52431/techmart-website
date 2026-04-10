@@ -48,11 +48,11 @@ services:
       - FRONTEND_URL=http://localhost:5173
       - SMTP_HOST=smtp.gmail.com
       - SMTP_PORT=587
-      - SMTP_USER=
-      - SMTP_PASS=
+      - SMTP_USER=tokikhanh1234@gmail.com
+      - SMTP_PASS=bldi qnsa ltvu fdwi
       - SMTP_FROM_NAME=TechMart
-      - VNPAY_TMN_CODE=
-      - VNPAY_HASH_SECRET=
+      - VNPAY_TMN_CODE=LGZKF5XY
+      - VNPAY_HASH_SECRET=L25C1P0I1GSXW0TBC49HYQZ5QS95ZZA6
       - VNPAY_RETURN_URL=http://localhost:5001/api/payment/vnpay/return
     volumes:
       - ./backend:/app

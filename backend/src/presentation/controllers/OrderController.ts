@@ -1,10 +1,34 @@
-import { Request, Response } from 'express';
-import { OrderUseCase } from '../../application/use-cases/OrderUseCase';
-import { AuthRequest } from '../middlewares/auth.middleware';
-import { toOrderDetail, toOrderListItem } from '../../application/mappers/OrderPresenter';
+import { Request, Response } from "express";
+import { OrderUseCase } from "../../application/use-cases/OrderUseCase";
+import { AuthRequest } from "../middlewares/auth.middleware";
+import { createGuestOrderAccessToken } from "../../application/services/GuestOrderAccessService";
+import { GuestOrderRequest } from "../middlewares/guest-order.middleware";
+import {
+  toOrderDetail,
+  toOrderListItem,
+} from "../../application/mappers/OrderPresenter";
 
 export class OrderController {
   constructor(private orderUseCase: OrderUseCase) {}
+
+  private ensureGuestOrderAccess(
+    req: GuestOrderRequest,
+    orderCode: string,
+  ) {
+    const normalizedOrderCode = orderCode.trim().toUpperCase();
+    if (!req.guestOrder) {
+      throw new Error('Thiếu quyền truy cập đơn hàng');
+    }
+
+    if (req.guestOrder.orderCode !== normalizedOrderCode) {
+      throw new Error('Mã truy cập không khớp với đơn hàng');
+    }
+
+    return {
+      orderCode: normalizedOrderCode,
+      email: req.guestOrder.email,
+    };
+  }
 
   // --- DÀNH CHO KHÁCH HÀNG (MY ORDERS) ---
 
@@ -13,10 +37,10 @@ export class OrderController {
     try {
       const orders = await this.orderUseCase.getMyOrders(
         req.user.userId,
-        req.query.status as any
+        req.query.status as any,
       );
       // Sử dụng Mapper để trả về định dạng chuẩn cho khách hàng
-      res.json(orders.map((order) => toOrderListItem(order, 'customer')));
+      res.json(orders.map((order) => toOrderListItem(order, "customer")));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -27,14 +51,14 @@ export class OrderController {
     try {
       const aggregate = await this.orderUseCase.getMyOrderDetail(
         Number(req.params.id),
-        req.user.userId
+        req.user.userId,
       );
 
       if (!aggregate) {
-        return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
+        return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
       }
 
-      res.json(toOrderDetail(aggregate, 'customer'));
+      res.json(toOrderDetail(aggregate, "customer"));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -45,11 +69,13 @@ export class OrderController {
     try {
       const timeline = await this.orderUseCase.getMyOrderTimeline(
         Number(req.params.id),
-        req.user.userId
+        req.user.userId,
       );
 
       if (!timeline) {
-        return res.status(404).json({ message: 'Không tìm thấy lịch sử đơn hàng' });
+        return res
+          .status(404)
+          .json({ message: "Không tìm thấy lịch sử đơn hàng" });
       }
 
       res.json(timeline);
@@ -57,15 +83,18 @@ export class OrderController {
       res.status(500).json({ message: error.message });
     }
   };
-getReturns = async (req: AuthRequest, res: Response) => {
+
+  getReturns = async (req: AuthRequest, res: Response) => {
     try {
       const returns = await this.orderUseCase.getOrderReturns(
         Number(req.params.id),
-        req.user.userId
+        req.user.userId,
       );
 
       if (!returns) {
-        return res.status(404).json({ message: 'Không tìm thấy thông tin hoàn trả' });
+        return res
+          .status(404)
+          .json({ message: "Không tìm thấy thông tin hoàn trả" });
       }
 
       res.json(returns);
@@ -73,16 +102,19 @@ getReturns = async (req: AuthRequest, res: Response) => {
       res.status(500).json({ message: error.message });
     }
   };
+
   getReturnById = async (req: AuthRequest, res: Response) => {
     try {
       const orderReturn = await this.orderUseCase.getOrderReturn(
         Number(req.params.id),
         Number(req.params.returnId),
-        req.user.userId
+        req.user.userId,
       );
 
       if (!orderReturn) {
-        return res.status(404).json({ message: 'Không tìm thấy phiếu hoàn trả' });
+        return res
+          .status(404)
+          .json({ message: "Không tìm thấy phiếu hoàn trả" });
       }
 
       res.json(orderReturn);
@@ -90,6 +122,7 @@ getReturns = async (req: AuthRequest, res: Response) => {
       res.status(500).json({ message: error.message });
     }
   };
+  
   // --- THAO TÁC ĐƠN HÀNG ---
 
   /** Tạo đơn hàng mới */
@@ -98,10 +131,85 @@ getReturns = async (req: AuthRequest, res: Response) => {
       const order = await this.orderUseCase.createOrder({
         ...req.body,
         userId: req.user.userId, // Lấy userId từ Token đã authenticate
+        customerName: req.body.customerName || req.body.shippingName,
+        customerEmail: req.body.customerEmail || req.user.email,
+        customerPhone: req.body.customerPhone || req.body.shippingPhone,
       });
       res.status(201).json(order);
     } catch (error: any) {
-      console.error('❌ [OrderController.create]', error.message, error.stack?.split('\n').slice(0, 3).join('\n'));
+      console.error(
+        "❌ [OrderController.create]",
+        error.message,
+        error.stack?.split("\n").slice(0, 3).join("\n"),
+      );
+      res.status(400).json({ message: error.message });
+    }
+  };
+
+  createGuest = async (req: Request, res: Response) => {
+    try {
+      const order = await this.orderUseCase.createOrder({
+        ...req.body,
+        userId: null,
+        customerName: req.body.customerName || req.body.shippingName,
+        customerEmail: req.body.customerEmail,
+        customerPhone: req.body.customerPhone || req.body.shippingPhone,
+      });
+      res.status(201).json({
+        ...order,
+        accessToken: createGuestOrderAccessToken({
+          orderCode: order.orderCode,
+          email: req.body.customerEmail,
+        }),
+      });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  };
+
+  lookupGuest = async (req: Request, res: Response) => {
+    try {
+      const aggregate = await this.orderUseCase.lookupGuestOrder(
+        req.body.orderCode || '',
+        req.body.email || '',
+      );
+
+      if (!aggregate) {
+        return res
+          .status(404)
+          .json({ message: 'Không tìm thấy đơn hàng phù hợp' });
+      }
+
+      res.json({
+        order: toOrderDetail(aggregate, 'guest'),
+        accessToken: createGuestOrderAccessToken({
+          orderCode: aggregate.order.orderCode,
+          email: req.body.email,
+        }),
+      });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  };
+
+  confirmDeliveredGuest = async (req: GuestOrderRequest, res: Response) => {
+    try {
+      const { orderCode, email } = this.ensureGuestOrderAccess(
+        req,
+        req.params.orderCode || '',
+      );
+
+      const order = await this.orderUseCase.confirmDeliveredByGuest(
+        orderCode,
+        email,
+      );
+
+      if (!order) {
+        return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
+      }
+
+      res.json(order);
+    } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
   };
@@ -113,12 +221,14 @@ getReturns = async (req: AuthRequest, res: Response) => {
         Number(req.params.id),
         req.user.userId,
         req.user.role,
-        req.body.reason || '',
-        req.body.adminNote
+        req.body.reason || "",
+        req.body.adminNote,
       );
 
       if (!order) {
-        return res.status(404).json({ message: 'Không tìm thấy đơn hàng để hủy' });
+        return res
+          .status(404)
+          .json({ message: "Không tìm thấy đơn hàng để hủy" });
       }
 
       res.json(order);
@@ -132,11 +242,11 @@ getReturns = async (req: AuthRequest, res: Response) => {
     try {
       const order = await this.orderUseCase.confirmDeliveredByCustomer(
         Number(req.params.id),
-        req.user.userId
+        req.user.userId,
       );
 
       if (!order) {
-        return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
+        return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
       }
 
       res.json(order);
@@ -154,7 +264,7 @@ getReturns = async (req: AuthRequest, res: Response) => {
 
       // Nếu items gửi dưới dạng string (FormData), parse lại
       let items = req.body.items;
-      if (typeof items === 'string') {
+      if (typeof items === "string") {
         items = JSON.parse(items);
       }
 
@@ -165,12 +275,53 @@ getReturns = async (req: AuthRequest, res: Response) => {
           reason: req.body.reason,
           customerNote: req.body.customerNote,
           items,
-          evidenceImages: evidenceImages.length > 0 ? evidenceImages : undefined,
-        }
+          evidenceImages:
+            evidenceImages.length > 0 ? evidenceImages : undefined,
+        },
       );
 
       if (!orderReturn) {
-        return res.status(404).json({ message: 'Yêu cầu trả hàng không hợp lệ' });
+        return res
+          .status(404)
+          .json({ message: "Yêu cầu trả hàng không hợp lệ" });
+      }
+
+      res.status(201).json(orderReturn);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  };
+
+  createGuestReturn = async (req: GuestOrderRequest, res: Response) => {
+    try {
+      const { orderCode, email } = this.ensureGuestOrderAccess(
+        req,
+        req.params.orderCode || '',
+      );
+      const files = (req.files as Express.Multer.File[]) || [];
+      const evidenceImages = files.map((f) => `/images/returns/${f.filename}`);
+
+      let items = req.body.items;
+      if (typeof items === "string") {
+        items = JSON.parse(items);
+      }
+
+      const orderReturn = await this.orderUseCase.requestReturnByGuest(
+        orderCode,
+        email,
+        {
+          reason: req.body.reason,
+          customerNote: req.body.customerNote,
+          items,
+          evidenceImages:
+            evidenceImages.length > 0 ? evidenceImages : undefined,
+        },
+      );
+
+      if (!orderReturn) {
+        return res
+          .status(404)
+          .json({ message: "Yêu cầu trả hàng không hợp lệ" });
       }
 
       res.status(201).json(orderReturn);
@@ -184,7 +335,9 @@ getReturns = async (req: AuthRequest, res: Response) => {
   /** Lấy tất cả yêu cầu hoàn trả (Admin) */
   adminListAllReturns = async (req: Request, res: Response) => {
     try {
-      const returns = await this.orderUseCase.getAdminAllReturns(req.query as any);
+      const returns = await this.orderUseCase.getAdminAllReturns(
+        req.query as any,
+      );
       res.json(returns);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -201,9 +354,12 @@ getReturns = async (req: AuthRequest, res: Response) => {
         req.user.userId,
         req.user.role,
         decision,
-        adminNote
+        adminNote,
       );
-      if (!result) return res.status(404).json({ message: 'Không tìm thấy yêu cầu hoàn trả' });
+      if (!result)
+        return res
+          .status(404)
+          .json({ message: "Không tìm thấy yêu cầu hoàn trả" });
       res.json(result);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -218,9 +374,12 @@ getReturns = async (req: AuthRequest, res: Response) => {
         Number(req.params.returnId),
         req.user.userId,
         req.user.role,
-        req.body.adminNote
+        req.body.adminNote,
       );
-      if (!result) return res.status(404).json({ message: 'Không tìm thấy yêu cầu hoàn trả' });
+      if (!result)
+        return res
+          .status(404)
+          .json({ message: "Không tìm thấy yêu cầu hoàn trả" });
       res.json(result);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -235,9 +394,12 @@ getReturns = async (req: AuthRequest, res: Response) => {
         Number(req.params.returnId),
         req.user.userId,
         req.user.role,
-        req.body.adminNote
+        req.body.adminNote,
       );
-      if (!result) return res.status(404).json({ message: 'Không tìm thấy yêu cầu hoàn trả' });
+      if (!result)
+        return res
+          .status(404)
+          .json({ message: "Không tìm thấy yêu cầu hoàn trả" });
       res.json(result);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -246,20 +408,23 @@ getReturns = async (req: AuthRequest, res: Response) => {
 
   /** Lấy tất cả đơn hàng (Admin) */
   getAll = async (req: Request, res: Response) => {
-  try {
-    console.log(">>> Đã nhận yêu cầu lấy danh sách đơn hàng Admin"); // Thêm dòng này
-    const orders = await this.orderUseCase.getAdminOrders(req.query as any);
-    res.json(orders);
-  } catch (error: any) {
-    console.error("!!! LỖI NGHIÊM TRỌNG TẠI CONTROLLER:", error); // Đảm bảo có dòng này để Docker hiện chữ đỏ
-    res.status(500).json({ message: error.message });
-  }
-};  
+    try {
+      console.log(">>> Đã nhận yêu cầu lấy danh sách đơn hàng Admin"); // Thêm dòng này
+      const orders = await this.orderUseCase.getAdminOrders(req.query as any);
+      res.json(orders);
+    } catch (error: any) {
+      console.error("!!! LỖI NGHIÊM TRỌNG TẠI CONTROLLER:", error); // Đảm bảo có dòng này để Docker hiện chữ đỏ
+      res.status(500).json({ message: error.message });
+    }
+  };
 
   /** Lấy thống kê đơn hàng cho Dashboard */
   getStats = async (req: Request, res: Response) => {
     try {
-      const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
+      const { startDate, endDate } = req.query as {
+        startDate?: string;
+        endDate?: string;
+      };
       const stats = await this.orderUseCase.getOrderStats(startDate, endDate);
       res.json({ success: true, data: stats });
     } catch (error: any) {
@@ -277,14 +442,16 @@ getReturns = async (req: AuthRequest, res: Response) => {
         status,
         actorUserId,
         actorRole,
-        note
+        note,
       );
 
       if (!order) {
-        return res.status(404).json({ message: 'Không thể cập nhật trạng thái' });
+        return res
+          .status(404)
+          .json({ message: "Không thể cập nhật trạng thái" });
       }
 
-      res.json({ message: 'Trạng thái đơn hàng đã được cập nhật', order });
+      res.json({ message: "Trạng thái đơn hàng đã được cập nhật", order });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }

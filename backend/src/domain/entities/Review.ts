@@ -16,7 +16,7 @@ export interface OrderFeedback {
 export interface ProductReview {
   reviewId: number;
   productId: number;
-  userId: number;
+  userId: number | null;
   orderId?: number;
   orderDetailId?: number;
   rating: number;
@@ -26,6 +26,9 @@ export interface ProductReview {
   isVerifiedPurchase: boolean;
   helpfulCount: number;
   status: ProductReviewStatus;
+  editCount: number;
+  editedAfterReturnAt?: Date;
+  editedAfterReturnOrderReturnId?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -39,6 +42,12 @@ export interface OrderReviewItem {
   productImage?: string;
   quantity: number;
   canReview: boolean;
+  canCreateReview: boolean;
+  canEditReview: boolean;
+  hasUsedReturnEdit: boolean;
+  remainingEditCount: number;
+  reviewEditLimit: number;
+  linkedReturnId?: number;
   review?: ProductReview;
 }
 
@@ -47,6 +56,7 @@ export interface OrderReviewSummary {
   orderStatus: OrderStatus;
   canReviewOrder: boolean;
   orderFeedback?: OrderFeedback;
+  hasPendingReviewActions: boolean;
   items: OrderReviewItem[];
 }
 
@@ -62,8 +72,18 @@ export interface CreateProductReviewDTO {
   orderId: number;
   orderDetailId: number;
   productId: number;
-  userId: number;
+  userId: number | null;
   rating: number;
   title?: string;
   comment?: string;
+}
+
+export interface UpdateProductReviewDTO {
+  reviewId: number;
+  userId: number | null;
+  orderId?: number;
+  rating: number;
+  title?: string;
+  comment?: string;
+  editedAfterReturnOrderReturnId: number;
 }

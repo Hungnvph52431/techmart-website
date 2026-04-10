@@ -4,6 +4,16 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL;
 
+const isLoginRequest = (error: any) => {
+  const method = error?.config?.method?.toLowerCase();
+  const url = String(error?.config?.url || '');
+  return method === 'post' && url.includes('/auth/login');
+};
+
+const shouldSkipAuthRedirect = (error: any) => {
+  return Boolean((error?.config as any)?.skipAuthRedirect);
+};
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -35,12 +45,16 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // 👉 Handle CORS / Network lỗi rõ hơn
     if (!error.response) {
       console.error("❌ Network / CORS error:", error.message);
     }
 
-    if (error.response?.status === 401) {
+    if (
+      error.response?.status === 401 &&
+      !isLoginRequest(error) &&
+      !shouldSkipAuthRedirect(error)
+    ) {
+      // Đã gộp: Xóa sạch localStorage và cả auth-storage của Zustand
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('auth-storage');

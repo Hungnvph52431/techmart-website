@@ -3,14 +3,22 @@ import { Link, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { authService } from "@/services/auth.service";
 import toast from "react-hot-toast";
-import {
-  Mail,
-  ArrowLeft,
-  Loader2,
-  Lock,
-  Eye,
-  EyeOff,
-} from "lucide-react";
+import { Mail, ArrowLeft, Loader2, Lock, Eye, EyeOff, Check, X } from "lucide-react";
+
+const passwordRules = [
+  {
+    label: "Mật khẩu phải từ 8 đến 20 ký tự",
+    test: (p: string) => p.length >= 8 && p.length <= 20,
+  },
+  {
+    label: "Bao gồm số, chữ viết hoa, chữ viết thường",
+    test: (p: string) => /[0-9]/.test(p) && /[A-Z]/.test(p) && /[a-z]/.test(p),
+  },
+  {
+    label: "Bao gồm ít nhất một ký tự đặc biệt !@#$^*()_",
+    test: (p: string) => /[!@#$^*()_]/.test(p),
+  },
+];
 
 type Step = "email" | "otp" | "reset";
 
@@ -24,12 +32,12 @@ export const ForgotPasswordPage = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  const [tempToken, setTempToken] = useState(""); // token từ bước 1
-  const [resetToken, setResetToken] = useState(""); // token từ bước 2
+  const [tempToken, setTempToken] = useState(""); 
+  const [resetToken, setResetToken] = useState(""); 
 
   const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
-  // Bước 1: Gửi OTP
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
@@ -50,7 +58,6 @@ export const ForgotPasswordPage = () => {
     }
   };
 
-  // Bước 2: Xác thực OTP
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!otp || otp.length !== 6) {
@@ -73,14 +80,27 @@ export const ForgotPasswordPage = () => {
     }
   };
 
-  // Bước 3: Đặt lại mật khẩu
+  const getRuleStyle = (passes: boolean) => {
+    if (!newPassword && !submitted) return "text-gray-400";
+    if (passes) return "text-green-500";
+    if (submitted) return "text-red-500";
+    return "text-gray-400";
+  };
+
+  const getRuleIcon = (passes: boolean) => {
+    if (!newPassword && !submitted) return <Check size={14} />;
+    if (passes) return <Check size={14} />;
+    if (submitted) return <X size={14} />;
+    return <Check size={14} />;
+  };
+
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitted(true);
 
-    if (newPassword.length < 8) {
-      toast.error("Mật khẩu phải có ít nhất 8 ký tự");
-      return;
-    }
+    const allRulesPass = passwordRules.every((r) => r.test(newPassword));
+    if (!allRulesPass) return;
+
     if (newPassword !== confirmPassword) {
       toast.error("Mật khẩu xác nhận không khớp");
       return;
@@ -91,7 +111,6 @@ export const ForgotPasswordPage = () => {
       await authService.resetPassword(resetToken, newPassword);
       toast.success("Đặt lại mật khẩu thành công!");
 
-      // Chuyển về trang đăng nhập sau 1.5s
       setTimeout(() => {
         navigate("/login");
       }, 1500);
@@ -106,7 +125,6 @@ export const ForgotPasswordPage = () => {
     <Layout>
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-md mx-auto bg-white rounded-[32px] shadow-xl border border-gray-100 p-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {/* Header */}
           <div className="text-center mb-10">
             <Link
               to="/login"
@@ -127,9 +145,8 @@ export const ForgotPasswordPage = () => {
             </p>
           </div>
 
-          {/* Bước 1: Nhập Email */}
           {step === "email" && (
-            <form onSubmit={handleSendOtp} className="space-y-6">
+            <form onSubmit={handleSendOtp} noValidate className="space-y-6">
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase ml-1">
                   Email tài khoản
@@ -164,9 +181,8 @@ export const ForgotPasswordPage = () => {
             </form>
           )}
 
-          {/* Bước 2: Nhập OTP */}
           {step === "otp" && (
-            <form onSubmit={handleVerifyOtp} className="space-y-6">
+            <form onSubmit={handleVerifyOtp} noValidate className="space-y-6">
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase ml-1">
                   Mã OTP (6 số)
@@ -205,9 +221,8 @@ export const ForgotPasswordPage = () => {
             </form>
           )}
 
-          {/* Bước 3: Đặt lại mật khẩu */}
           {step === "reset" && (
-            <form onSubmit={handleResetPassword} className="space-y-6">
+            <form onSubmit={handleResetPassword} noValidate className="space-y-6">
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase ml-1">
                   Mật khẩu mới
@@ -223,7 +238,6 @@ export const ForgotPasswordPage = () => {
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="••••••••"
                     required
-                    minLength={8}
                     className="w-full pl-12 pr-12 py-4 bg-gray-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                   <button
@@ -234,6 +248,17 @@ export const ForgotPasswordPage = () => {
                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
                 </div>
+                <ul className="mt-2 space-y-1">
+                  {passwordRules.map((rule) => {
+                    const passes = rule.test(newPassword);
+                    return (
+                      <li key={rule.label} className={`flex items-center gap-1.5 text-sm ${getRuleStyle(passes)}`}>
+                        {getRuleIcon(passes)}
+                        {rule.label}
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
 
               <div>
@@ -273,7 +298,6 @@ export const ForgotPasswordPage = () => {
             </form>
           )}
 
-          {/* Footer */}
           <div className="mt-8 text-center pt-6 border-t border-gray-50">
             <p className="text-gray-500 text-sm font-medium">
               Nhớ mật khẩu rồi?{" "}

@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { sendForgotPasswordOtpEmail } from "../../application/services/EmailService";
+import { validatePasswordPolicy } from "./UserUseCase";
 
 const JWT_SECRET: string = process.env.JWT_SECRET || "secret";
 const JWT_EXPIRES = (process.env.JWT_EXPIRES_IN || "7d") as any;
@@ -39,7 +40,9 @@ export class AuthUseCase {
 
   async register(userData: any) {
     const existingUser = await this.userRepository.findByEmail(userData.email);
-    if (existingUser) throw new Error("Email already exists");
+    if (existingUser) throw new Error("Email đã tồn tại");
+
+    validatePasswordPolicy(userData.password);
 
     const user = await this.userRepository.create(userData);
     const { password, ...userWithoutPassword } = user;
@@ -74,10 +77,8 @@ export class AuthUseCase {
       throw new Error("Email không tồn tại hoặc yêu cầu không hợp lệ");
     }
 
-    // Tạo OTP 6 số
     const otp = crypto.randomInt(100000, 999999).toString();
 
-    // Tạo temporary JWT chứa OTP và userId (để verify sau)
     const tempPayload = {
       userId: user.userId,
       email: user.email,
@@ -89,7 +90,6 @@ export class AuthUseCase {
       expiresIn: `${OTP_EXPIRY_MINUTES}m`,
     });
 
-    // Gửi email OTP
     await sendForgotPasswordOtpEmail({
       customerName: user.name,
       customerEmail: user.email,
@@ -97,10 +97,9 @@ export class AuthUseCase {
       expiresInMinutes: OTP_EXPIRY_MINUTES,
     });
 
-    // Trả về tempToken để frontend dùng khi verify OTP
     return {
       message: "OTP đã được gửi đến email của bạn",
-      tempToken, // Frontend sẽ lưu tạm token này
+      tempToken, 
     };
   }
 
@@ -121,7 +120,6 @@ export class AuthUseCase {
       throw new Error("OTP không chính xác");
     }
 
-    // Tạo temporary reset token (dùng để đổi mật khẩu)
     const resetToken = jwt.sign(
       {
         userId: decoded.userId,
@@ -148,11 +146,11 @@ export class AuthUseCase {
     const user = await this.userRepository.findById(decoded.userId);
     if (!user) throw new Error("Người dùng không tồn tại");
 
-    // Hash mật khẩu mới
+    validatePasswordPolicy(newPassword);
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-    // Cập nhật mật khẩu
     await this.userRepository.updatePassword(decoded.userId, hashedPassword);
 
     return { message: "Mật khẩu đã được đặt lại thành công" };

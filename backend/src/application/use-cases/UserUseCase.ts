@@ -3,6 +3,20 @@ import { User } from '../../domain/entities/User';
 import bcrypt from 'bcryptjs';
 import { CreateUserDTO, UpdateUserDTO } from '../../domain/entities/User';
 
+export const validatePasswordPolicy = (password: string) => {
+    if (password.length < 8 || password.length > 20) {
+        throw new Error('Mật khẩu phải từ 8 đến 20 ký tự');
+    }
+
+    if (!/[0-9]/.test(password) || !/[A-Z]/.test(password) || !/[a-z]/.test(password)) {
+        throw new Error('Mật khẩu phải bao gồm số, chữ viết hoa và chữ viết thường');
+    }
+
+    if (!/[!@#$^*()_]/.test(password)) {
+        throw new Error('Mật khẩu phải có ít nhất một ký tự đặc biệt !@#$^*()_');
+    }
+};
+
 export interface UserFilters {
     role?: 'customer' | 'admin' | 'staff' | 'warehouse';
     status?: 'active' | 'inactive' | 'banned';
@@ -39,7 +53,7 @@ export class UserUseCase {
                 );
             }
 
-        }
+        }   
         return users.map(({ password, ...user }) => user as User);
     }
 
@@ -181,15 +195,15 @@ export class UserUseCase {
     async changePassword(userId: number, oldPassword: string, newPassword: string): Promise<boolean> {
         const user = await this.userRepository.findById(userId);
         if (!user) {
-            throw new Error('User not found');
+            throw new Error('Không tìm thấy người dùng');
         }
         const isPasswordValid = await bcrypt.compare(oldPassword, user.password);
         if (!isPasswordValid) {
-            throw new Error('Old password is incorrect');
+            throw new Error('Mật khẩu hiện tại không chính xác');
         }
-        if (newPassword.length < 6) {
-            throw new Error('New password must be at least 6 characters long');
-        }
+
+        validatePasswordPolicy(newPassword);
+
         const hashedPassword = await bcrypt.hash(newPassword, 10);
         return await this.userRepository.updatePassword(userId, hashedPassword);
     }

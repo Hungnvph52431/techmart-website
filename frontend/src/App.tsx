@@ -1,54 +1,59 @@
-import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-  Navigate,
-} from "react-router-dom";
-import { Toaster } from "react-hot-toast";
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
+import { useAuthStore } from '@/store/authStore';
 
 // --- PAGES CÔNG KHAI ---
-import { HomePage } from "@/pages/HomePage";
-import { AboutPage } from "@/pages/AboutPage";
-import { ContactPage } from "@/pages/ContactPage";
-import { PolicyPage } from "@/pages/PolicyPage";
-import { ShippingPage } from "@/pages/ShippingPage";
-import { ReturnPage } from "@/pages/ReturnPage";
-import { PaymentPage } from "@/pages/PaymentPage";
-import { FAQPage } from "@/pages/FAQPage";
-import { ProductListPage } from "@/features/products/pages/ProductListPage";
-import { ProductDetailPage } from "@/features/products/pages/ProductDetailPage";
-import { CartPage } from "@/features/cart/pages/CartPage";
-import { CheckoutPage } from "@/features/orders/pages/CheckoutPage";
+import { HomePage } from '@/pages/HomePage';
+import { AboutPage } from '@/pages/AboutPage';
+import { ContactPage } from '@/pages/ContactPage';
+import { PolicyPage } from '@/pages/PolicyPage';
+import { ShippingPage } from '@/pages/ShippingPage';
+import { ReturnPage } from '@/pages/ReturnPage';
+import { PaymentPage } from '@/pages/PaymentPage';
+import { FAQPage } from '@/pages/FAQPage';
+import { ProductListPage } from '@/features/products/pages/ProductListPage';
+import { ProductDetailPage } from '@/features/products/pages/ProductDetailPage';
+import { CartPage } from '@/features/cart/pages/CartPage';
+import { CheckoutPage } from '@/features/orders/pages/CheckoutPage';
 
 // --- AUTH & ACCOUNT ---
-import { LoginPage } from "@/features/auth/pages/LoginPage";
-import { RegisterPage } from "@/features/auth/pages/RegisterPage"; //
-import { ProfilePage } from "@/features/account/pages/ProfilePage"; //
+import { LoginPage } from '@/features/auth/pages/LoginPage';
+import { RegisterPage } from '@/features/auth/pages/RegisterPage'; //
+import { ProfilePage } from '@/features/account/pages/ProfilePage'; //
 import { ForgotPasswordPage } from "./features/auth/pages/ForgotPasswordPage";
 
+
 // --- HỆ THỐNG ĐƠN HÀNG (KHÁCH HÀNG) ---
-import { CustomerRouteGuard } from "@/features/orders/components/CustomerRouteGuard";
-import { CustomerOrdersLayout } from "@/features/orders/components/CustomerOrdersLayout";
-import { OrdersPage } from "@/features/orders/pages/OrdersPage";
-import { OrderDetailPage } from "@/features/orders/pages/OrderDetailPage";
-import { PaymentResultPage } from "@/features/payment/pages/PaymentResultPage";
-import { BankTransferPage } from "@/features/payment/pages/BankTransferPage";
+import { CustomerRouteGuard } from '@/features/orders/components/CustomerRouteGuard';
+import { CustomerOrdersLayout } from '@/features/orders/components/CustomerOrdersLayout';
+import { OrdersPage } from '@/features/orders/pages/OrdersPage';
+import { OrderDetailPage } from '@/features/orders/pages/OrderDetailPage';
+import { GuestOrderDetailPage } from '@/features/orders/pages/GuestOrderDetailPage';
+import { PaymentResultPage } from '@/features/payment/pages/PaymentResultPage';
 // --- QUẢN TRỊ (ADMIN) ---
-import { AdminReviews } from "@/features/admin/pages/AdminReviews";
-import { AdminLayout } from "@/features/admin/components/AdminLayout";
-import { AdminDashboard } from "@/features/admin/pages/AdminDashboard";
-import { AdminCategories } from "@/features/admin/pages/AdminCategories";
-import { AdminProducts } from "@/features/admin/pages/AdminProducts";
-import { AdminProductFormPage } from "@/features/admin/pages/AdminProductFormPage";
-import { AdminOrders } from "@/features/admin/pages/AdminOrders";
-import { AdminUsers } from "@/features/admin/pages/AdminUsers";
-import { AdminAttributes } from "@/features/admin/pages/AdminAttributes";
-import { AdminVoucher } from "@/features/admin/pages/AdminVouchers";
-import { AdminBanners } from "@/features/admin/pages/AdminBanners";
-import { AdminOrderDetail } from "./features/admin/pages/AdminOrderDetail";
-import { AdminReturns } from "@/features/admin/pages/AdminReturns";
-import { WalletPage } from "@/features/wallet/pages/WalletPage";
-import { AdminWalletTopups } from "@/features/admin/pages/AdminWalletTopups";
+import { AdminReviews } from '@/features/admin/pages/AdminReviews';
+import { AdminLayout } from '@/features/admin/components/AdminLayout';
+import { AdminDashboard } from '@/features/admin/pages/AdminDashboard';
+import { AdminCategories } from '@/features/admin/pages/AdminCategories';
+import { AdminProducts } from '@/features/admin/pages/AdminProducts';
+import { AdminProductFormPage } from '@/features/admin/pages/AdminProductFormPage';
+import { AdminOrders } from '@/features/admin/pages/AdminOrders';
+import { AdminUsers } from '@/features/admin/pages/AdminUsers';
+import { AdminAttributes } from '@/features/admin/pages/AdminAttributes';
+import { AdminVoucher } from '@/features/admin/pages/AdminVouchers';
+import { AdminBrands } from '@/features/admin/pages/AdminBrands';
+import { AdminBanners } from '@/features/admin/pages/AdminBanners';
+import { AdminOrderDetail } from './features/admin/pages/AdminOrderDetail';
+import { AdminReturns } from '@/features/admin/pages/AdminReturns';
+import { WalletPage } from '@/features/wallet/pages/WalletPage';
+import { AdminWalletTopups } from '@/features/admin/pages/AdminWalletTopups';
+import { AdminWalletWithdrawals } from '@/features/admin/pages/AdminWalletWithdrawals';
+
+const CartRoute = () => {
+  const authenticated = useAuthStore((state) => state.isAuthenticated)();
+  return authenticated ? <CartPage /> : <Navigate to="/orders" replace />;
+};
+
 function App() {
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -68,20 +73,18 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/cart" element={<CartPage />} />
+        <Route path="/cart" element={<CartRoute />} />
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/payment/result" element={<PaymentResultPage />} />
-        <Route
-          path="/payment/bank-transfer/:orderId"
-          element={<BankTransferPage />}
-        />
-        {/* Bảo vệ các route cần đăng nhập (Đơn hàng & Profile) */}
-        <Route element={<CustomerRouteGuard />}>
-          <Route path="/orders" element={<CustomerOrdersLayout />}>
-            <Route index element={<OrdersPage />} />
+        <Route path="/orders" element={<CustomerOrdersLayout />}>
+          <Route index element={<OrdersPage />} />
+          <Route path="lookup/:orderCode" element={<GuestOrderDetailPage />} />
+          <Route element={<CustomerRouteGuard />}>
             <Route path=":id" element={<OrderDetailPage />} />
           </Route>
-
+        </Route>
+        {/* Bảo vệ các route cần đăng nhập */}
+        <Route element={<CustomerRouteGuard />}>
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/wallet" element={<WalletPage />} />
         </Route>
@@ -100,10 +103,12 @@ function App() {
           <Route path="orders" element={<AdminOrders />} />
           <Route path="/admin/orders/:id" element={<AdminOrderDetail />} />
           <Route path="users" element={<AdminUsers />} />
+          <Route path="brands" element={<AdminBrands />} />
           <Route path="vouchers" element={<AdminVoucher />} />
           <Route path="reviews" element={<AdminReviews />} />
           <Route path="returns" element={<AdminReturns />} />
           <Route path="wallet-topups" element={<AdminWalletTopups />} />
+          <Route path="wallet-withdrawals" element={<AdminWalletWithdrawals />} />
         </Route>
 
         {/* Điều hướng mặc định nếu gõ sai URL */}

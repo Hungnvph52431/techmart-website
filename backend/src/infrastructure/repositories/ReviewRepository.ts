@@ -6,6 +6,7 @@ import {
   CreateProductReviewDTO,
   OrderFeedback,
   ProductReview,
+  UpdateProductReviewDTO,
 } from '../../domain/entities/Review';
 import { IReviewRepository } from '../../domain/repositories/IReviewRepository';
 
@@ -34,6 +35,65 @@ export class ReviewRepository implements IReviewRepository {
     );
 
     return rows.map((row) => this.mapRowToProductReview(row));
+  }
+
+  async findProductReviewByIdForUser(
+    reviewId: number,
+    userId: number
+  ): Promise<ProductReview | null> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      'SELECT * FROM reviews WHERE review_id = ? AND user_id = ? LIMIT 1',
+      [reviewId, userId]
+    );
+
+    return rows.length > 0 ? this.mapRowToProductReview(rows[0]) : null;
+  }
+
+  async findProductReviewByIdForGuest(
+    reviewId: number,
+    orderId: number
+  ): Promise<ProductReview | null> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      'SELECT * FROM reviews WHERE review_id = ? AND order_id = ? AND user_id IS NULL LIMIT 1',
+      [reviewId, orderId]
+    );
+
+    return rows.length > 0 ? this.mapRowToProductReview(rows[0]) : null;
+  }
+
+  async findReturnLinkedOrderDetailIds(
+    orderId: number,
+    userId: number
+  ): Promise<Map<number, number>> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT ori.order_detail_id, MIN(orr.order_return_id) AS order_return_id
+       FROM order_return_items ori
+       JOIN order_returns orr ON orr.order_return_id = ori.order_return_id
+       WHERE orr.order_id = ? AND orr.requested_by = ?
+       GROUP BY ori.order_detail_id`,
+      [orderId, userId]
+    );
+
+    return new Map(
+      rows.map((row) => [Number(row.order_detail_id), Number(row.order_return_id)])
+    );
+  }
+
+  async findReturnLinkedOrderDetailIdsForOrder(
+    orderId: number
+  ): Promise<Map<number, number>> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT ori.order_detail_id, MIN(orr.order_return_id) AS order_return_id
+       FROM order_return_items ori
+       JOIN order_returns orr ON orr.order_return_id = ori.order_return_id
+       WHERE orr.order_id = ?
+       GROUP BY ori.order_detail_id`,
+      [orderId]
+    );
+
+    return new Map(
+      rows.map((row) => [Number(row.order_detail_id), Number(row.order_return_id)])
+    );
   }
 
   async createOrderFeedback(input: CreateOrderFeedbackDTO): Promise<OrderFeedback> {
@@ -72,8 +132,8 @@ export class ReviewRepository implements IReviewRepository {
           is_verified_purchase, helpful_count, status, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'approved', ?, ?)`,
         [
-          input.productId,
-          input.userId,
+         input.productId,
+          input.userId ?? null,
           input.orderId,
           input.orderDetailId,
           input.rating,
@@ -95,6 +155,60 @@ export class ReviewRepository implements IReviewRepository {
       );
 
       return this.mapRowToProductReview(rows[0]);
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async updateProductReview(input: UpdateProductReviewDTO): Promise<ProductReview> {
+    const connection = await pool.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      await connection.execute(
+        `UPDATE reviews
+         SET rating = ?,
+             title = ?,
+             comment = ?,
+             edit_count = edit_count + 1,
+             edited_after_return_at = ?,
+             edited_after_return_order_return_id = ?,
+             updated_at = ?
+         WHERE review_id = ?
+           AND ((? IS NOT NULL AND user_id = ?) OR (? IS NULL AND order_id = ? AND user_id IS NULL))`,
+        [
+          input.rating,
+          input.title || null,
+          input.comment || null,
+          new Date(),
+          input.editedAfterReturnOrderReturnId,
+          new Date(),
+          input.reviewId,
+          input.userId,
+          input.userId,
+          input.userId,
+          input.orderId ?? null,
+        ]
+      );
+
+      const [rows] = await connection.execute<RowDataPacket[]>(
+        'SELECT * FROM reviews WHERE review_id = ? LIMIT 1',
+        [input.reviewId]
+      );
+
+      if (rows.length === 0) {
+        throw new Error('Updated review not found');
+      }
+
+      const updatedReview = this.mapRowToProductReview(rows[0]);
+      await this.updateProductRatingStats(connection, updatedReview.productId);
+      await connection.commit();
+
+      return updatedReview;
     } catch (error) {
       await connection.rollback();
       throw error;
@@ -141,7 +255,7 @@ export class ReviewRepository implements IReviewRepository {
     return {
       reviewId: row.review_id,
       productId: row.product_id,
-      userId: row.user_id,
+      userId: row.user_id ?? null,
       orderId: row.order_id || undefined,
       orderDetailId: row.order_detail_id || undefined,
       rating: Number(row.rating),
@@ -155,6 +269,12 @@ export class ReviewRepository implements IReviewRepository {
       isVerifiedPurchase: Boolean(row.is_verified_purchase),
       helpfulCount: Number(row.helpful_count || 0),
       status: row.status,
+      editCount: Number(row.edit_count || 0),
+      editedAfterReturnAt: row.edited_after_return_at || undefined,
+      editedAfterReturnOrderReturnId:
+        row.edited_after_return_order_return_id != null
+          ? Number(row.edited_after_return_order_return_id)
+          : undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };

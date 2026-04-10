@@ -30,9 +30,6 @@ export class AuthController {
     }
   };
 
-  /**
-   * Lấy thông tin cá nhân mới nhất từ Database
-   */
   getProfile = async (req: Request, res: Response) => {
     try {
       // authUser được đính kèm vào request thông qua AuthMiddleware

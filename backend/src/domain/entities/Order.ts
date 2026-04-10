@@ -40,7 +40,10 @@ export type ReturnRestockAction = 'restock' | 'inspect' | 'discard';
 export interface Order {
   orderId: number;
   orderCode: string;
-  userId: number;
+  userId: number | null;
+  customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
   shippingName: string;
   shippingPhone: string;
   shippingAddress: string;
@@ -102,6 +105,8 @@ export interface OrderEvent {
   toStatus?: string;
   actorUserId?: number;
   actorRole?: OrderActorRole;
+  actorName?: string;
+  actorEmail?: string;
   note?: string;
   metadata?: Record<string, any>;
   createdAt: Date;
@@ -126,7 +131,7 @@ export interface OrderReturn {
   orderReturnId: number;
   orderId: number;
   requestCode: string;
-  requestedBy: number;
+  requestedBy: number | null;
   status: ReturnStatus;
   reason: string;
   customerNote?: string;
@@ -144,9 +149,9 @@ export interface OrderReturn {
 
 // --- 4. CÁC KIỂU DỮ LIỆU TỔNG HỢP & DTO ---
 export interface OrderCustomerSnapshot {
-  userId: number;
+  userId?: number | null;
   name: string;
-  email: string;
+  email?: string;
   phone?: string;
 }
 
@@ -167,7 +172,10 @@ export interface PaginatedResult<T> {
 }
 
 export interface CreateOrderDTO {
-  userId: number;
+  userId?: number | null;
+  customerName?: string;
+  customerEmail: string;
+  customerPhone?: string;
   items: Array<{
     productId: number;
     variantId?: number;
@@ -202,7 +210,7 @@ export interface TransitionOrderStatusDTO {
   orderId: number;
   currentStatus: OrderStatus;
   nextStatus: OrderStatus;
-  actorUserId: number;
+  actorUserId: number | null;
   actorRole: OrderActorRole;
   note?: string;
 }
@@ -219,7 +227,7 @@ export interface UpdatePaymentStatusDTO {
 export interface CancelOrderDTO {
   orderId: number;
   currentStatus: OrderStatus;
-  actorUserId: number;
+  actorUserId: number | null;
   actorRole: OrderActorRole;
   reason: string;
   adminNote?: string;
@@ -228,7 +236,7 @@ export interface CancelOrderDTO {
 // DTO cho Hoàn trả
 export interface CreateOrderReturnDTO {
   orderId: number;
-  requestedBy: number;
+  requestedBy: number | null;
   reason: string;
   customerNote?: string;
   evidenceImages?: string[];

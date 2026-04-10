@@ -9,8 +9,8 @@ export const createCouponRoutes = (couponController: CouponController) => {
     router.get('/available', couponController.getAvailable);
 
 
-    // Public: validate coupon (authenticated users)
-    router.post('/validate', authMiddleware, couponController.validate);
+    // Public: validate coupon
+    router.post('/validate', couponController.validate);
 
     // Public: get by code
     router.get('/code/:code', couponController.getByCode);

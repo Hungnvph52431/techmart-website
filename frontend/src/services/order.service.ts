@@ -1,4 +1,5 @@
 import api from './api';
+import { buildGuestOrderHeaders } from '@/features/orders/lib/guestOrderAccess';
 import type {
   CreateOrderPayload,
   CreateOrderReturnPayload,
@@ -53,6 +54,35 @@ export const orderService = {
     return response.data;
   },
 
+  createGuest: async (orderData: CreateOrderPayload): Promise<{ orderId: number; orderCode: string; accessToken: string }> => {
+    const response = await api.post('/orders/guest', orderData);
+    return response.data;
+  },
+
+  lookupGuestOrder: async (
+    orderCode: string,
+    email: string,
+  ): Promise<{ order: OrderDetailView; accessToken: string }> => {
+    const response = await api.post(
+      '/orders/lookup',
+      { orderCode, email },
+      { ...( { skipAuthRedirect: true } as any ) },
+    );
+    return response.data;
+  },
+
+  confirmDeliveredGuest: async (orderCode: string, accessToken: string): Promise<any> => {
+    const response = await api.post(
+      `/orders/lookup/${encodeURIComponent(orderCode)}/confirm-delivered`,
+      {},
+      {
+        headers: buildGuestOrderHeaders(accessToken),
+        ...( { skipAuthRedirect: true } as any ),
+      },
+    );
+    return response.data;
+  },
+
   cancel: async (orderId: number, payload: { reason: string }): Promise<{ status: string }> => {
     const response = await api.post(`/orders/my-orders/${orderId}/cancel`, payload);
     return response.data;
@@ -99,6 +129,64 @@ export const orderService = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
+  },
+
+  createGuestReturn: async (
+    orderCode: string,
+    payload: CreateOrderReturnPayload & { evidenceImages?: File[] },
+    accessToken: string,
+  ): Promise<OrderReturnView> => {
+    const formData = new FormData();
+    formData.append('reason', payload.reason);
+    if (payload.customerNote) formData.append('customerNote', payload.customerNote);
+    formData.append('items', JSON.stringify(payload.items));
+    if (payload.evidenceImages) {
+      for (const file of payload.evidenceImages) {
+        formData.append('evidenceImages', file);
+      }
+    }
+    const response = await api.post(
+      `/orders/lookup/${encodeURIComponent(orderCode)}/returns`,
+      formData,
+      {
+        headers: {
+          ...buildGuestOrderHeaders(accessToken),
+          'Content-Type': 'multipart/form-data',
+        },
+        ...( { skipAuthRedirect: true } as any ),
+      },
+    );
+    return response.data;
+  },
+
+  createGuestVNPayPaymentUrl: async (
+    orderCode: string,
+    accessToken: string,
+  ): Promise<string> => {
+    const response = await api.post(
+      '/payment/vnpay/guest/create',
+      { orderCode },
+      {
+        headers: buildGuestOrderHeaders(accessToken),
+        ...( { skipAuthRedirect: true } as any ),
+      },
+    );
+    return response.data.paymentUrl;
+  },
+
+  repayGuestVNPay: async (
+    orderCode: string,
+    accessToken: string,
+  ): Promise<string> => {
+    const response = await api.post(
+      '/payment/vnpay/guest/repay',
+      { orderCode },
+      {
+        headers: buildGuestOrderHeaders(accessToken),
+        ...( { skipAuthRedirect: true } as any ),
+      },
+    );
+    return response.data.paymentUrl;
   },
 
   getReturns: async (orderId: number): Promise<OrderReturnView[]> => {

@@ -22,7 +22,11 @@ interface VariantPickerModalProps {
   onClose: () => void;
 }
 
-export const VariantPickerModal = ({ product, open, onClose }: VariantPickerModalProps) => {
+export const VariantPickerModal = ({
+  product,
+  open,
+  onClose,
+}: VariantPickerModalProps) => {
   const { addItem, items } = useCartStore();
   const variants = product.variants ?? [];
 
@@ -37,8 +41,6 @@ export const VariantPickerModal = ({ product, open, onClose }: VariantPickerModa
       setQuantity(1);
     }
   }, [open]);
-
-  if (!open) return null;
 
   const selectedVariant = variants.find(
     (v: any) => (v.variantId ?? v.id) === selectedVariantId
@@ -172,6 +174,8 @@ export const VariantPickerModal = ({ product, open, onClose }: VariantPickerModa
     setQuantityDraft(String(nextQuantity));
     return nextQuantity;
   };
+
+  if (!open) return null;
 
   const handleAdd = () => {
     if (!selectedVariantId) {

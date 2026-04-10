@@ -13,8 +13,11 @@ export const createCategoryRoutes = (categoryController: CategoryController) => 
   // LƯU Ý: Phải đặt đường dẫn '/tree' TRƯỚC '/:id' để tránh bị bắt nhầm tham số
   router.get('/tree', categoryController.getTree);
 
+  router.get('/deleted', categoryController.getDeleted);
+
   // Lấy chi tiết danh mục theo ID
   router.get('/:id', categoryController.getById);
+
 
   // --- 2. ROUTES QUẢN TRỊ (ADMIN) ---
   // Các route này yêu cầu quyền Admin từ bản của Tuấn Anh
