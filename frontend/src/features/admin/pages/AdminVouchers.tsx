@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { voucherService, Voucher, CreateVoucherPayload } from '@/services/voucher.service';
 import { Ticket, Plus, X, Save, Loader2, AlertCircle, Trash2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 // Helper: lấy datetime hiện tại dạng "YYYY-MM-DDTHH:mm" cho input min
 const getNowLocal = () => {
@@ -22,6 +23,8 @@ export const AdminVoucher = () => {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState<{ id: number; code: string } | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // 1. State form chuẩn cấu trúc TechMart
   const [formData, setFormData] = useState<CreateVoucherPayload>({
@@ -115,20 +118,55 @@ export const AdminVoucher = () => {
     }
   };
 
-  const handleDelete = async (id: number, code: string) => {
-    if (window.confirm(`Bạn có chắc chắn muốn xóa vĩnh viễn mã voucher ${code} này không?`)) {
-      try {
-        await voucherService.delete(id);
-        alert("Đã xóa thành công!");
-        loadData();
-      } catch (error) {
-        alert("Có lỗi xảy ra khi xóa Voucher!");
-      }
+  const handleDelete = (id: number, code: string) => {
+    setConfirmDelete({ id, code });
+  };
+
+  const executeDelete = async () => {
+    if (!confirmDelete) return;
+    setDeleteLoading(true);
+    try {
+      await voucherService.delete(confirmDelete.id);
+      toast.success(`Đã xóa voucher "${confirmDelete.code}"`);
+      loadData();
+    } catch {
+      toast.error('Có lỗi xảy ra khi xóa voucher');
+    } finally {
+      setDeleteLoading(false);
+      setConfirmDelete(null);
     }
   };
 
   return (
     <div className="space-y-6">
+      {/* Confirm delete modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <Trash2 size={18} className="text-red-600" />
+              </div>
+              <h3 className="font-bold text-slate-800">Xóa voucher</h3>
+            </div>
+            <p className="text-sm text-slate-600 mb-1">
+              Bạn có chắc muốn xóa vĩnh viễn mã <strong>"{confirmDelete.code}"</strong>?
+            </p>
+            <p className="text-xs text-slate-400 mb-5">Hành động này không thể hoàn tác.</p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setConfirmDelete(null)}
+                className="px-4 py-2 text-sm font-semibold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors">
+                Hủy
+              </button>
+              <button onClick={executeDelete} disabled={deleteLoading}
+                className="px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors disabled:opacity-50">
+                {deleteLoading ? 'Đang xóa...' : 'Xóa vĩnh viễn'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Banner tiêu đề thiết kế mới */}
       <div className="bg-blue-600 p-8 rounded-3xl shadow-xl text-white flex justify-between items-center border-b-4 border-blue-700">
         <div>

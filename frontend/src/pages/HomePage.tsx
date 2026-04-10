@@ -136,14 +136,14 @@ const SmallBannerCard = ({ banner }: { banner: Banner }) => (
 const ProductRow = ({ products, loading }: { products: Product[]; loading: boolean }) => {
   if (loading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem' }}>
         {[1,2,3,4,5].map(i => <div key={i} className="animate-pulse bg-gray-100 h-72 rounded-2xl" />)}
       </div>
     );
   }
   if (products.length === 0) return <p className="text-center text-gray-400 py-8">Đang cập nhật...</p>;
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem' }}>
       {products.map(p => <ProductCard key={p.productId} product={p} />)}
     </div>
   );
@@ -258,6 +258,14 @@ export const HomePage = () => {
                   ))}
                 </div>
               )}
+
+              {/* Xem tất cả sản phẩm */}
+              <div className="flex justify-center pt-4 border-t border-gray-50">
+                <Link to="/products"
+                  className="text-blue-600 font-semibold text-sm flex items-center gap-0.5 hover:underline">
+                  Xem tất cả sản phẩm <ChevronRight size={16} />
+                </Link>
+              </div>
             </div>
           </div>
         </section>

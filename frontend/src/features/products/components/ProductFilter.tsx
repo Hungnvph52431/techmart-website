@@ -1,15 +1,15 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { SlidersHorizontal, X } from "lucide-react";
 import { brandService, type Brand } from "@/services/brand.service";
 import { categoryService, type Category } from "@/services/category.service";
+import { ProductListContent } from "./ProductListContent";
 
-// ─── Filter config ───
 const FILTER_GROUPS: {
   key: string;
   label: string;
   paramKey: string;
-  multi: boolean; // true = multi-select, false = single
+  multi: boolean;
   options: { value: string; label: string }[];
 }[] = [
   {
@@ -56,8 +56,6 @@ const FILTER_GROUPS: {
   },
 ];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-// tempFilters lưu dạng: { ram: "6GB,8GB", chip: "Snapdragon", price: "0-5000000" }
 const getValues = (csv: string): string[] => csv ? csv.split(",") : [];
 const toggleInCsv = (csv: string, value: string): string => {
   const arr = getValues(csv);
@@ -66,10 +64,8 @@ const toggleInCsv = (csv: string, value: string): string => {
   return arr.join(",");
 };
 
-// ─── Main ────────────────────────────────────────────────────────────────────
 export const ProductsFilter = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [searchInput, setSearchInput] = useState(searchParams.get("search") || "");
   const [showPanel, setShowPanel] = useState(false);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [childCategories, setChildCategories] = useState<Category[]>([]);
@@ -80,11 +76,10 @@ export const ProductsFilter = () => {
       .then(data => setBrands((data || []).filter((b: Brand) => b.isActive)))
       .catch(() => {});
     categoryService.getAll()
-      .then(data => setChildCategories((data || []).filter((c: Category) => c.parentId && c.isActive !== false)))
+      .then(data => setChildCategories((data || []).filter((c: Category) => !c.parentId && c.isActive !== false)))
       .catch(() => {});
   }, []);
 
-  // Sync tempFilters từ URL
   useEffect(() => {
     const current: Record<string, string> = {};
     FILTER_GROUPS.forEach(g => {
@@ -116,24 +111,16 @@ export const ProductsFilter = () => {
     setSearchParams(next);
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateParams({ search: searchInput });
-  };
-
-  // Toggle pill trong panel
   const toggleTemp = (group: typeof FILTER_GROUPS[0], value: string) => {
     setTempFilters(prev => {
       const key = group.paramKey;
       if (group.multi) {
         return { ...prev, [key]: toggleInCsv(prev[key] || "", value) };
       }
-      // single-select (price): toggle on/off
       return { ...prev, [key]: prev[key] === value ? "" : value };
     });
   };
 
-  // Apply filters
   const applyFilters = () => {
     const updates: Record<string, string> = {};
     FILTER_GROUPS.forEach(g => {
@@ -156,13 +143,9 @@ export const ProductsFilter = () => {
     setShowPanel(false);
   };
 
-  // Reset panel
-  const resetFilters = () => {
-    setTempFilters({});
-  };
+  const resetFilters = () => setTempFilters({});
 
   const clearAll = () => {
-    setSearchInput("");
     setTempFilters({});
     setSearchParams({ page: "1" });
     setShowPanel(false);
@@ -171,175 +154,211 @@ export const ProductsFilter = () => {
   const hasAnyFilter = brand || category || realActiveCount > 0 || searchParams.get("search");
 
   return (
-    <div className="space-y-3">
+    // Layout 3/10 - 7/10
+    <div className="flex gap-4 items-start">
 
-      {/* ── Search + Brand pills ── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-4">
-        <form onSubmit={handleSearch} className="flex gap-2 mb-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
-            <input value={searchInput} onChange={e => setSearchInput(e.target.value)}
-              placeholder="Tìm iPhone, Samsung, Xiaomi..."
-              className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm font-medium focus:outline-none focus:border-blue-400 focus:bg-white transition-all" />
-            {searchInput && (
-              <button type="button" onClick={() => { setSearchInput(""); updateParams({ search: "" }); }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                <X size={15} />
+      {/* ── Cột 3/10: Sidebar thương hiệu ── */}
+      <aside className="w-[15%] shrink-0 bg-white rounded-2xl border border-gray-100 p-4 sticky top-4">
+  <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-3">Thương hiệu</h3>
+  
+   {/* Nút Tất cả */}
+    <button
+      onClick={() => updateParams({ brand: "" })}
+      className={`w-full flex items-center justify-start px-3 py-2.5 rounded-xl text-base font-semibold border transition-all mb-2 ${
+        !brand
+          ? "border-blue-600 bg-blue-600 text-white shadow-sm shadow-blue-200"
+          : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 hover:bg-gray-100"
+      }`}
+    >
+      Tất cả
+    </button>
+
+    {/* Danh sách thương hiệu - 1 cột, căn trái */}
+    <div className="flex flex-col gap-1.5">
+      {brands.map(b => (
+        <button
+          key={b.brandId}
+          onClick={() => updateParams({ brand: brand === b.slug ? "" : b.slug! })}
+          className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-base font-semibold border transition-all ${
+            brand === b.slug
+              ? "border-blue-600 bg-blue-600 text-white shadow-sm shadow-blue-200"
+              : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 hover:bg-gray-100"
+          }`}
+        >
+          {b.logoUrl && (
+            <img
+              src={b.logoUrl.startsWith('/') ? `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5001'}${b.logoUrl}` : b.logoUrl}
+              alt=""
+              className="w-5 h-5 object-contain shrink-0"
+            />
+          )}
+          <span className="truncate text-left">{b.name}</span>
+        </button>
+      ))}
+    </div>
+  </aside>
+
+      {/* ── Cột 7/10: Danh mục + Bộ lọc + Sản phẩm ── */}
+      <div className="w-[85%] min-w-0 space-y-3">
+
+        {/* Danh mục + Bộ lọc */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
+
+          {/* Category pills */}
+          {childCategories.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-bold text-gray-400 uppercase tracking-wide mr-1">Danh mục:</span>
+              <button
+                onClick={() => updateParams({ category: "" })}
+                className={`px-3.5 py-1.5 rounded-xl text-base font-semibold border transition-all ${
+                  !category
+                    ? "border-blue-600 bg-blue-600 text-white"
+                    : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
+                }`}
+              >
+                Tất cả
               </button>
-            )}
-          </div>
-          <button type="submit"
-            className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors">
-            Tìm
-          </button>
-        </form>
-
-        {/* Brand pills */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-bold text-gray-400 uppercase tracking-wide mr-1">Thương hiệu:</span>
-          <button onClick={() => updateParams({ brand: "" })}
-            className={`px-3.5 py-1.5 rounded-xl text-sm font-semibold border transition-all ${
-              !brand ? "border-blue-600 bg-blue-600 text-white" : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
-            }`}>
-            Tất cả
-          </button>
-          {brands.map(b => (
-            <button key={b.brandId} onClick={() => updateParams({ brand: brand === b.slug ? "" : b.slug! })}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-sm font-semibold border transition-all ${
-                brand === b.slug ? "border-blue-600 bg-blue-600 text-white" : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
-              }`}>
-              {b.logoUrl && <img src={b.logoUrl.startsWith('/') ? `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5001'}${b.logoUrl}` : b.logoUrl} alt="" className="w-4 h-4 object-contain" />}
-              {b.name}
-            </button>
-          ))}
-        </div>
-
-        {/* Category pills */}
-        {childCategories.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-gray-100">
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wide mr-1">Danh mục:</span>
-            <button onClick={() => updateParams({ category: "" })}
-              className={`px-3.5 py-1.5 rounded-xl text-sm font-semibold border transition-all ${
-                !category ? "border-blue-600 bg-blue-600 text-white" : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
-              }`}>
-              Tất cả
-            </button>
-            {childCategories.map(c => (
-              <button key={c.categoryId} onClick={() => updateParams({ category: category === c.slug ? "" : c.slug })}
-                className={`px-3.5 py-1.5 rounded-xl text-sm font-semibold border transition-all ${
-                  category === c.slug ? "border-blue-600 bg-blue-600 text-white" : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
-                }`}>
-                {c.name}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ── Filter bar ── */}
-      <div className="bg-white rounded-2xl border border-gray-100 px-4 py-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={() => setShowPanel(p => !p)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold border-2 transition-all ${
-              showPanel
-                ? "border-red-400 bg-red-50 text-red-600"
-                : realActiveCount > 0
-                  ? "border-blue-500 bg-blue-50 text-blue-700"
-                  : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
-            }`}>
-            <SlidersHorizontal size={15} />
-            Bộ lọc
-            {realActiveCount > 0 && (
-              <span className="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-md font-bold">{realActiveCount}</span>
-            )}
-          </button>
-
-          {/* Active filter tags */}
-          {FILTER_GROUPS.map(g => {
-            let val = "";
-            if (g.key === "price") {
-              const min = searchParams.get("minPrice");
-              const max = searchParams.get("maxPrice");
-              if (min || max) val = `${min || "0"}-${max || ""}`;
-            } else {
-              val = searchParams.get(g.paramKey) || "";
-            }
-            if (!val) return null;
-
-            // Multi-value: hiện từng giá trị
-            const values = getValues(val);
-            const labels = values.map(v => g.options.find(o => o.value === v)?.label || v);
-
-            return (
-              <span key={g.key}
-                className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold border border-blue-100">
-                {g.label}: {labels.join(", ")}
-                <button onClick={() => {
-                  if (g.key === "price") {
-                    updateParams({ minPrice: "", maxPrice: "", price: "" });
-                  } else {
-                    updateParams({ [g.paramKey]: "" });
-                  }
-                }}
-                  className="text-blue-400 hover:text-blue-700 ml-0.5">
-                  <X size={11} />
+              {childCategories.map(c => (
+                <button
+                  key={c.categoryId}
+                  onClick={() => updateParams({ category: category === c.slug ? "" : c.slug })}
+                  className={`px-3.5 py-1.5 rounded-xl text-base font-semibold border transition-all ${
+                    category === c.slug
+                      ? "border-blue-600 bg-blue-600 text-white"
+                      : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
+                  }`}
+                >
+                  {c.name}
                 </button>
-              </span>
-            );
-          })}
+              ))}
+            </div>
+          )}
 
-          {hasAnyFilter && (
-            <button onClick={clearAll}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-semibold text-red-500 border border-red-100 bg-red-50 hover:bg-red-100 transition-colors ml-auto">
-              <X size={13} /> Xóa lọc
+          {/* Divider */}
+          <div className="border-t border-gray-100" />
+
+          {/* Filter bar */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setShowPanel(p => !p)}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold border-2 transition-all ${
+                showPanel
+                  ? "border-red-400 bg-red-50 text-red-600"
+                  : realActiveCount > 0
+                    ? "border-blue-500 bg-blue-50 text-blue-700"
+                    : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+              }`}
+            >
+              <SlidersHorizontal size={15} />
+              Bộ lọc
+              {realActiveCount > 0 && (
+                <span className="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-md font-bold">
+                  {realActiveCount}
+                </span>
+              )}
             </button>
+
+            {/* Active filter tags */}
+            {FILTER_GROUPS.map(g => {
+              let val = "";
+              if (g.key === "price") {
+                const min = searchParams.get("minPrice");
+                const max = searchParams.get("maxPrice");
+                if (min || max) val = `${min || "0"}-${max || ""}`;
+              } else {
+                val = searchParams.get(g.paramKey) || "";
+              }
+              if (!val) return null;
+
+              const values = getValues(val);
+              const labels = values.map(v => g.options.find(o => o.value === v)?.label || v);
+
+              return (
+                <span key={g.key} className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold border border-blue-100">
+                  {g.label}: {labels.join(", ")}
+                  <button
+                    onClick={() => {
+                      if (g.key === "price") {
+                        updateParams({ minPrice: "", maxPrice: "", price: "" });
+                      } else {
+                        updateParams({ [g.paramKey]: "" });
+                      }
+                    }}
+                    className="text-blue-400 hover:text-blue-700 ml-0.5"
+                  >
+                    <X size={11} />
+                  </button>
+                </span>
+              );
+            })}
+
+            {hasAnyFilter && (
+              <button
+                onClick={clearAll}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-semibold text-red-500 border border-red-100 bg-red-50 hover:bg-red-100 transition-colors ml-auto"
+              >
+                <X size={13} /> Xóa lọc
+              </button>
+            )}
+          </div>
+
+          {/* Filter panel */}
+          {showPanel && (
+            <div className="pt-3 border-t border-gray-100">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                {FILTER_GROUPS.map(g => {
+                  const activeValues = getValues(tempFilters[g.paramKey] || "");
+                  return (
+                    <div key={g.key}>
+                      <h4 className="text-sm font-bold text-gray-800 mb-2">{g.label}</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {g.options.map(opt => {
+                          const isActive = activeValues.includes(opt.value);
+                          return (
+                            <button
+                              key={opt.value}
+                              onClick={() => toggleTemp(g, opt.value)}
+                              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
+                                isActive
+                                  ? "border-blue-500 bg-blue-50 text-blue-700"
+                                  : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex gap-3 mt-5 pt-4 border-t border-gray-100">
+                <button
+                  onClick={resetFilters}
+                  className="flex-1 py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 transition-all"
+                >
+                  Reset
+                </button>
+                <button
+                  onClick={applyFilters}
+                  className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-all"
+                >
+                  Xem kết quả
+                </button>
+              </div>
+            </div>
           )}
         </div>
 
-        {/* ── Filter panel (CellphoneS style) ── */}
-        {showPanel && (
-          <div className="mt-3 pt-3 border-t border-gray-100">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {FILTER_GROUPS.map(g => {
-                const activeValues = getValues(tempFilters[g.paramKey] || "");
-                return (
-                  <div key={g.key}>
-                    <h4 className="text-sm font-bold text-gray-800 mb-2">{g.label}</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {g.options.map(opt => {
-                        const isActive = activeValues.includes(opt.value);
-                        return (
-                          <button key={opt.value}
-                            onClick={() => toggleTemp(g, opt.value)}
-                            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
-                              isActive
-                                ? "border-blue-500 bg-blue-50 text-blue-700"
-                                : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
-                            }`}>
-                            {opt.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+        {/* ── Danh sách sản phẩm ── */}
+        <ProductListContent />
 
-            {/* Buttons */}
-            <div className="flex gap-3 mt-5 pt-4 border-t border-gray-100">
-              <button onClick={resetFilters}
-                className="flex-1 py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 transition-all">
-                Reset
-              </button>
-              <button onClick={applyFilters}
-                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-all">
-                Xem kết quả
-              </button>
-            </div>
-          </div>
-        )}
       </div>
+      {/* kết thúc cột 7/10 */}
+
     </div>
+    // kết thúc flex container
   );
 };

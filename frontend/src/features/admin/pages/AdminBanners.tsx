@@ -251,6 +251,7 @@ export const AdminBanners = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   const fetchBanners = async () => {
     try {
@@ -275,12 +276,17 @@ export const AdminBanners = () => {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('Xác nhận xóa banner này?')) return;
-    setDeletingId(id);
+  const handleDelete = (id: number) => {
+    setConfirmDeleteId(id);
+  };
+
+  const executeDelete = async () => {
+    if (!confirmDeleteId) return;
+    setDeletingId(confirmDeleteId);
+    setConfirmDeleteId(null);
     try {
-      await bannerService.delete(id);
-      setBanners(prev => prev.filter(b => b.bannerId !== id));
+      await bannerService.delete(confirmDeleteId);
+      setBanners(prev => prev.filter(b => b.bannerId !== confirmDeleteId));
     } catch (err) {
       console.error('Lỗi xóa:', err);
     } finally {
@@ -306,6 +312,32 @@ export const AdminBanners = () => {
 
   return (
     <div>
+      {/* Confirm delete modal */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <Trash2 size={18} className="text-red-600" />
+              </div>
+              <h3 className="font-bold text-slate-800">Xóa banner</h3>
+            </div>
+            <p className="text-sm text-slate-600 mb-1">Bạn có chắc muốn xóa banner này?</p>
+            <p className="text-xs text-slate-400 mb-5">Hành động này không thể hoàn tác.</p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setConfirmDeleteId(null)}
+                className="px-4 py-2 text-sm font-semibold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors">
+                Hủy
+              </button>
+              <button onClick={executeDelete}
+                className="px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors">
+                Xóa banner
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>

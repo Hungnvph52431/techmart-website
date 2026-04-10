@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { UserController } from "../controllers/UserControllers";
-import { authMiddleware, adminMiddleware } from "../middlewares/auth.middleware";
+import { authMiddleware, adminMiddleware, staffMiddleware } from "../middlewares/auth.middleware";
 import { uploadAvatar, uploadBanner } from "../middlewares/upload.middleware";
 import pool  from "../../infrastructure/database/connection";
 import type { AuthRequest } from "../middlewares/auth.middleware";
@@ -32,11 +32,37 @@ export const createUserRoutes = (userController: UserController) => {
     }
   });
 
-  // ✅ Các route admin — áp dụng adminMiddleware từ đây trở xuống
+  // ✅ Route tự cập nhật profile — chỉ cần đăng nhập
+  router.put('/me/profile', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user.userId;
+      // Chỉ cho phép sửa các field an toàn
+      const { fullName, email, phone } = req.body;
+      const updates: string[] = [];
+      const values: any[] = [];
+      if (fullName !== undefined) { updates.push('full_name = ?'); values.push(fullName); }
+      if (email !== undefined) { updates.push('email = ?'); values.push(email); }
+      if (phone !== undefined) { updates.push('phone = ?'); values.push(phone); }
+      if (updates.length === 0) return res.status(400).json({ message: 'Không có gì để cập nhật' });
+      values.push(userId);
+      await pool.execute(`UPDATE users SET ${updates.join(', ')} WHERE user_id = ?`, values);
+      return res.json({ success: true, message: 'Cập nhật thành công' });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  router.patch('/me/password', authMiddleware, userController.changeMyPassword);
+
+  // Tất cả role nội bộ: xem stats (dùng cho Dashboard)
+  router.get('/stats', authMiddleware, userController.getStats);
+
+  // Staff + Admin: xem danh sách & chi tiết khách hàng (chăm sóc khách hàng)
+  router.get('/', authMiddleware, staffMiddleware, userController.getAll);
+  router.get('/:id', authMiddleware, staffMiddleware, userController.getById);
+
+  // Admin only: tạo/sửa/xoá, thay đổi trạng thái, điểm, mật khẩu
   router.use(authMiddleware, adminMiddleware);
-  router.get('/', userController.getAll);
-  router.get('/stats', userController.getStats);
-  router.get('/:id', userController.getById);
   router.post('/', userController.create);
   router.put('/:id', userController.update);
   router.delete('/:id', userController.delete);

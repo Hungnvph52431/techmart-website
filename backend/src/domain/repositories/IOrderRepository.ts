@@ -57,6 +57,8 @@ export interface IOrderRepository {
   findById(orderId: number): Promise<Order | null>;
   findOwnedById(orderId: number, userId: number): Promise<Order | null>;
   findByOrderCode(orderCode: string): Promise<Order | null>;
+  findGuestDetailByCode(orderCode: string, email: string): Promise<OrderAggregate | null>;
+  findGuestByCode(orderCode: string, email: string): Promise<Order | null>;
   
   // 2. Danh sách & Phân trang
   findAdminList(filters?: AdminOrderListFilters): Promise<PaginatedResult<OrderListItem>>;

@@ -15,6 +15,7 @@
 6. [API Endpoints](#6-api-endpoints)
 7. [Cơ sở dữ liệu](#7-cơ-sở-dữ-liệu)
 8. [Hướng dẫn cài đặt & chạy Docker](#8-hướng-dẫn-cài-đặt--chạy-docker)
+9. [Tính năng còn thiếu / cần hoàn thiện](#9-tính-năng-còn-thiếu--cần-hoàn-thiện)
 
 ---
 
@@ -28,12 +29,22 @@
 - **Deploy**: Docker Compose (dev + production)
 
 ### Vai trò người dùng
-| Vai trò | Mô tả |
-|---------|--------|
-| `customer` | Khách hàng (mặc định khi đăng ký) |
-| `admin` | Quản trị viên - toàn quyền |
-| `staff` | Nhân viên (dự phòng) |
-| `warehouse` | Quản lý kho (dự phòng) |
+| Vai trò | Mô tả | Quyền truy cập Admin |
+|---------|--------|----------------------|
+| `customer` | Khách hàng (mặc định khi đăng ký) | Không |
+| `admin` | Quản trị viên - toàn quyền | Toàn bộ |
+| `staff` | Nhân viên | Dashboard, Danh mục, Thương hiệu, Đơn hàng, Khách hàng (xem), Đánh giá, Hoàn trả |
+| `warehouse` | Quản lý kho | Dashboard, Sản phẩm, Đơn hàng (xem + cập nhật trạng thái) |
+
+### Phân quyền chi tiết theo middleware
+
+| Middleware | Các role được phép | Áp dụng cho |
+|------------|-------------------|-------------|
+| `authMiddleware` | Tất cả (đã đăng nhập) | Routes cần xác thực |
+| `adminMiddleware` | `admin` | Cập nhật trạng thái thanh toán, quản lý voucher, banner, ví, xoá/sửa user |
+| `staffMiddleware` | `admin`, `staff` | Danh mục, thương hiệu, đánh giá, hoàn trả, huỷ đơn, xem khách hàng |
+| `warehouseMiddleware` | `admin`, `warehouse` | Sản phẩm (CRUD, tồn kho) |
+| `internalMiddleware` | `admin`, `staff`, `warehouse` | Xem đơn hàng, cập nhật trạng thái đơn, thống kê |
 
 ---
 
@@ -125,8 +136,9 @@
 - Badge "Đã mua hàng" (verified purchase)
 
 ### 2.8 Tài khoản & Hồ sơ (`/profile`)
-- Xem/sửa thông tin cá nhân: Tên, email, SĐT
-- Upload ảnh đại diện
+- Xem/sửa thông tin cá nhân: Tên, email, SĐT (qua `PUT /api/users/me/profile`)
+- Upload ảnh đại diện (qua `POST /api/users/me/avatar`)
+- Upload ảnh bìa/banner cá nhân (qua `POST /api/users/me/banner`)
 - Quản lý địa chỉ giao hàng:
   - Thêm/sửa/xoá địa chỉ
   - Chọn Tỉnh/Quận/Phường (API địa chỉ Việt Nam)
@@ -144,6 +156,11 @@
 - **Đăng ký** (`/register`): Email, mật khẩu, họ tên, SĐT
 - **Đăng nhập** (`/login`): Email + mật khẩu → JWT token
 - Tự động chuyển hướng admin/customer theo vai trò
+
+### 2.12 Kết quả thanh toán (`/payment/result`)
+- Trang hiển thị kết quả sau khi VNPay redirect về
+- Hiển thị trạng thái: Thành công / Thất bại
+- Thông tin đơn hàng tương ứng
 
 ### 2.11 Trang thông tin
 | Trang | Đường dẫn | Nội dung |
@@ -260,6 +277,8 @@
 - Thay đổi vai trò (customer, admin, staff, warehouse)
 - Trạng thái: Hoạt động | Tắt | Cấm
 - Điều chỉnh điểm thưởng
+- Đặt lại mật khẩu người dùng
+- Thống kê người dùng tổng quan
 
 ### 3.12 Quản lý nạp ví (`/admin/wallet-topups`)
 - Lịch sử nạp ví của tất cả người dùng
@@ -352,6 +371,22 @@ Admin hoàn tiền vào ví (refunded)
 | POST | `/register` | Đăng ký | Không |
 | GET | `/profile` | Lấy thông tin cá nhân | Có |
 
+### Người dùng (`/api/users`)
+| Method | Path | Mô tả | Auth |
+|--------|------|--------|------|
+| POST | `/me/avatar` | Upload ảnh đại diện | Có |
+| POST | `/me/banner` | Upload ảnh bìa cá nhân | Có |
+| PUT | `/me/profile` | Tự cập nhật thông tin (tên, email, SĐT) | Có |
+| GET | `/` | Danh sách người dùng | Admin |
+| GET | `/stats` | Thống kê người dùng | Admin |
+| GET | `/:id` | Chi tiết người dùng | Admin |
+| POST | `/` | Tạo người dùng | Admin |
+| PUT | `/:id` | Sửa người dùng | Admin |
+| DELETE | `/:id` | Xoá người dùng | Admin |
+| PATCH | `/:id/status` | Cập nhật trạng thái | Admin |
+| PATCH | `/:id/points` | Điều chỉnh điểm thưởng | Admin |
+| PATCH | `/:id/password` | Đặt lại mật khẩu | Admin |
+
 ### Sản phẩm (`/api/products`)
 | Method | Path | Mô tả | Auth |
 |--------|------|--------|------|
@@ -373,9 +408,16 @@ Admin hoàn tiền vào ví (refunded)
 | POST | `/` | Tạo đơn hàng | Có |
 | POST | `/my-orders/:id/cancel` | Huỷ đơn | Có |
 | POST | `/my-orders/:id/confirm-delivered` | Xác nhận nhận hàng | Có |
-| POST | `/my-orders/:id/returns` | Yêu cầu hoàn trả | Có |
+| POST | `/my-orders/:id/returns` | Yêu cầu hoàn trả (tối đa 5 ảnh) | Có |
+| GET | `/my-orders/:id/returns` | Danh sách yêu cầu hoàn trả | Có |
+| GET | `/my-orders/:id/returns/:returnId` | Chi tiết yêu cầu hoàn trả | Có |
 | GET | `/stats` | Thống kê đơn hàng | Admin |
-| PATCH | `/:id/status` | Cập nhật trạng thái | Admin |
+| GET | `/` | Tất cả đơn hàng | Admin |
+| PATCH | `/:id/status` | Cập nhật trạng thái đơn / thanh toán | Admin |
+| GET | `/admin/returns` | Tất cả yêu cầu hoàn trả | Admin |
+| PATCH | `/:id/returns/:returnId/review` | Duyệt / Từ chối yêu cầu | Admin |
+| PATCH | `/:id/returns/:returnId/receive` | Xác nhận đã nhận hàng trả | Admin |
+| PATCH | `/:id/returns/:returnId/refund` | Hoàn tiền vào ví | Admin |
 
 ### Danh mục (`/api/categories`)
 | Method | Path | Mô tả | Auth |
@@ -398,8 +440,9 @@ Admin hoàn tiền vào ví (refunded)
 | Method | Path | Mô tả | Auth |
 |--------|------|--------|------|
 | POST | `/vnpay/create` | Tạo link thanh toán VNPay | Có |
-| GET | `/vnpay/return` | VNPay redirect callback | Không |
-| GET | `/vnpay/ipn` | VNPay server callback | Không |
+| GET | `/vnpay/return` | VNPay redirect về sau thanh toán | Không |
+| GET | `/vnpay/callback` | Frontend gọi để lấy kết quả sau redirect | Có |
+| GET | `/vnpay/ipn` | VNPay server-to-server callback | Không |
 
 ### Ví (`/api/wallet`)
 | Method | Path | Mô tả | Auth |
@@ -407,6 +450,7 @@ Admin hoàn tiền vào ví (refunded)
 | GET | `/balance` | Xem số dư | Có |
 | GET | `/transactions` | Lịch sử giao dịch | Có |
 | POST | `/topup/vnpay` | Nạp ví qua VNPay | Có |
+| GET | `/admin/topups` | Lịch sử nạp ví tất cả user | Admin |
 
 ### Địa chỉ (`/api/addresses`)
 | Method | Path | Mô tả | Auth |
@@ -417,17 +461,34 @@ Admin hoàn tiền vào ví (refunded)
 | PATCH | `/:id/default` | Đặt mặc định | Có |
 | DELETE | `/:id` | Xoá địa chỉ | Có |
 
-### Đánh giá (`/api/reviews`)
+### Đánh giá
 | Method | Path | Mô tả | Auth |
 |--------|------|--------|------|
-| GET | `/product/:productId` | Đánh giá theo sản phẩm | Không |
-| GET | `/can-review/:productId` | Kiểm tra quyền đánh giá | Có |
-| POST | `/` | Viết đánh giá | Có |
+| GET | `/api/reviews/product/:productId` | Đánh giá theo sản phẩm | Không |
+| POST | `/api/reviews/:reviewId/helpful` | Đánh dấu đánh giá hữu ích | Không |
+| GET | `/api/reviews/can-review/:productId` | Kiểm tra quyền đánh giá | Có |
+| GET | `/api/reviews/orders/:orderId/summary` | Tóm tắt đánh giá theo đơn hàng | Có |
+| POST | `/api/reviews` | Viết đánh giá mới | Có |
+| PATCH | `/api/reviews/:reviewId` | Sửa đánh giá của mình | Có |
+| GET | `/api/admin/reviews` | Tất cả đánh giá | Admin |
+| PATCH | `/api/admin/reviews/:reviewId/status` | Duyệt / Từ chối đánh giá | Admin |
 
-### Banner (`/api/banners`)
+### Địa chỉ Việt Nam (`/api/locations`)
 | Method | Path | Mô tả | Auth |
 |--------|------|--------|------|
-| GET | `/` | Banner đang hiển thị | Không |
+| GET | `/provinces` | Danh sách tỉnh/thành | Không |
+| GET | `/provinces/:provinceCode/wards` | Phường/xã theo tỉnh | Không |
+
+### Banner
+| Method | Path | Mô tả | Auth |
+|--------|------|--------|------|
+| GET | `/api/banners` | Banner đang hiển thị (public) | Không |
+| GET | `/api/admin/banners` | Tất cả banner | Admin |
+| GET | `/api/admin/banners/:id` | Chi tiết banner | Admin |
+| POST | `/api/admin/banners` | Tạo banner | Admin |
+| PUT | `/api/admin/banners/:id` | Sửa banner | Admin |
+| DELETE | `/api/admin/banners/:id` | Xoá banner | Admin |
+| PATCH | `/api/admin/banners/:id/toggle` | Bật/tắt banner | Admin |
 
 ### Voucher (`/api/vouchers`)
 | Method | Path | Mô tả | Auth |
@@ -436,6 +497,18 @@ Admin hoàn tiền vào ví (refunded)
 | GET | `/` | Danh sách (admin) | Admin |
 | POST | `/` | Tạo voucher | Admin |
 | DELETE | `/:id` | Xoá voucher | Admin |
+
+### Coupon (`/api/coupons`)
+| Method | Path | Mô tả | Auth |
+|--------|------|--------|------|
+| GET | `/available` | Danh sách coupon khả dụng | Không |
+| POST | `/validate` | Kiểm tra coupon | Có |
+| GET | `/code/:code` | Lấy coupon theo mã | Không |
+| GET | `/` | Tất cả coupon | Admin |
+| GET | `/:id` | Chi tiết coupon | Admin |
+| POST | `/` | Tạo coupon | Admin |
+| PUT | `/:id` | Sửa coupon | Admin |
+| DELETE | `/:id` | Xoá coupon | Admin |
 
 ---
 
@@ -525,3 +598,21 @@ Truy cập:
 | `SMTP_USER` | Email gửi mail | (bỏ trống nếu không dùng) |
 | `SMTP_PASS` | App password Gmail | (bỏ trống nếu không dùng) |
 | `VITE_API_URL` | URL API cho frontend | `http://localhost:5001/api` |
+
+---
+
+## 9. Tính năng còn thiếu / cần hoàn thiện
+
+### 9.1 Trang mồ côi (có code nhưng chưa dùng)
+| Trang | File | Ghi chú |
+|-------|------|---------|
+| Chuyển khoản ngân hàng | `BankTransferPage.tsx` (route: `/payment/bank-transfer/:orderId`) | Có route nhưng không có backend API |
+
+### 9.2 Coupon = Voucher
+- Hệ thống coupon (`/api/coupons`) và voucher (`/api/vouchers`) làm cùng một việc — coupon không cần UI admin riêng, dùng chung `AdminVouchers.tsx` là đủ
+
+### 9.3 Chức năng Admin theo role (đã implement)
+- **Staff**: vào `/admin`, thấy menu: Dashboard, Danh mục, Thương hiệu, Đơn hàng, Khách hàng, Đánh giá, Hoàn trả
+- **Warehouse**: vào `/admin`, thấy menu: Dashboard, Sản phẩm, Đơn hàng
+- Header hiển thị role label: "Admin" / "Nhân viên" / "Kho"
+- Middleware phân quyền: `staffMiddleware`, `warehouseMiddleware`, `internalMiddleware` (xem mục 1)

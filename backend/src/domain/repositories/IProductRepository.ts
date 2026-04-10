@@ -74,12 +74,15 @@ export interface IProductRepository {
   // Truy vấn chi tiết
   findById(productId: number): Promise<Product | null>;
   findBySlug(slug: string): Promise<Product | null>;
+  getAvailableProductStock(productId: number): Promise<number>;
+  getAvailableVariantStock(variantId: number): Promise<number>;
 
   // Thao tác cơ bản
   create(product: CreateProductDTO): Promise<Product>;
   update(product: UpdateProductDTO): Promise<Product | null>;
   delete(productId: number): Promise<boolean>;
   hardDelete(productId: number): Promise<boolean>;
+  restore(productId: number): Promise<boolean>;
   updateStock(productId: number, quantity: number): Promise<boolean>;
 
   // --- 3. QUẢN LÝ ẢNH (BÍ QUYẾT HIỂN THỊ ẢNH CỦA TUẤN ANH) ---

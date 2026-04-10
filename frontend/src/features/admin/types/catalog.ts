@@ -121,6 +121,7 @@ export interface AdminProduct {
   variants: AdminProductVariant[];
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string | null;
 }
 
 export interface SaveAdminProductPayload {

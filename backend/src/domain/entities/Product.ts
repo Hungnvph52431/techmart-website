@@ -29,6 +29,7 @@ export interface ProductVariant {
   attributes: Record<string, any>;
   priceAdjustment: number;
   stockQuantity: number;
+  availableStockQuantity?: number;
   imageUrl?: string;
   isActive: boolean;
   createdAt?: Date;
@@ -57,10 +58,13 @@ export interface Product {
   specifications?: Record<string, any>;
   mainImage?: string;
   stockQuantity: number;
+  availableStockQuantity?: number;
   soldQuantity: number;
   viewCount: number;
   ratingAvg: number;
   reviewCount: number;
+  hasVariants?: boolean;
+  variantCount?: number;
   isFeatured: boolean;
   isNew: boolean;
   isBestseller: boolean;

@@ -43,7 +43,7 @@ const CUSTOMER_CANCELLABLE_STATUSES: OrderStatus[] = ['pending', 'confirmed'];
 const BACKOFFICE_CANCELLABLE_STATUSES: OrderStatus[] = ['pending', 'confirmed'];
 
 // Yêu cầu trả hàng khi đã giao hoặc đã hoàn thành (delivered/completed)
-const RETURN_REQUESTABLE_STATUSES: OrderStatus[] = ['delivered', 'completed'];
+const RETURN_REQUESTABLE_STATUSES: OrderStatus[] = ['delivered', 'completed', 'returned'];
 
 // Thời hạn cho phép yêu cầu hoàn trả (tính từ ngày giao hàng)
 export const RETURN_DEADLINE_DAYS = 7;

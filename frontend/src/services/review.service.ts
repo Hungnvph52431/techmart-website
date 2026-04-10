@@ -1,10 +1,12 @@
 import api from './api';
+import { buildGuestOrderHeaders } from '@/features/orders/lib/guestOrderAccess';
 
 export interface Review {
   reviewId: number;
   productId: number;
-  productName?: string;  // ✅ Thêm để Admin có thể hiển thị tên sản phẩm
-  userId: number;
+  productName?: string;
+  variantName?: string;
+  userId: number | null;
   userName: string;
   userAvatar?: string;
   orderId?: number;
@@ -16,6 +18,9 @@ export interface Review {
   isVerifiedPurchase: boolean;
   helpfulCount: number;
   status: 'pending' | 'approved' | 'rejected';
+  editCount?: number;
+  editedAfterReturnAt?: string;
+  editedAfterReturnOrderReturnId?: number;
   createdAt: string;
 }
 
@@ -25,13 +30,68 @@ export interface ReviewStats {
   distribution: Record<number, number>; // { 1: 5, 2: 3, 3: 10, 4: 25, 5: 57 }
 }
 
+export type ReviewSource = 'product' | 'system_fallback' | 'empty';
+
+export interface ProductReviewResponse {
+  reviewSource: ReviewSource;
+  hasOwnReviews: boolean;
+  productStats: ReviewStats;
+  stats: ReviewStats;
+  reviews: Review[];
+  total: number;
+  page: number;
+  totalPages: number;
+  fallbackLabel?: string;
+  fallbackDescription?: string;
+}
+
 export interface CreateReviewPayload {
   productId: number;
+  orderCode?: string;
   orderId?: number;
   orderDetailId?: number;
   rating: number;
   title?: string;
   comment?: string;
+}
+
+export interface UpdateReviewPayload {
+  rating: number;
+  title?: string;
+  comment?: string;
+}
+
+export interface OrderReviewItemSummary {
+  orderDetailId: number;
+  productId: number;
+  productName: string;
+  variantName?: string;
+  sku?: string;
+  productImage?: string;
+  quantity: number;
+  canReview: boolean;
+  canCreateReview: boolean;
+  canEditReview: boolean;
+  hasUsedReturnEdit: boolean;
+  remainingEditCount: number;
+  reviewEditLimit: number;
+  linkedReturnId?: number;
+  review?: Review;
+}
+
+export interface OrderReviewSummary {
+  orderId: number;
+  orderStatus: string;
+  canReviewOrder: boolean;
+  orderFeedback?: {
+    orderFeedbackId: number;
+    rating: number;
+    title?: string;
+    comment?: string;
+    createdAt: string;
+  };
+  hasPendingReviewActions: boolean;
+  items: OrderReviewItemSummary[];
 }
 
 export const reviewService = {
@@ -41,7 +101,7 @@ export const reviewService = {
   getByProduct: async (
     productId: number,
     params?: { rating?: number; page?: number; limit?: number }
-  ): Promise<{ reviews: Review[]; stats: ReviewStats; total: number; page: number; totalPages: number }> => {
+  ): Promise<ProductReviewResponse> => {
     const query = new URLSearchParams();
     if (params?.rating) query.append('rating', String(params.rating));
     if (params?.page) query.append('page', String(params.page));
@@ -53,6 +113,61 @@ export const reviewService = {
   // Tạo review mới
   create: async (payload: CreateReviewPayload): Promise<Review> => {
     const res = await api.post('/reviews', payload);
+    return res.data;
+  },
+
+  update: async (reviewId: number, payload: UpdateReviewPayload): Promise<Review> => {
+    const res = await api.patch(`/reviews/${reviewId}`, payload);
+    return res.data;
+  },
+
+  createGuest: async (
+    payload: CreateReviewPayload & { orderCode: string },
+    accessToken: string,
+  ): Promise<Review> => {
+    const res = await api.post(
+      '/reviews/guest',
+      payload,
+      {
+        headers: buildGuestOrderHeaders(accessToken),
+        ...( { skipAuthRedirect: true } as any ),
+      },
+    );
+    return res.data;
+  },
+
+  updateGuest: async (
+    reviewId: number,
+    payload: UpdateReviewPayload & { orderCode: string },
+    accessToken: string,
+  ): Promise<Review> => {
+    const res = await api.patch(
+      `/reviews/guest/${reviewId}`,
+      payload,
+      {
+        headers: buildGuestOrderHeaders(accessToken),
+        ...( { skipAuthRedirect: true } as any ),
+      },
+    );
+    return res.data;
+  },
+
+  getOrderSummary: async (orderId: number): Promise<OrderReviewSummary> => {
+    const res = await api.get(`/reviews/orders/${orderId}/summary`);
+    return res.data;
+  },
+
+  getGuestOrderSummary: async (
+    orderCode: string,
+    accessToken: string,
+  ): Promise<OrderReviewSummary> => {
+    const res = await api.get(
+      `/reviews/guest/orders/${encodeURIComponent(orderCode)}/summary`,
+      {
+        headers: buildGuestOrderHeaders(accessToken),
+        ...( { skipAuthRedirect: true } as any ),
+      },
+    );
     return res.data;
   },
 

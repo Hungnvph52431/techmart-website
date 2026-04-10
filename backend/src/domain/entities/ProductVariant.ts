@@ -6,6 +6,7 @@ export interface ProductVariant {
     attributes?: Record<string, any>;
     priceAdjustment: number;
     stockQuantity: number;
+    availableStockQuantity?: number;
     imageUrl?: string;
     isActive: boolean;
     createdAt: Date;

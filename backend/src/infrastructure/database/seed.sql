@@ -63,53 +63,108 @@ INSERT INTO categories (name, slug, description, parent_id, display_order, is_ac
 -- ==================================================
 -- 5. PRODUCTS
 -- ==================================================
-INSERT INTO products (name, slug, sku, category_id, brand_id, price, sale_price, description, specifications, stock_quantity, sold_quantity, is_featured, is_new, is_bestseller, status) VALUES
-('iPhone 15 Pro Max', 'iphone-15-pro-max', 'IP15PM-001', 7, 1, 29990000, 28990000, 'iPhone 15 Pro Max - Đỉnh cao công nghệ với chip A17 Pro, camera 48MP, titan thiết kế', '{"screen": "6.7 inch", "chip": "A17 Pro", "ram": "8GB", "storage": ["256GB", "512GB", "1TB"], "camera": "48MP + 12MP + 12MP", "battery": "4422mAh"}', 50, 120, TRUE, TRUE, TRUE, 'active'),
-('iPhone 14 Pro', 'iphone-14-pro', 'IP14P-001', 7, 1, 25990000, 24490000, 'iPhone 14 Pro - Chip A16 Bionic, Dynamic Island, camera 48MP', '{"screen": "6.1 inch", "chip": "A16 Bionic", "ram": "6GB", "storage": ["128GB", "256GB", "512GB"], "camera": "48MP + 12MP + 12MP", "battery": "3200mAh"}', 80, 250, TRUE, FALSE, TRUE, 'active'),
-('iPhone 13', 'iphone-13', 'IP13-001', 7, 1, 17990000, 16990000, 'iPhone 13 - Hiệu năng mạnh mẽ, pin trâu, camera kép xuất sắc', '{"screen": "6.1 inch", "chip": "A15 Bionic", "ram": "4GB", "storage": ["128GB", "256GB", "512GB"], "camera": "12MP + 12MP", "battery": "3240mAh"}', 100, 450, TRUE, FALSE, TRUE, 'active'),
-('Samsung Galaxy S24 Ultra', 'samsung-galaxy-s24-ultra', 'SS24U-001', 8, 2, 29990000, 28490000, 'Galaxy S24 Ultra - Snapdragon 8 Gen 3, camera 200MP, S Pen tích hợp', '{"screen": "6.8 inch", "chip": "Snapdragon 8 Gen 3", "ram": "12GB", "storage": ["256GB", "512GB", "1TB"], "camera": "200MP + 50MP + 12MP + 10MP", "battery": "5000mAh"}', 60, 180, TRUE, TRUE, TRUE, 'active'),
-('Samsung Galaxy A54 5G', 'samsung-galaxy-a54-5g', 'SSA54-001', 8, 2, 9990000, 9490000, 'Galaxy A54 5G - Thiết kế cao cấp, màn hình 120Hz, camera 50MP', '{"screen": "6.4 inch", "chip": "Exynos 1380", "ram": "8GB", "storage": ["128GB", "256GB"], "camera": "50MP + 12MP + 5MP", "battery": "5000mAh"}', 150, 520, TRUE, FALSE, TRUE, 'active'),
-('Samsung Galaxy Z Fold5', 'samsung-galaxy-z-fold5', 'SSZF5-001', 8, 2, 40990000, 38990000, 'Galaxy Z Fold5 - Điện thoại gập cao cấp, màn hình Dynamic AMOLED', '{"screen": "7.6 inch", "chip": "Snapdragon 8 Gen 2", "ram": "12GB", "storage": ["256GB", "512GB", "1TB"], "camera": "50MP + 12MP + 10MP", "battery": "4400mAh"}', 30, 85, TRUE, TRUE, FALSE, 'active'),
-('Xiaomi 14 Pro', 'xiaomi-14-pro', 'XM14P-001', 9, 3, 19990000, 18990000, 'Xiaomi 14 Pro - Snapdragon 8 Gen 3, camera Leica, sạc nhanh 120W', '{"screen": "6.73 inch", "chip": "Snapdragon 8 Gen 3", "ram": "12GB", "storage": ["256GB", "512GB"], "camera": "50MP + 50MP + 50MP", "battery": "4880mAh"}', 70, 210, TRUE, TRUE, TRUE, 'active'),
-('Xiaomi Redmi Note 13 Pro', 'xiaomi-redmi-note-13-pro', 'RN13P-001', 9, 3, 7990000, 7490000, 'Redmi Note 13 Pro - Camera 200MP, sạc nhanh 67W, pin 5000mAh', '{"screen": "6.67 inch", "chip": "Snapdragon 7s Gen 2", "ram": "8GB", "storage": ["128GB", "256GB"], "camera": "200MP + 8MP + 2MP", "battery": "5000mAh"}', 200, 850, TRUE, FALSE, TRUE, 'active'),
-('OPPO Find X6 Pro', 'oppo-find-x6-pro', 'OPX6P-001', 10, 4, 22990000, 21990000, 'OPPO Find X6 Pro - Camera Hasselblad, Snapdragon 8 Gen 2', '{"screen": "6.82 inch", "chip": "Snapdragon 8 Gen 2", "ram": "12GB", "storage": ["256GB", "512GB"], "camera": "50MP + 50MP + 50MP", "battery": "5000mAh"}', 50, 95, TRUE, TRUE, FALSE, 'active'),
-('OPPO Reno10 5G', 'oppo-reno10-5g', 'OPR10-001', 10, 4, 9490000, 8990000, 'OPPO Reno10 5G - Thiết kế mỏng nhẹ, camera chân dung chuyên nghiệp', '{"screen": "6.7 inch", "chip": "MediaTek Dimensity 7050", "ram": "8GB", "storage": ["256GB"], "camera": "64MP + 32MP + 8MP", "battery": "5000mAh"}', 120, 380, TRUE, FALSE, TRUE, 'active'),
-('MacBook Air M2', 'macbook-air-m2', 'MBA-M2-001', 3, 1, 27990000, 26990000, 'MacBook Air M2 - Siêu mỏng nhẹ, chip M2 mạnh mẽ, pin 18 giờ', '{"screen": "13.6 inch", "chip": "Apple M2", "ram": "8GB", "storage": ["256GB", "512GB"], "graphics": "8-core GPU", "weight": "1.24kg"}', 40, 150, TRUE, FALSE, TRUE, 'active'),
-('Dell XPS 13', 'dell-xps-13', 'DXP13-001', 3, 9, 32990000, 31490000, 'Dell XPS 13 - Thiết kế premium, màn hình InfinityEdge', '{"screen": "13.4 inch", "chip": "Intel Core i7-1355U", "ram": "16GB", "storage": ["512GB", "1TB"], "graphics": "Intel Iris Xe", "weight": "1.17kg"}', 35, 85, TRUE, FALSE, FALSE, 'active'),
-('AirPods Pro 2', 'airpods-pro-2', 'APP2-001', 11, 1, 6490000, 5990000, 'AirPods Pro 2 - Chống ồn chủ động, âm thanh không gian', '{"type": "In-ear", "connection": "Bluetooth 5.3", "battery": "30 giờ", "features": ["Chống ồn ANC", "Âm thanh không gian", "Chống nước IPX4"]}', 200, 450, TRUE, FALSE, TRUE, 'active'),
-('Samsung Galaxy Buds2 Pro', 'samsung-galaxy-buds2-pro', 'SGB2P-001', 11, 2, 4490000, 3990000, 'Galaxy Buds2 Pro - Âm thanh Hi-Fi 24bit, chống ồn thông minh', '{"type": "In-ear", "connection": "Bluetooth 5.3", "battery": "29 giờ", "features": ["Chống ồn ANC", "360 Audio", "Chống nước IPX7"]}', 150, 320, TRUE, FALSE, TRUE, 'active'),
-('Anker PowerBank 20000mAh', 'anker-powerbank-20000mah', 'ANK-PB20-001', 12, 10, 990000, 890000, 'Sạc dự phòng Anker 20000mAh - Sạc nhanh 22.5W, 2 cổng USB', '{"capacity": "20000mAh", "input": "USB-C", "output": ["USB-C", "USB-A"], "fast_charge": "22.5W", "weight": "342g"}', 300, 1200, FALSE, FALSE, TRUE, 'active');
+-- Phân chia section:
+-- Săn Deal Giá Sốc = có sale_price (iPhone 14 Pro, Galaxy A54, Redmi Note 13 Pro, OPPO Reno10, Dell XPS 13)
+-- Sản phẩm nổi bật = is_featured (iPhone 15 Pro Max, Galaxy S24 Ultra, Galaxy Z Fold5, OPPO Find X6 Pro, MacBook Air M2)
+-- Bán chạy nhất = is_bestseller (iPhone 13, Xiaomi 14 Pro, Galaxy Buds2 Pro, AirPods Pro 2, Anker PowerBank)
+-- Mới cập bến = is_new (iPhone 15 Pro Max, Galaxy S24 Ultra, Galaxy Z Fold5, Xiaomi 14 Pro, OPPO Find X6 Pro)
+INSERT INTO products (name, slug, sku, category_id, brand_id, price, sale_price, description, specifications, main_image, stock_quantity, sold_quantity, is_featured, is_new, is_bestseller, status) VALUES
+('iPhone 15 Pro Max', 'iphone-15-pro-max', 'IP15PM-001', 7, 1, 29990000, NULL, 'iPhone 15 Pro Max - Đỉnh cao công nghệ với chip A17 Pro, camera 48MP, titan thiết kế', '{"screen": "6.7 inch", "chip": "A17 Pro", "ram": "8GB", "storage": ["256GB", "512GB", "1TB"], "camera": "48MP + 12MP + 12MP", "battery": "4422mAh"}', 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/i/p/iphone-15-pro-max_3.png', 50, 120, TRUE, TRUE, FALSE, 'active'),
+('iPhone 14 Pro', 'iphone-14-pro', 'IP14P-001', 7, 1, 25990000, 24490000, 'iPhone 14 Pro - Chip A16 Bionic, Dynamic Island, camera 48MP', '{"screen": "6.1 inch", "chip": "A16 Bionic", "ram": "6GB", "storage": ["128GB", "256GB", "512GB"], "camera": "48MP + 12MP + 12MP", "battery": "3200mAh"}', 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/i/p/iphone-14-pro_2__4.png', 80, 250, FALSE, FALSE, FALSE, 'active'),
+('iPhone 13', 'iphone-13', 'IP13-001', 7, 1, 17990000, NULL, 'iPhone 13 - Hiệu năng mạnh mẽ, pin trâu, camera kép xuất sắc', '{"screen": "6.1 inch", "chip": "A15 Bionic", "ram": "4GB", "storage": ["128GB", "256GB", "512GB"], "camera": "12MP + 12MP", "battery": "3240mAh"}', 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/i/p/iphone-13_2_2.jpg', 100, 450, FALSE, FALSE, TRUE, 'active'),
+('Samsung Galaxy S24 Ultra', 'samsung-galaxy-s24-ultra', 'SS24U-001', 8, 2, 29990000, NULL, 'Galaxy S24 Ultra - Snapdragon 8 Gen 3, camera 200MP, S Pen tích hợp', '{"screen": "6.8 inch", "chip": "Snapdragon 8 Gen 3", "ram": "12GB", "storage": ["256GB", "512GB", "1TB"], "camera": "200MP + 50MP + 12MP + 10MP", "battery": "5000mAh"}', 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/s/s/ss-s24-ultra-xam-222.png', 60, 180, TRUE, TRUE, FALSE, 'active'),
+('Samsung Galaxy A54 5G', 'samsung-galaxy-a54-5g', 'SSA54-001', 8, 2, 9990000, 9490000, 'Galaxy A54 5G - Thiết kế cao cấp, màn hình 120Hz, camera 50MP', '{"screen": "6.4 inch", "chip": "Exynos 1380", "ram": "8GB", "storage": ["128GB", "256GB"], "camera": "50MP + 12MP + 5MP", "battery": "5000mAh"}', 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/s/a/samsung-galaxy-a54.png', 150, 520, FALSE, FALSE, FALSE, 'active'),
+('Samsung Galaxy Z Fold5', 'samsung-galaxy-z-fold5', 'SSZF5-001', 8, 2, 40990000, NULL, 'Galaxy Z Fold5 - Điện thoại gập cao cấp, màn hình Dynamic AMOLED', '{"screen": "7.6 inch", "chip": "Snapdragon 8 Gen 2", "ram": "12GB", "storage": ["256GB", "512GB", "1TB"], "camera": "50MP + 12MP + 10MP", "battery": "4400mAh"}', 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/s/a/samsung-z-fold5_3__1.png', 30, 85, TRUE, TRUE, FALSE, 'active'),
+('Xiaomi 14 Pro', 'xiaomi-14-pro', 'XM14P-001', 9, 3, 19990000, NULL, 'Xiaomi 14 Pro - Snapdragon 8 Gen 3, camera Leica, sạc nhanh 120W', '{"screen": "6.73 inch", "chip": "Snapdragon 8 Gen 3", "ram": "12GB", "storage": ["256GB", "512GB"], "camera": "50MP + 50MP + 50MP", "battery": "4880mAh"}', 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/d/g/dgr77776.jpg', 70, 210, FALSE, TRUE, TRUE, 'active'),
+('Xiaomi Redmi Note 13 Pro', 'xiaomi-redmi-note-13-pro', 'RN13P-001', 9, 3, 7990000, 7490000, 'Redmi Note 13 Pro - Camera 200MP, sạc nhanh 67W, pin 5000mAh', '{"screen": "6.67 inch", "chip": "Snapdragon 7s Gen 2", "ram": "8GB", "storage": ["128GB", "256GB"], "camera": "200MP + 8MP + 2MP", "battery": "5000mAh"}', 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/x/i/xiaomi-redmi-note-13-pro-4g_13__1.png', 200, 850, FALSE, FALSE, FALSE, 'active'),
+('OPPO Find X6 Pro', 'oppo-find-x6-pro', 'OPX6P-001', 10, 4, 22990000, NULL, 'OPPO Find X6 Pro - Camera Hasselblad, Snapdragon 8 Gen 2', '{"screen": "6.82 inch", "chip": "Snapdragon 8 Gen 2", "ram": "12GB", "storage": ["256GB", "512GB"], "camera": "50MP + 50MP + 50MP", "battery": "5000mAh"}', 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/o/p/oppo-find-x6-pro.png', 50, 95, TRUE, TRUE, FALSE, 'active'),
+('OPPO Reno10 5G', 'oppo-reno10-5g', 'OPR10-001', 10, 4, 9490000, 8990000, 'OPPO Reno10 5G - Thiết kế mỏng nhẹ, camera chân dung chuyên nghiệp', '{"screen": "6.7 inch", "chip": "MediaTek Dimensity 7050", "ram": "8GB", "storage": ["256GB"], "camera": "64MP + 32MP + 8MP", "battery": "5000mAh"}', 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/r/e/reno10_5g_-_combo_product_-_blue.png', 120, 380, FALSE, FALSE, FALSE, 'active'),
+('MacBook Air M2', 'macbook-air-m2', 'MBA-M2-001', 3, 1, 27990000, NULL, 'MacBook Air M2 - Siêu mỏng nhẹ, chip M2 mạnh mẽ, pin 18 giờ', '{"screen": "13.6 inch", "chip": "Apple M2", "ram": "8GB", "storage": ["256GB", "512GB"], "graphics": "8-core GPU", "weight": "1.24kg"}', 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/m/a/macbook_1__1_8.png', 40, 150, TRUE, FALSE, FALSE, 'active'),
+('Dell XPS 13', 'dell-xps-13', 'DXP13-001', 3, 9, 32990000, 31490000, 'Dell XPS 13 - Thiết kế premium, màn hình InfinityEdge', '{"screen": "13.4 inch", "chip": "Intel Core i7-1355U", "ram": "16GB", "storage": ["512GB", "1TB"], "graphics": "Intel Iris Xe", "weight": "1.17kg"}', 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/l/a/laptop-dell-xps-13-9310_1_.jpg', 35, 85, FALSE, FALSE, FALSE, 'active'),
+('AirPods Pro 2', 'airpods-pro-2', 'APP2-001', 11, 1, 6490000, NULL, 'AirPods Pro 2 - Chống ồn chủ động, âm thanh không gian', '{"type": "In-ear", "connection": "Bluetooth 5.3", "battery": "30 giờ", "features": ["Chống ồn ANC", "Âm thanh không gian", "Chống nước IPX4"]}', 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/a/p/apple-airpods-pro-2-usb-c_1_.png', 200, 450, FALSE, FALSE, TRUE, 'active'),
+('Samsung Galaxy Buds2 Pro', 'samsung-galaxy-buds2-pro', 'SGB2P-001', 11, 2, 4490000, NULL, 'Galaxy Buds2 Pro - Âm thanh Hi-Fi 24bit, chống ồn thông minh', '{"type": "In-ear", "connection": "Bluetooth 5.3", "battery": "29 giờ", "features": ["Chống ồn ANC", "360 Audio", "Chống nước IPX7"]}', 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/s/a/samsung-galaxy-buds-2-pro-thumb.png', 150, 320, FALSE, FALSE, TRUE, 'active'),
+('Anker PowerBank 20000mAh', 'anker-powerbank-20000mah', 'ANK-PB20-001', 12, 10, 990000, 890000, 'Sạc dự phòng Anker 20000mAh - Sạc nhanh 22.5W, 2 cổng USB', '{"capacity": "20000mAh", "input": "USB-C", "output": ["USB-C", "USB-A"], "fast_charge": "22.5W", "weight": "342g"}', 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/f/r/frame_511_5_.png', 300, 1200, FALSE, FALSE, TRUE, 'active');
 
 -- ==================================================
 -- 6. PRODUCT_VARIANTS
 -- ==================================================
 INSERT INTO product_variants (product_id, variant_name, sku, attributes, price_adjustment, stock_quantity, is_active) VALUES
+-- 1. iPhone 15 Pro Max
 (1, 'iPhone 15 Pro Max 256GB - Titan Tự Nhiên', 'IP15PM-256-TN', '{"storage": "256GB", "color": "Titan Tự Nhiên"}', 0, 20, TRUE),
 (1, 'iPhone 15 Pro Max 512GB - Titan Tự Nhiên', 'IP15PM-512-TN', '{"storage": "512GB", "color": "Titan Tự Nhiên"}', 5000000, 15, TRUE),
 (1, 'iPhone 15 Pro Max 256GB - Titan Trắng', 'IP15PM-256-TT', '{"storage": "256GB", "color": "Titan Trắng"}', 0, 15, TRUE),
+-- 2. iPhone 14 Pro
 (2, 'iPhone 14 Pro 128GB - Tím', 'IP14P-128-T', '{"storage": "128GB", "color": "Tím"}', 0, 30, TRUE),
 (2, 'iPhone 14 Pro 256GB - Tím', 'IP14P-256-T', '{"storage": "256GB", "color": "Tím"}', 3000000, 25, TRUE),
 (2, 'iPhone 14 Pro 128GB - Đen', 'IP14P-128-D', '{"storage": "128GB", "color": "Đen"}', 0, 25, TRUE),
+-- 3. iPhone 13
+(3, 'iPhone 13 128GB - Xanh dương', 'IP13-128-XD', '{"storage": "128GB", "color": "Xanh dương"}', 0, 35, TRUE),
+(3, 'iPhone 13 256GB - Xanh dương', 'IP13-256-XD', '{"storage": "256GB", "color": "Xanh dương"}', 2000000, 30, TRUE),
+(3, 'iPhone 13 128GB - Hồng', 'IP13-128-H', '{"storage": "128GB", "color": "Hồng"}', 0, 35, TRUE),
+-- 4. Galaxy S24 Ultra
 (4, 'Galaxy S24 Ultra 256GB - Titan Xám', 'SS24U-256-TX', '{"storage": "256GB", "color": "Titan Xám"}', 0, 25, TRUE),
 (4, 'Galaxy S24 Ultra 512GB - Titan Xám', 'SS24U-512-TX', '{"storage": "512GB", "color": "Titan Xám"}', 4000000, 20, TRUE),
 (4, 'Galaxy S24 Ultra 256GB - Titan Tím', 'SS24U-256-TT', '{"storage": "256GB", "color": "Titan Tím"}', 0, 15, TRUE),
+-- 5. Galaxy A54 5G
+(5, 'Galaxy A54 5G 128GB - Đen', 'SSA54-128-D', '{"storage": "128GB", "color": "Đen"}', 0, 50, TRUE),
+(5, 'Galaxy A54 5G 256GB - Đen', 'SSA54-256-D', '{"storage": "256GB", "color": "Đen"}', 1000000, 50, TRUE),
+(5, 'Galaxy A54 5G 128GB - Tím', 'SSA54-128-T', '{"storage": "128GB", "color": "Tím"}', 0, 50, TRUE),
+-- 6. Galaxy Z Fold5
+(6, 'Galaxy Z Fold5 256GB - Kem', 'SSZF5-256-K', '{"storage": "256GB", "color": "Kem"}', 0, 10, TRUE),
+(6, 'Galaxy Z Fold5 512GB - Kem', 'SSZF5-512-K', '{"storage": "512GB", "color": "Kem"}', 5000000, 10, TRUE),
+(6, 'Galaxy Z Fold5 256GB - Xanh', 'SSZF5-256-X', '{"storage": "256GB", "color": "Xanh"}', 0, 10, TRUE),
+-- 7. Xiaomi 14 Pro
+(7, 'Xiaomi 14 Pro 256GB - Đen', 'XM14P-256-D', '{"storage": "256GB", "color": "Đen"}', 0, 35, TRUE),
+(7, 'Xiaomi 14 Pro 512GB - Đen', 'XM14P-512-D', '{"storage": "512GB", "color": "Đen"}', 3000000, 20, TRUE),
+(7, 'Xiaomi 14 Pro 256GB - Trắng', 'XM14P-256-TR', '{"storage": "256GB", "color": "Trắng"}', 0, 15, TRUE),
+-- 8. Redmi Note 13 Pro
+(8, 'Redmi Note 13 Pro 128GB - Xanh', 'RN13P-128-X', '{"storage": "128GB", "color": "Xanh"}', 0, 80, TRUE),
+(8, 'Redmi Note 13 Pro 256GB - Xanh', 'RN13P-256-X', '{"storage": "256GB", "color": "Xanh"}', 1000000, 60, TRUE),
+(8, 'Redmi Note 13 Pro 128GB - Tím', 'RN13P-128-T', '{"storage": "128GB", "color": "Tím"}', 0, 60, TRUE),
+-- 9. OPPO Find X6 Pro
+(9, 'OPPO Find X6 Pro 256GB - Đen', 'OPX6P-256-D', '{"storage": "256GB", "color": "Đen"}', 0, 25, TRUE),
+(9, 'OPPO Find X6 Pro 512GB - Đen', 'OPX6P-512-D', '{"storage": "512GB", "color": "Đen"}', 3000000, 15, TRUE),
+(9, 'OPPO Find X6 Pro 256GB - Xanh', 'OPX6P-256-X', '{"storage": "256GB", "color": "Xanh"}', 0, 10, TRUE),
+-- 10. OPPO Reno10 5G
+(10, 'OPPO Reno10 5G 256GB - Xanh', 'OPR10-256-X', '{"storage": "256GB", "color": "Xanh"}', 0, 60, TRUE),
+(10, 'OPPO Reno10 5G 256GB - Bạc', 'OPR10-256-B', '{"storage": "256GB", "color": "Bạc"}', 0, 60, TRUE),
+-- 11. MacBook Air M2
 (11, 'MacBook Air M2 256GB - Midnight', 'MBA-M2-256-MN', '{"storage": "256GB", "color": "Midnight"}', 0, 20, TRUE),
 (11, 'MacBook Air M2 512GB - Midnight', 'MBA-M2-512-MN', '{"storage": "512GB", "color": "Midnight"}', 3000000, 10, TRUE),
-(11, 'MacBook Air M2 256GB - Starlight', 'MBA-M2-256-ST', '{"storage": "256GB", "color": "Starlight"}', 0, 10, TRUE);
+(11, 'MacBook Air M2 256GB - Starlight', 'MBA-M2-256-ST', '{"storage": "256GB", "color": "Starlight"}', 0, 10, TRUE),
+-- 12. Dell XPS 13
+(12, 'Dell XPS 13 512GB - Bạc', 'DXP13-512-B', '{"storage": "512GB", "color": "Bạc"}', 0, 20, TRUE),
+(12, 'Dell XPS 13 1TB - Bạc', 'DXP13-1TB-B', '{"storage": "1TB", "color": "Bạc"}', 4000000, 15, TRUE),
+-- 13. AirPods Pro 2
+(13, 'AirPods Pro 2 - USB-C Trắng', 'APP2-USBC-W', '{"connection": "USB-C", "color": "Trắng"}', 0, 100, TRUE),
+(13, 'AirPods Pro 2 - Lightning Trắng', 'APP2-LTN-W', '{"connection": "Lightning", "color": "Trắng"}', -500000, 100, TRUE),
+-- 14. Galaxy Buds2 Pro
+(14, 'Galaxy Buds2 Pro - Đen', 'SGB2P-D', '{"color": "Đen"}', 0, 50, TRUE),
+(14, 'Galaxy Buds2 Pro - Trắng', 'SGB2P-TR', '{"color": "Trắng"}', 0, 50, TRUE),
+(14, 'Galaxy Buds2 Pro - Tím', 'SGB2P-T', '{"color": "Tím"}', 0, 50, TRUE),
+-- 15. Anker PowerBank
+(15, 'Anker PowerBank 20000mAh - Đen', 'ANK-PB20-D', '{"color": "Đen"}', 0, 150, TRUE),
+(15, 'Anker PowerBank 20000mAh - Trắng', 'ANK-PB20-TR', '{"color": "Trắng"}', 0, 150, TRUE);
 
 -- ==================================================
 -- 7. PRODUCT_IMAGES
 -- ==================================================
 INSERT INTO product_images (product_id, image_url, alt_text, display_order, is_primary) VALUES
-(1, '/images/products/iphone-15-pro-max-1.jpg', 'iPhone 15 Pro Max mặt trước', 1, TRUE),
-(1, '/images/products/iphone-15-pro-max-2.jpg', 'iPhone 15 Pro Max mặt sau', 2, FALSE),
-(1, '/images/products/iphone-15-pro-max-3.jpg', 'iPhone 15 Pro Max camera', 3, FALSE),
-(2, '/images/products/iphone-14-pro-1.jpg', 'iPhone 14 Pro mặt trước', 1, TRUE),
-(2, '/images/products/iphone-14-pro-2.jpg', 'iPhone 14 Pro Dynamic Island', 2, FALSE),
-(4, '/images/products/galaxy-s24-ultra-1.jpg', 'Galaxy S24 Ultra mặt trước', 1, TRUE),
-(4, '/images/products/galaxy-s24-ultra-2.jpg', 'Galaxy S24 Ultra với S Pen', 2, FALSE),
-(11, '/images/products/macbook-air-m2-1.jpg', 'MacBook Air M2 màn hình', 1, TRUE),
-(11, '/images/products/macbook-air-m2-2.jpg', 'MacBook Air M2 thiết kế', 2, FALSE);
+(1, 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/i/p/iphone-15-pro-max_3.png', 'iPhone 15 Pro Max', 1, TRUE),
+(2, 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/i/p/iphone-14-pro_2__4.png', 'iPhone 14 Pro', 1, TRUE),
+(3, 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/i/p/iphone-13_2_2.jpg', 'iPhone 13', 1, TRUE),
+(4, 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/s/s/ss-s24-ultra-xam-222.png', 'Galaxy S24 Ultra', 1, TRUE),
+(5, 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/s/a/samsung-galaxy-a54.png', 'Galaxy A54 5G', 1, TRUE),
+(6, 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/s/a/samsung-z-fold5_3__1.png', 'Galaxy Z Fold5', 1, TRUE),
+(7, 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/d/g/dgr77776.jpg', 'Xiaomi 14 Pro', 1, TRUE),
+(8, 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/x/i/xiaomi-redmi-note-13-pro-4g_13__1.png', 'Redmi Note 13 Pro', 1, TRUE),
+(9, 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/o/p/oppo-find-x6-pro.png', 'OPPO Find X6 Pro', 1, TRUE),
+(10, 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/r/e/reno10_5g_-_combo_product_-_blue.png', 'OPPO Reno10 5G', 1, TRUE),
+(11, 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/m/a/macbook_1__1_8.png', 'MacBook Air M2', 1, TRUE),
+(12, 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/l/a/laptop-dell-xps-13-9310_1_.jpg', 'Dell XPS 13', 1, TRUE),
+(13, 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/a/p/apple-airpods-pro-2-usb-c_1_.png', 'AirPods Pro 2', 1, TRUE),
+(14, 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/s/a/samsung-galaxy-buds-2-pro-thumb.png', 'Galaxy Buds2 Pro', 1, TRUE),
+(15, 'https://cdn2.cellphones.com.vn/insecure/rs:fill:358:358/q:80/plain/https://cellphones.com.vn/media/catalog/product/f/r/frame_511_5_.png', 'Anker PowerBank 20000mAh', 1, TRUE);
 
 -- ==================================================
 -- 8. PRODUCT_ATTRIBUTES

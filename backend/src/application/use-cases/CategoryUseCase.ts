@@ -69,22 +69,38 @@ export class CategoryUseCase {
     await this.validateCategoryPayload(data, data.categoryId);
     return this.categoryRepository.update(data);
   }
+async getDeletedCategories() {
+  return this.categoryRepository.findDeleted();
+}
 
+async restoreCategory(categoryId: number) {
+  return this.categoryRepository.restore(categoryId);
+}
   async deleteCategory(categoryId: number) {
-    // Không cho xóa nếu còn danh mục con
-    const hasChildren = await this.categoryRepository.hasChildren(categoryId);
-    if (hasChildren) {
-      throw new Error('Category still has child categories');
-    }
+    const alreadyDeleted = await this.categoryRepository.isDeleted(categoryId);
 
-    // Nếu còn sản phẩm → chuyển sang danh mục "Không xác định" thay vì chặn
-    const hasProducts = await this.categoryRepository.hasProducts(categoryId);
-    if (hasProducts) {
+    if (!alreadyDeleted) {
+      // ── LẦN 1: Soft delete ──────────────────────────────────────────────
+      // Chỉ ẩn danh mục, giữ nguyên sản phẩm và danh mục con
+      // để khi restore thì tất cả tự động quay lại
+      return this.categoryRepository.softDelete(categoryId);
+    } else {
+      // ── LẦN 2: Hard delete ──────────────────────────────────────────────
+      // Lúc này mới chuyển sản phẩm và danh mục con sang "Không xác định"
       const uncategorized = await this.categoryRepository.findOrCreateUncategorized();
-      await this.categoryRepository.moveProductsToCategory(categoryId, uncategorized.categoryId);
-    }
 
-    return this.categoryRepository.delete(categoryId);
+      const hasChildren = await this.categoryRepository.hasChildren(categoryId);
+      if (hasChildren) {
+        await this.categoryRepository.moveChildrenToCategory(categoryId, uncategorized.categoryId);
+      }
+
+      const hasProducts = await this.categoryRepository.hasProducts(categoryId);
+      if (hasProducts) {
+        await this.categoryRepository.moveProductsToCategory(categoryId, uncategorized.categoryId);
+      }
+
+      return this.categoryRepository.delete(categoryId);
+    }
   }
 
   // --- 3. LOGIC KIỂM TRA RÀNG BUỘC (PRIVATE) ---

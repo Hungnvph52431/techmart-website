@@ -62,4 +62,16 @@ export class AdminProductController {
       res.status(500).json({ message: error.message });
     }
   };
+
+  restore = async (req: Request, res: Response) => {
+    try {
+      const success = await this.productUseCase.restoreProduct(Number(req.params.id));
+      if (!success) {
+        return res.status(404).json({ message: 'Product not found or not deleted' });
+      }
+      res.json({ message: 'Product restored successfully' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  };
 }

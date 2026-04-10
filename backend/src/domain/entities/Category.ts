@@ -9,6 +9,8 @@ export interface Category {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+  deletedAt?: Date | null;
+
 }
 
 export interface CreateCategoryDTO {

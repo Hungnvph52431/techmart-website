@@ -24,6 +24,8 @@ CREATE TABLE users (
     points INT DEFAULT 0,
     membership_level ENUM('bronze', 'silver', 'gold', 'platinum') DEFAULT 'bronze',
     wallet_balance DECIMAL(15,2) DEFAULT 0.00,
+    withdraw_pin_hash VARCHAR(255) NULL,
+    withdraw_pin_set_at TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     last_login TIMESTAMP NULL,
@@ -65,10 +67,12 @@ CREATE TABLE categories (
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
     FOREIGN KEY (parent_id) REFERENCES categories(category_id) ON DELETE SET NULL,
     INDEX idx_slug (slug),
     INDEX idx_parent_id (parent_id),
-    INDEX idx_active (is_active)
+    INDEX idx_active (is_active),
+    INDEX idx_deleted_at (deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
@@ -229,7 +233,7 @@ CREATE TABLE category_attributes (
 CREATE TABLE reviews (
     review_id INT AUTO_INCREMENT PRIMARY KEY,
     product_id INT NOT NULL,
-    user_id INT NOT NULL,
+    user_id INT NULL,
     order_id INT,
     order_detail_id INT,
     rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
@@ -238,7 +242,10 @@ CREATE TABLE reviews (
     images JSON,
     is_verified_purchase BOOLEAN DEFAULT FALSE,
     helpful_count INT DEFAULT 0,
+    edit_count INT DEFAULT 0,
     status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    edited_after_return_at TIMESTAMP NULL,
+    edited_after_return_order_return_id INT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE,
@@ -249,7 +256,8 @@ CREATE TABLE reviews (
     INDEX idx_order (order_id),
     INDEX idx_order_detail (order_detail_id),
     INDEX idx_status (status),
-    INDEX idx_rating (rating)
+    INDEX idx_rating (rating),
+    INDEX idx_review_return_edit (edited_after_return_order_return_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
@@ -300,7 +308,12 @@ CREATE TABLE cart (
 CREATE TABLE orders (
     order_id INT AUTO_INCREMENT PRIMARY KEY,
     order_code VARCHAR(50) NOT NULL UNIQUE,
-    user_id INT NOT NULL,
+    user_id INT NULL,
+
+    -- Thông tin người đặt đơn
+    customer_name VARCHAR(255),
+    customer_email VARCHAR(255),
+    customer_phone VARCHAR(20),
     
     -- Thông tin người nhận
     shipping_name VARCHAR(255) NOT NULL,
@@ -347,6 +360,7 @@ CREATE TABLE orders (
     FOREIGN KEY (coupon_id) REFERENCES coupons(coupon_id) ON DELETE SET NULL,
     INDEX idx_order_code (order_code),
     INDEX idx_user (user_id),
+    INDEX idx_customer_email (customer_email),
     INDEX idx_status (status),
     INDEX idx_payment_status (payment_status),
     INDEX idx_order_date (order_date)
@@ -414,7 +428,7 @@ CREATE TABLE order_returns (
     order_return_id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT NOT NULL,
     request_code VARCHAR(50) NOT NULL UNIQUE,
-    requested_by INT NOT NULL,
+    requested_by INT NULL,
     status ENUM('requested', 'approved', 'rejected', 'received', 'refunded', 'closed') DEFAULT 'requested',
     reason TEXT NOT NULL,
     customer_note TEXT,
@@ -428,7 +442,7 @@ CREATE TABLE order_returns (
     closed_at TIMESTAMP NULL,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE,
-    FOREIGN KEY (requested_by) REFERENCES users(user_id) ON DELETE RESTRICT,
+    FOREIGN KEY (requested_by) REFERENCES users(user_id) ON DELETE SET NULL,
     INDEX idx_order (order_id),
     INDEX idx_status (status),
     INDEX idx_requested_at (requested_at)
@@ -710,7 +724,7 @@ CREATE TABLE wallet_topup_requests (
 CREATE TABLE wallet_transactions (
     transaction_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
-    type ENUM('topup', 'payment', 'refund', 'admin_adjust') NOT NULL,
+    type ENUM('topup', 'payment', 'refund', 'admin_adjust', 'withdraw_request', 'withdraw_reversal', 'withdraw_complete') NOT NULL,
     amount DECIMAL(15,2) NOT NULL,
     balance_after DECIMAL(15,2) NOT NULL,
     reference_type VARCHAR(50),
@@ -721,6 +735,55 @@ CREATE TABLE wallet_transactions (
     INDEX idx_user (user_id),
     INDEX idx_type (type),
     INDEX idx_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==================================================
+-- BẢNG USER_BANK_ACCOUNTS - Tài khoản ngân hàng liên kết để rút tiền
+-- ==================================================
+CREATE TABLE user_bank_accounts (
+    bank_account_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    bank_code VARCHAR(50) NOT NULL,
+    bank_name VARCHAR(255) NOT NULL,
+    account_number VARCHAR(50) NOT NULL,
+    account_holder_name VARCHAR(255) NOT NULL,
+    branch_name VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    UNIQUE KEY uniq_user_bank_account (user_id),
+    INDEX idx_bank_code (bank_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==================================================
+-- BẢNG WALLET_WITHDRAWAL_REQUESTS - Yêu cầu rút tiền từ ví
+-- ==================================================
+CREATE TABLE wallet_withdrawal_requests (
+    withdrawal_request_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    bank_account_id INT NOT NULL,
+    reference_code VARCHAR(50) NOT NULL UNIQUE,
+    amount DECIMAL(15,2) NOT NULL,
+    status ENUM('pending', 'approved', 'paid', 'rejected', 'cancelled') NOT NULL DEFAULT 'pending',
+    bank_code VARCHAR(50) NOT NULL,
+    bank_name VARCHAR(255) NOT NULL,
+    account_number VARCHAR(50) NOT NULL,
+    account_holder_name VARCHAR(255) NOT NULL,
+    branch_name VARCHAR(255) NOT NULL,
+    customer_note TEXT,
+    admin_note TEXT,
+    requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    approved_at TIMESTAMP NULL,
+    paid_at TIMESTAMP NULL,
+    rejected_at TIMESTAMP NULL,
+    cancelled_at TIMESTAMP NULL,
+    processed_by INT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (bank_account_id) REFERENCES user_bank_accounts(bank_account_id) ON DELETE RESTRICT,
+    FOREIGN KEY (processed_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    INDEX idx_user_status (user_id, status),
+    INDEX idx_requested_at (requested_at),
+    INDEX idx_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
