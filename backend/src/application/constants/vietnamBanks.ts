@@ -1,0 +1,57 @@
+export interface VietnamBankCatalogItem {
+  code: string;
+  name: string;
+  shortName: string;
+  keywords?: string[];
+  displayOrder: number;
+}
+
+export const VIETNAM_BANKS: VietnamBankCatalogItem[] = [
+  { code: 'AGRIBANK', name: 'Ngân hàng Nông nghiệp và Phát triển Nông thôn Việt Nam', shortName: 'Agribank', keywords: ['nong nghiep', 'agri'], displayOrder: 1 },
+  { code: 'BIDV', name: 'Ngân hàng TMCP Đầu tư và Phát triển Việt Nam', shortName: 'BIDV', keywords: ['dau tu phat trien'], displayOrder: 2 },
+  { code: 'VCB', name: 'Ngân hàng TMCP Ngoại thương Việt Nam', shortName: 'Vietcombank', keywords: ['vietcom', 'ngoai thuong'], displayOrder: 3 },
+  { code: 'CTG', name: 'Ngân hàng TMCP Công thương Việt Nam', shortName: 'VietinBank', keywords: ['vietin', 'cong thuong'], displayOrder: 4 },
+  { code: 'LPB', name: 'Ngân hàng TMCP Lộc Phát Việt Nam', shortName: 'LPBank', keywords: ['lien viet post bank', 'lienvietpostbank'], displayOrder: 5 },
+  { code: 'ACB', name: 'Ngân hàng TMCP Á Châu', shortName: 'ACB', displayOrder: 6 },
+  { code: 'ABBANK', name: 'Ngân hàng TMCP An Bình', shortName: 'ABBank', keywords: ['an binh'], displayOrder: 7 },
+  { code: 'BAB', name: 'Ngân hàng TMCP Bắc Á', shortName: 'Bac A Bank', keywords: ['bac a'], displayOrder: 8 },
+  { code: 'BVB', name: 'Ngân hàng TMCP Bản Việt', shortName: 'BVBank', keywords: ['ban viet', 'viet capital bank'], displayOrder: 9 },
+  { code: 'BAOVIETBANK', name: 'Ngân hàng TMCP Bảo Việt', shortName: 'BaoViet Bank', keywords: ['bao viet'], displayOrder: 10 },
+  { code: 'COOPBANK', name: 'Ngân hàng Hợp tác xã Việt Nam', shortName: 'Co-opBank', keywords: ['hop tac xa'], displayOrder: 11 },
+  { code: 'CBBANK', name: 'Ngân hàng Thương mại TNHH MTV Xây dựng Việt Nam', shortName: 'CBBank', keywords: ['xay dung viet nam'], displayOrder: 12 },
+  { code: 'DONGABANK', name: 'Ngân hàng TMCP Đông Á', shortName: 'DongA Bank', keywords: ['dong a'], displayOrder: 13 },
+  { code: 'EIB', name: 'Ngân hàng TMCP Xuất Nhập khẩu Việt Nam', shortName: 'Eximbank', keywords: ['xuat nhap khau'], displayOrder: 14 },
+  { code: 'GPBANK', name: 'Ngân hàng Thương mại TNHH MTV Dầu Khí Toàn Cầu', shortName: 'GPBank', keywords: ['dau khi toan cau'], displayOrder: 15 },
+  { code: 'HDB', name: 'Ngân hàng TMCP Phát triển TP.HCM', shortName: 'HDBank', keywords: ['phat trien thanh pho ho chi minh'], displayOrder: 16 },
+  { code: 'HLBVN', name: 'Ngân hàng TNHH MTV Hong Leong Việt Nam', shortName: 'Hong Leong Bank', keywords: ['hong leong'], displayOrder: 17 },
+  { code: 'HSBC', name: 'Ngân hàng TNHH MTV HSBC Việt Nam', shortName: 'HSBC', displayOrder: 18 },
+  { code: 'IBK', name: 'Ngân hàng TNHH MTV Công nghiệp Hàn Quốc', shortName: 'IBK Bank', keywords: ['industrial bank of korea'], displayOrder: 19 },
+  { code: 'IVB', name: 'Ngân hàng TNHH Indovina', shortName: 'Indovina Bank', keywords: ['indovina'], displayOrder: 20 },
+  { code: 'KLB', name: 'Ngân hàng TMCP Kiên Long', shortName: 'KienlongBank', keywords: ['kien long'], displayOrder: 21 },
+  { code: 'MBB', name: 'Ngân hàng TMCP Quân đội', shortName: 'MB Bank', keywords: ['quan doi'], displayOrder: 22 },
+  { code: 'MSB', name: 'Ngân hàng TMCP Hàng Hải Việt Nam', shortName: 'MSB', keywords: ['hang hai'], displayOrder: 23 },
+  { code: 'NAB', name: 'Ngân hàng TMCP Nam Á', shortName: 'Nam A Bank', keywords: ['nam a'], displayOrder: 24 },
+  { code: 'NCB', name: 'Ngân hàng TMCP Quốc Dân', shortName: 'NCB', keywords: ['quoc dan'], displayOrder: 25 },
+  { code: 'OCB', name: 'Ngân hàng TMCP Phương Đông', shortName: 'OCB', keywords: ['phuong dong'], displayOrder: 26 },
+  { code: 'OCEANBANK', name: 'Ngân hàng Thương mại TNHH MTV Đại Dương', shortName: 'OceanBank', keywords: ['dai duong'], displayOrder: 27 },
+  { code: 'PGBANK', name: 'Ngân hàng TMCP Thịnh vượng và Phát triển', shortName: 'PGBank', keywords: ['petrolimex'], displayOrder: 28 },
+  { code: 'PBVN', name: 'Ngân hàng TNHH MTV Public Việt Nam', shortName: 'Public Bank Vietnam', keywords: ['public bank'], displayOrder: 29 },
+  { code: 'PVCB', name: 'Ngân hàng TMCP Đại Chúng Việt Nam', shortName: 'PVcomBank', keywords: ['dai chung viet nam'], displayOrder: 30 },
+  { code: 'SACOMBANK', name: 'Ngân hàng TMCP Sài Gòn Thương Tín', shortName: 'Sacombank', keywords: ['sai gon thuong tin'], displayOrder: 31 },
+  { code: 'SGB', name: 'Ngân hàng TMCP Sài Gòn Công Thương', shortName: 'Saigonbank', keywords: ['sai gon cong thuong'], displayOrder: 32 },
+  { code: 'SCB', name: 'Ngân hàng TMCP Sài Gòn', shortName: 'SCB', keywords: ['sai gon'], displayOrder: 33 },
+  { code: 'SEABANK', name: 'Ngân hàng TMCP Đông Nam Á', shortName: 'SeABank', keywords: ['dong nam a'], displayOrder: 34 },
+  { code: 'SHB', name: 'Ngân hàng TMCP Sài Gòn - Hà Nội', shortName: 'SHB', keywords: ['sai gon ha noi'], displayOrder: 35 },
+  { code: 'SHBVN', name: 'Ngân hàng TNHH MTV Shinhan Việt Nam', shortName: 'Shinhan Bank', keywords: ['shinhan'], displayOrder: 36 },
+  { code: 'SCVN', name: 'Ngân hàng TNHH MTV Standard Chartered Việt Nam', shortName: 'Standard Chartered', keywords: ['standard chartered'], displayOrder: 37 },
+  { code: 'TCB', name: 'Ngân hàng TMCP Kỹ thương Việt Nam', shortName: 'Techcombank', keywords: ['ky thuong'], displayOrder: 38 },
+  { code: 'TPB', name: 'Ngân hàng TMCP Tiên Phong', shortName: 'TPBank', keywords: ['tien phong'], displayOrder: 39 },
+  { code: 'UOB', name: 'Ngân hàng TNHH MTV United Overseas Bank Việt Nam', shortName: 'UOB', keywords: ['united overseas bank'], displayOrder: 40 },
+  { code: 'VAB', name: 'Ngân hàng TMCP Việt Á', shortName: 'VietABank', keywords: ['viet a'], displayOrder: 41 },
+  { code: 'VIB', name: 'Ngân hàng TMCP Quốc tế Việt Nam', shortName: 'VIB', keywords: ['quoc te'], displayOrder: 42 },
+  { code: 'VIETBANK', name: 'Ngân hàng TMCP Việt Nam Thương Tín', shortName: 'Vietbank', keywords: ['viet nam thuong tin'], displayOrder: 43 },
+  { code: 'VRB', name: 'Ngân hàng Liên doanh Việt - Nga', shortName: 'VRB', keywords: ['viet nga'], displayOrder: 44 },
+  { code: 'VPB', name: 'Ngân hàng TMCP Việt Nam Thịnh Vượng', shortName: 'VPBank', keywords: ['thinh vuong'], displayOrder: 45 },
+  { code: 'WOORI', name: 'Ngân hàng TNHH MTV Woori Việt Nam', shortName: 'Woori Bank', keywords: ['woori'], displayOrder: 46 },
+  { code: 'CIMB', name: 'Ngân hàng TNHH MTV CIMB Việt Nam', shortName: 'CIMB', displayOrder: 47 },
+];

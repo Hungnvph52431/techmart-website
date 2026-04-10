@@ -116,6 +116,29 @@ export class WalletController {
     }
   };
 
+  adminListWithdrawalNotifications = async (req: AuthRequest, res: Response) => {
+    try {
+      const notifications = await this.walletUseCase.adminListWithdrawalNotifications(req.user.userId);
+      res.json(notifications);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  };
+
+  adminMarkWithdrawalNotificationRead = async (req: AuthRequest, res: Response) => {
+    try {
+      const notificationId = Number(req.params.id);
+      if (Number.isNaN(notificationId)) {
+        return res.status(400).json({ message: 'Mã thông báo không hợp lệ' });
+      }
+
+      await this.walletUseCase.adminMarkWithdrawalNotificationRead(req.user.userId, notificationId);
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  };
+
   adminUpdateWithdrawalStatus = async (req: AuthRequest, res: Response) => {
     try {
       const requestId = Number(req.params.id);

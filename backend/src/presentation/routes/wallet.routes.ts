@@ -17,6 +17,8 @@ export const createWalletRoutes = (walletController: WalletController) => {
 
   // Admin routes
   router.get('/admin/topups', authMiddleware, adminMiddleware, walletController.adminListTopups);
+  router.get('/admin/withdrawal-notifications', authMiddleware, adminMiddleware, walletController.adminListWithdrawalNotifications);
+  router.patch('/admin/withdrawal-notifications/:id/read', authMiddleware, adminMiddleware, walletController.adminMarkWithdrawalNotificationRead);
   router.get('/admin/withdrawals', authMiddleware, adminMiddleware, walletController.adminListWithdrawals);
   router.patch('/admin/withdrawals/:id/status', authMiddleware, adminMiddleware, walletController.adminUpdateWithdrawalStatus);
 

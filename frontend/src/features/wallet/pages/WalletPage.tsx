@@ -19,6 +19,7 @@ import {
   type WalletWithdrawalProfile,
   type WalletWithdrawalRequest,
 } from '@/services/wallet.service';
+import { BankPicker } from '@/features/wallet/components/BankPicker';
 
 const QUICK_AMOUNTS = [50_000, 100_000, 200_000, 500_000, 1_000_000, 2_000_000];
 
@@ -345,18 +346,17 @@ export const WalletPage = () => {
                     <p className="text-xs text-gray-400 font-bold mt-1">Liên kết ngân hàng và tạo mật khẩu rút tiền 6 số</p>
                   </div>
 
-                  <select
-                    value={setupForm.bankCode}
-                    onChange={(e) => handleSetupChange('bankCode', e.target.value)}
-                    className="w-full border-2 border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-orange-400 bg-white"
-                  >
-                    <option value="">Chọn ngân hàng</option>
-                    {supportedBanks.map((bank) => (
-                      <option key={bank.code} value={bank.code}>
-                        {bank.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="space-y-2">
+                    <BankPicker
+                      banks={supportedBanks}
+                      value={setupForm.bankCode}
+                      onChange={(bankCode) => handleSetupChange('bankCode', bankCode)}
+                      disabled={actionLoading}
+                    />
+                    <p className="px-1 text-[11px] font-bold text-gray-400">
+                      Danh sách đã bao gồm các ngân hàng đang hoạt động tại Việt Nam. Bạn có thể tìm nhanh theo tên, mã hoặc viết tắt.
+                    </p>
+                  </div>
 
                   <input
                     type="text"
