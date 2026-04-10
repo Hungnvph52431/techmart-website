@@ -19,6 +19,7 @@ import {
   Menu,
   PanelLeftClose,
   Tag,
+  Landmark,
 } from 'lucide-react';
 
 const ALLOWED_ROLES = ['admin', 'staff', 'warehouse'];
@@ -138,6 +139,7 @@ export const AdminLayout = () => {
               <SidebarLink to="/admin/vouchers" icon={<Ticket size={18} />} label="Mã giảm giá" active={isActive('/admin/vouchers')} />
               <SidebarLink to="/admin/banners" icon={<Image size={18} />} label="Banner" active={isActive('/admin/banners')} />
               <SidebarLink to="/admin/wallet-topups" icon={<Wallet size={18} />} label="Lịch sử nạp ví" active={isActive('/admin/wallet-topups')} />
+              <SidebarLink to="/admin/wallet-withdrawals" icon={<Landmark size={18} />} label="Yêu cầu rút ví" active={isActive('/admin/wallet-withdrawals')} />
             </>}
           </nav>
         </aside>

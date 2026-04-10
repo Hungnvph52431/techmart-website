@@ -451,6 +451,166 @@ export async function sendWalletTopupEmail(
   }
 }
 
+interface WalletWithdrawalRequestedData {
+  customerName: string;
+  customerEmail: string;
+  referenceCode: string;
+  amount: number;
+  bankName: string;
+  accountNumberMasked: string;
+  currentBalance: number;
+}
+
+interface WalletWithdrawalStatusData {
+  customerName: string;
+  customerEmail: string;
+  referenceCode: string;
+  amount: number;
+  bankName: string;
+  accountNumberMasked: string;
+  status: 'approved' | 'paid' | 'rejected';
+  adminNote?: string;
+  currentBalance?: number;
+}
+
+export async function sendWalletWithdrawalRequestedEmail(
+  data: WalletWithdrawalRequestedData,
+): Promise<void> {
+  if (!process.env.SMTP_USER) {
+    console.warn('[Email] SMTP_USER chưa cấu hình — bỏ qua gửi email');
+    return;
+  }
+
+  const fromName = process.env.SMTP_FROM_NAME || 'TechMart';
+  const fromEmail = process.env.SMTP_USER;
+
+  const html = `
+  <div style="max-width:600px;margin:0 auto;font-family:'Segoe UI',Arial,sans-serif;color:#333;">
+    <div style="background:#2563eb;padding:24px;text-align:center;border-radius:8px 8px 0 0;">
+      <h1 style="color:#fff;margin:0;font-size:22px;">Yêu cầu rút tiền đã được ghi nhận</h1>
+    </div>
+    <div style="padding:24px;background:#fff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
+      <p>Xin chào <strong>${data.customerName}</strong>,</p>
+      <p>TechMart đã ghi nhận yêu cầu rút tiền từ ví của bạn và đang chờ xử lý.</p>
+
+      <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+        <tr style="background:#f9fafb;">
+          <td style="padding:8px 12px;"><strong>Mã yêu cầu</strong></td>
+          <td style="padding:8px 12px;">${data.referenceCode}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 12px;"><strong>Số tiền rút</strong></td>
+          <td style="padding:8px 12px;color:#dc2626;font-weight:bold;font-size:18px;">-${formatCurrency(data.amount)}</td>
+        </tr>
+        <tr style="background:#f9fafb;">
+          <td style="padding:8px 12px;"><strong>Ngân hàng nhận</strong></td>
+          <td style="padding:8px 12px;">${data.bankName} - ${data.accountNumberMasked}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 12px;"><strong>Số dư ví còn lại</strong></td>
+          <td style="padding:8px 12px;color:#2563eb;font-weight:bold;">${formatCurrency(data.currentBalance)}</td>
+        </tr>
+      </table>
+
+      <p style="font-size:13px;color:#6b7280;">Khi yêu cầu được duyệt hoặc bị từ chối, TechMart sẽ gửi thông báo tiếp theo cho bạn.</p>
+    </div>
+  </div>`;
+
+  try {
+    await getTransporter().sendMail({
+      from: `"${fromName}" <${fromEmail}>`,
+      to: data.customerEmail,
+      subject: `[TechMart] Đã nhận yêu cầu rút tiền — ${data.referenceCode}`,
+      html,
+    });
+  } catch (error) {
+    console.error('[Email] Lỗi gửi email yêu cầu rút tiền:', error);
+  }
+}
+
+export async function sendWalletWithdrawalStatusEmail(
+  data: WalletWithdrawalStatusData,
+): Promise<void> {
+  if (!process.env.SMTP_USER) {
+    console.warn('[Email] SMTP_USER chưa cấu hình — bỏ qua gửi email');
+    return;
+  }
+
+  const fromName = process.env.SMTP_FROM_NAME || 'TechMart';
+  const fromEmail = process.env.SMTP_USER;
+
+  const titleMap = {
+    approved: 'Yêu cầu rút tiền đã được duyệt',
+    paid: 'Tiền rút ví đã được chuyển khoản',
+    rejected: 'Yêu cầu rút tiền bị từ chối',
+  } as const;
+
+  const descriptionMap = {
+    approved: 'Yêu cầu rút tiền của bạn đã được duyệt và đang chờ chuyển khoản.',
+    paid: 'TechMart đã đánh dấu yêu cầu rút tiền của bạn là đã chuyển khoản thành công.',
+    rejected: 'Yêu cầu rút tiền của bạn đã bị từ chối.',
+  } as const;
+
+  const colorMap = {
+    approved: '#2563eb',
+    paid: '#16a34a',
+    rejected: '#dc2626',
+  } as const;
+
+  const balanceRow = typeof data.currentBalance === 'number'
+    ? `<tr>
+          <td style="padding:8px 12px;"><strong>Số dư ví hiện tại</strong></td>
+          <td style="padding:8px 12px;color:#2563eb;font-weight:bold;">${formatCurrency(data.currentBalance)}</td>
+        </tr>`
+    : '';
+
+  const noteRow = data.adminNote
+    ? `<tr>
+          <td style="padding:8px 12px;"><strong>Ghi chú</strong></td>
+          <td style="padding:8px 12px;">${data.adminNote}</td>
+        </tr>`
+    : '';
+
+  const html = `
+  <div style="max-width:600px;margin:0 auto;font-family:'Segoe UI',Arial,sans-serif;color:#333;">
+    <div style="background:${colorMap[data.status]};padding:24px;text-align:center;border-radius:8px 8px 0 0;">
+      <h1 style="color:#fff;margin:0;font-size:22px;">${titleMap[data.status]}</h1>
+    </div>
+    <div style="padding:24px;background:#fff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
+      <p>Xin chào <strong>${data.customerName}</strong>,</p>
+      <p>${descriptionMap[data.status]}</p>
+
+      <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+        <tr style="background:#f9fafb;">
+          <td style="padding:8px 12px;"><strong>Mã yêu cầu</strong></td>
+          <td style="padding:8px 12px;">${data.referenceCode}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 12px;"><strong>Số tiền</strong></td>
+          <td style="padding:8px 12px;font-weight:bold;">${formatCurrency(data.amount)}</td>
+        </tr>
+        <tr style="background:#f9fafb;">
+          <td style="padding:8px 12px;"><strong>Ngân hàng nhận</strong></td>
+          <td style="padding:8px 12px;">${data.bankName} - ${data.accountNumberMasked}</td>
+        </tr>
+        ${noteRow}
+        ${balanceRow}
+      </table>
+    </div>
+  </div>`;
+
+  try {
+    await getTransporter().sendMail({
+      from: `"${fromName}" <${fromEmail}>`,
+      to: data.customerEmail,
+      subject: `[TechMart] ${titleMap[data.status]} — ${data.referenceCode}`,
+      html,
+    });
+  } catch (error) {
+    console.error('[Email] Lỗi gửi email trạng thái rút tiền:', error);
+  }
+}
+
 // ──────────────────────────────────────────────────────────────
 // Gửi OTP cho Quên mật khẩu
 // ──────────────────────────────────────────────────────────────
