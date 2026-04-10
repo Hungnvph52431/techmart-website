@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { CheckCircle2, RefreshCw, Wallet, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { walletService, type AdminWalletWithdrawalRequest, type WalletWithdrawalStatus } from '@/services/wallet.service';
@@ -28,6 +29,7 @@ const STATUS_BADGE: Record<WalletWithdrawalStatus, string> = {
 const DAY_OPTIONS = [7, 14, 30];
 
 export const AdminWalletWithdrawals = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState<AdminWalletWithdrawalRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -38,6 +40,7 @@ export const AdminWalletWithdrawals = () => {
     status: 'approved' | 'paid' | 'rejected';
   } | null>(null);
   const [adminNote, setAdminNote] = useState('');
+  const focusedRequestId = Number(searchParams.get('focus') || 0);
 
   const load = async (nextDays = days, nextStatus = status) => {
     try {
@@ -54,6 +57,15 @@ export const AdminWalletWithdrawals = () => {
   useEffect(() => {
     void load(days, status);
   }, [days, status]);
+
+  useEffect(() => {
+    if (!focusedRequestId || !items.length) return;
+
+    const row = document.getElementById(`wallet-withdrawal-row-${focusedRequestId}`);
+    if (row) {
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [focusedRequestId, items]);
 
   const pendingAmount = useMemo(
     () => items.filter((item) => item.status === 'pending').reduce((sum, item) => sum + item.amount, 0),
@@ -128,6 +140,24 @@ export const AdminWalletWithdrawals = () => {
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
+          {focusedRequestId > 0 && (
+            <div className="flex items-center gap-2 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">
+                Đang focus yêu cầu #{focusedRequestId}
+              </span>
+              <button
+                onClick={() => {
+                  const nextParams = new URLSearchParams(searchParams);
+                  nextParams.delete('focus');
+                  setSearchParams(nextParams);
+                }}
+                className="text-[10px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-700"
+              >
+                Bỏ focus
+              </button>
+            </div>
+          )}
+
           <div className="flex gap-2">
             {DAY_OPTIONS.map((option) => (
               <button
@@ -181,7 +211,11 @@ export const AdminWalletWithdrawals = () => {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {items.map((item) => (
-                <tr key={item.requestId} className="hover:bg-gray-50/50 align-top">
+                <tr
+                  key={item.requestId}
+                  id={`wallet-withdrawal-row-${item.requestId}`}
+                  className={`align-top hover:bg-gray-50/50 ${focusedRequestId === item.requestId ? 'bg-blue-50/60' : ''}`}
+                >
                   <td className="px-5 py-4">
                     <p className="font-mono text-xs font-bold text-gray-700">{item.referenceCode}</p>
                   </td>

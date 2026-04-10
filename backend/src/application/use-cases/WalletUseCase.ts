@@ -3,6 +3,7 @@ import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { PoolConnection } from 'mysql2/promise';
 import bcrypt from 'bcryptjs';
 import { createPaymentUrl } from '../services/VNPayService';
+import { VIETNAM_BANKS, type VietnamBankCatalogItem } from '../constants/vietnamBanks';
 import {
   sendWalletTopupEmail,
   sendWalletWithdrawalRequestedEmail,
@@ -35,10 +36,7 @@ export interface WalletTransaction {
   createdAt: Date;
 }
 
-export interface SupportedBank {
-  code: string;
-  name: string;
-}
+export type SupportedBank = VietnamBankCatalogItem;
 
 export interface LinkedBankAccount {
   bankAccountId: number;
@@ -104,20 +102,22 @@ interface UpdateWithdrawalStatusInput {
   adminNote?: string;
 }
 
-const SUPPORTED_BANKS: SupportedBank[] = [
-  { code: 'VCB', name: 'Vietcombank' },
-  { code: 'BIDV', name: 'BIDV' },
-  { code: 'CTG', name: 'VietinBank' },
-  { code: 'ACB', name: 'ACB' },
-  { code: 'TCB', name: 'Techcombank' },
-  { code: 'MBB', name: 'MB Bank' },
-  { code: 'VPB', name: 'VPBank' },
-  { code: 'VIB', name: 'VIB' },
-  { code: 'STB', name: 'Sacombank' },
-  { code: 'TPB', name: 'TPBank' },
-  { code: 'SHB', name: 'SHB' },
-  { code: 'OCB', name: 'OCB' },
-];
+export interface AdminWithdrawalNotification {
+  notificationId: number;
+  requestId: number;
+  title: string;
+  message: string;
+  isRead: boolean;
+  createdAt: Date;
+  referenceCode: string;
+  amount: number;
+  customerName?: string;
+  customerEmail?: string;
+  bankName?: string;
+  status?: WalletWithdrawalRequest['status'];
+}
+
+const ADMIN_WITHDRAWAL_NOTIFICATION_TITLE = 'Yêu cầu rút ví mới';
 
 function generateReferenceCode(): string {
   const ts = Date.now().toString(36).toUpperCase();
@@ -213,7 +213,7 @@ export class WalletUseCase {
   }
 
   private getSupportedBankByCode(bankCode: string): SupportedBank | undefined {
-    return SUPPORTED_BANKS.find((item) => item.code === bankCode);
+    return VIETNAM_BANKS.find((item) => item.code === bankCode);
   }
 
   private normalizeAccountNumber(accountNumber: string): string {
@@ -257,6 +257,34 @@ export class WalletUseCase {
     );
   }
 
+  private async createAdminWithdrawalNotificationsWithConnection(
+    connection: PoolConnection,
+    input: {
+      requestId: number;
+      amount: number;
+      customerName: string;
+      bankName: string;
+    }
+  ) {
+    const [rows] = await connection.execute<RowDataPacket[]>(
+      "SELECT user_id FROM users WHERE role = 'admin'"
+    );
+
+    const admins = rows as RowDataPacket[];
+    if (!admins.length) return;
+
+    const now = new Date();
+    const message = `${input.customerName} vừa yêu cầu rút ${input.amount.toLocaleString('vi-VN')}đ về ${input.bankName}.`;
+
+    for (const admin of admins) {
+      await connection.execute(
+        `INSERT INTO notifications (user_id, title, message, type, reference_id, created_at)
+         VALUES (?, ?, ?, 'system', ?, ?)`,
+        [admin.user_id, ADMIN_WITHDRAWAL_NOTIFICATION_TITLE, message, input.requestId, now]
+      );
+    }
+  }
+
   private validateSetupInput(input: WithdrawalSetupInput) {
     const bank = this.getSupportedBankByCode(input.bankCode);
     if (!bank) throw new Error('Ngân hàng không hợp lệ');
@@ -284,7 +312,7 @@ export class WalletUseCase {
   }
 
   getSupportedBanks(): SupportedBank[] {
-    return SUPPORTED_BANKS;
+    return VIETNAM_BANKS;
   }
 
   async getBalance(userId: number): Promise<number> {
@@ -510,6 +538,13 @@ export class WalletUseCase {
         referenceId: result.insertId,
       });
 
+      await this.createAdminWithdrawalNotificationsWithConnection(connection, {
+        requestId: result.insertId,
+        amount,
+        customerName: user.name || user.email || 'Khách hàng',
+        bankName: bankAccount.bankName,
+      });
+
       await connection.commit();
 
       sendWalletWithdrawalRequestedEmail({
@@ -565,6 +600,64 @@ export class WalletUseCase {
     );
 
     return rows.map(mapWithdrawal);
+  }
+
+  async adminListWithdrawalNotifications(adminUserId: number): Promise<AdminWithdrawalNotification[]> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT
+        n.notification_id,
+        n.reference_id AS request_id,
+        n.title,
+        n.message,
+        n.is_read,
+        n.created_at,
+        r.reference_code,
+        r.amount,
+        r.bank_name,
+        r.status,
+        u.name AS customer_name,
+        u.email AS customer_email
+       FROM notifications n
+       JOIN wallet_withdrawal_requests r ON r.withdrawal_request_id = n.reference_id
+       LEFT JOIN users u ON u.user_id = r.user_id
+       WHERE n.user_id = ?
+         AND n.type = 'system'
+         AND n.title = ?
+       ORDER BY n.is_read ASC, n.created_at DESC
+       LIMIT 12`,
+      [adminUserId, ADMIN_WITHDRAWAL_NOTIFICATION_TITLE]
+    );
+
+    return (rows as RowDataPacket[]).map((row) => ({
+      notificationId: row.notification_id,
+      requestId: row.request_id,
+      title: row.title,
+      message: row.message,
+      isRead: Boolean(row.is_read),
+      createdAt: row.created_at,
+      referenceCode: row.reference_code,
+      amount: Number(row.amount),
+      customerName: row.customer_name ?? undefined,
+      customerEmail: row.customer_email ?? undefined,
+      bankName: row.bank_name ?? undefined,
+      status: row.status ?? undefined,
+    }));
+  }
+
+  async adminMarkWithdrawalNotificationRead(adminUserId: number, notificationId: number): Promise<void> {
+    const [result] = await pool.execute<ResultSetHeader>(
+      `UPDATE notifications
+       SET is_read = TRUE
+       WHERE notification_id = ?
+         AND user_id = ?
+         AND type = 'system'
+         AND title = ?`,
+      [notificationId, adminUserId, ADMIN_WITHDRAWAL_NOTIFICATION_TITLE]
+    );
+
+    if (result.affectedRows === 0) {
+      throw new Error('Không tìm thấy thông báo rút ví');
+    }
   }
 
   async adminUpdateWithdrawalStatus(

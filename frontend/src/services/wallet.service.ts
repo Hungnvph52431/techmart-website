@@ -26,6 +26,9 @@ export interface WalletTransaction {
 export interface SupportedBank {
   code: string;
   name: string;
+  shortName: string;
+  keywords?: string[];
+  displayOrder: number;
 }
 
 export interface LinkedBankAccount {
@@ -74,6 +77,21 @@ export interface AdminWalletWithdrawalRequest extends WalletWithdrawalRequest {
   accountNumber?: string;
   processedByName?: string;
   processedByEmail?: string;
+}
+
+export interface AdminWithdrawalNotification {
+  notificationId: number;
+  requestId: number;
+  title: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+  referenceCode: string;
+  amount: number;
+  customerName?: string;
+  customerEmail?: string;
+  bankName?: string;
+  status?: WalletWithdrawalStatus;
 }
 
 export const walletService = {
@@ -138,6 +156,15 @@ export const walletService = {
   adminListWithdrawals: async (params?: { status?: string; days?: number }): Promise<AdminWalletWithdrawalRequest[]> => {
     const res = await api.get('/wallet/admin/withdrawals', { params });
     return res.data;
+  },
+
+  adminListWithdrawalNotifications: async (): Promise<AdminWithdrawalNotification[]> => {
+    const res = await api.get('/wallet/admin/withdrawal-notifications');
+    return res.data;
+  },
+
+  adminMarkWithdrawalNotificationRead: async (notificationId: number | string): Promise<void> => {
+    await api.patch(`/wallet/admin/withdrawal-notifications/${notificationId}/read`);
   },
 
   adminUpdateWithdrawalStatus: async (
