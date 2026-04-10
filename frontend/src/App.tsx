@@ -47,6 +47,7 @@ import { AdminOrderDetail } from './features/admin/pages/AdminOrderDetail';
 import { AdminReturns } from '@/features/admin/pages/AdminReturns';
 import { WalletPage } from '@/features/wallet/pages/WalletPage';
 import { AdminWalletTopups } from '@/features/admin/pages/AdminWalletTopups';
+import { AdminWalletWithdrawals } from '@/features/admin/pages/AdminWalletWithdrawals';
 
 // --- SHIPPER ---
 import { ShipperRouteGuard, BlockShipperGuard } from '@/features/shipper/components/ShipperRouteGuard';
@@ -123,6 +124,7 @@ function App() {
             <Route path="reviews" element={<AdminReviews />} />
             <Route path="returns" element={<AdminReturns />} />
             <Route path="wallet-topups" element={<AdminWalletTopups />} />
+            <Route path="wallet-withdrawals" element={<AdminWalletWithdrawals />} />
           </Route>
         </Route>
 
