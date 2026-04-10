@@ -4,7 +4,7 @@ export interface User {
   password: string;
   name: string;
   phone?: string;
-  role: 'customer' | 'admin' | 'staff' | 'warehouse';
+  role: 'customer' | 'admin' | 'staff' | 'warehouse' | 'shipper';
   status: 'active' | 'inactive' | 'banned';
   points: number;
   membershipLevel: 'bronze' | 'silver' | 'gold' | 'platinum';
@@ -19,7 +19,7 @@ export interface CreateUserDTO {
   password: string;
   name: string;
   phone?: string;
-  role?: 'customer' | 'admin' | 'staff' | 'warehouse';
+  role?: 'customer' | 'admin' | 'staff' | 'warehouse' | 'shipper';
 }
 
 export interface UpdateUserDTO extends Partial<Omit<CreateUserDTO, 'password'>> {

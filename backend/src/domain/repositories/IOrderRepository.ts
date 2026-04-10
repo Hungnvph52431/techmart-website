@@ -79,7 +79,12 @@ export interface IOrderRepository {
   transitionStatus(input: TransitionOrderStatusDTO): Promise<Order | null>;
   updatePaymentStatus(input: UpdatePaymentStatusDTO): Promise<Order | null>;
   cancel(input: CancelOrderDTO): Promise<Order | null>;
-  
+  assignShipper(orderId: number, shipperId: number | null): Promise<Order | null>;
+  reassignShipper(orderId: number, newShipperId: number): Promise<Order | null>;
+  confirmAndAssignShipper(orderId: number, shipperId: number, actorUserId: number): Promise<Order | null>;
+  logEvent(orderId: number, actorUserId: number, actorRole: string, eventType: string, fromStatus: string, toStatus: string, note: string): Promise<void>;
+  updateWarehouseReceivedAt(orderId: number): Promise<void>;
+
   // 6. Quản lý Đổi/Trả (Returns)
   listAllReturns(filters?: { status?: string }): Promise<OrderReturn[]>;
   listReturns(orderId: number): Promise<OrderReturn[]>;

@@ -27,7 +27,7 @@ const getImageUrl = (url?: string | null) => {
 
 // Admin KHÔNG được chuyển sang completed — chỉ khách hàng xác nhận nhận hàng mới được
 const ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
-  pending: ['confirmed', 'cancelled'],
+  pending: ['shipping', 'cancelled'],  // pending → shipping (confirm+assign trong 1 bước)
   confirmed: ['shipping', 'cancelled'],
   shipping: ['delivered'],
   delivered: [],       // ❌ Admin không được chuyển → completed (khách tự xác nhận)
@@ -38,7 +38,6 @@ const ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
 
 // Chuỗi auto-process: admin chỉ đi tối đa đến delivered
 const AUTO_PROCESS_CHAIN: Record<string, string[]> = {
-  pending: ['confirmed', 'shipping', 'delivered'],
   confirmed: ['shipping', 'delivered'],
   shipping: ['delivered'],
 };
@@ -193,6 +192,12 @@ export const AdminOrderDetail = () => {
     adminNote: string;
   }>({ type: null, returnId: null, adminNote: '' });
 
+  // Confirm + assign shipper modal
+  const [shipperModal, setShipperModal] = useState(false);
+  const [shippers, setShippers] = useState<{ id: number; fullName: string; phone: string; activeOrders: number }[]>([]);
+  const [selectedShipperId, setSelectedShipperId] = useState<number | null>(null);
+  const [shipperModalLoading, setShipperModalLoading] = useState(false);
+
   const loadDetail = async () => {
     try {
       setLoading(true);
@@ -225,6 +230,37 @@ export const AdminOrderDetail = () => {
     void loadDetail();
   }, [orderId]);
 
+  // ── Mở modal chọn shipper khi admin bấm "Đã xác nhận" ─────────────────────
+  const openShipperModal = async () => {
+    setShipperModal(true);
+    setSelectedShipperId(null);
+    setShipperModalLoading(true);
+    try {
+      const res = await adminOrderService.getAvailableShippers();
+      setShippers(res.data);
+    } catch {
+      toast.error('Không thể tải danh sách shipper');
+    } finally {
+      setShipperModalLoading(false);
+    }
+  };
+
+  const handleConfirmAndAssign = async () => {
+    if (!selectedShipperId) { toast.error('Vui lòng chọn shipper'); return; }
+    try {
+      setSubmitting('status');
+      await adminOrderService.confirmAndAssign(orderId, selectedShipperId);
+      const shipperName = shippers.find(s => s.id === selectedShipperId)?.fullName ?? '';
+      toast.success(`Đã xác nhận & phân công cho ${shipperName}`);
+      setShipperModal(false);
+      await loadDetail();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Xác nhận thất bại');
+    } finally {
+      setSubmitting(null);
+    }
+  };
+
   // ── Đổi trạng thái đơn ──────────────────────────────────────────────────────
   const handleUpdateStatus = async (nextStatus: string, note?: string) => {
     try {
@@ -234,6 +270,19 @@ export const AdminOrderDetail = () => {
       await loadDetail();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Cập nhật thất bại');
+    } finally {
+      setSubmitting(null);
+    }
+  };
+
+  const handleConfirmWarehouseReceipt = async () => {
+    try {
+      setSubmitting('warehouse');
+      await adminOrderService.confirmWarehouseReceipt(orderId);
+      toast.success('Đã xác nhận nhập kho thành công');
+      await loadDetail();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Xác nhận nhập kho thất bại');
     } finally {
       setSubmitting(null);
     }
@@ -750,7 +799,11 @@ const allowedPayments = (() => {
                         setCancelDialog({ show: true, reason: '', adminNote: '' });
                         return;
                       }
-
+                      // pending → shipping: mở modal chọn shipper (confirm + assign 1 bước)
+                      if (order.status === 'pending' && s === 'shipping') {
+                        openShipperModal();
+                        return;
+                      }
                       setConfirmDialog({ show: true, type: 'status', nextValue: s, label: STATUS_LABELS[s] });
                     }}
                     disabled={!!submitting}
@@ -760,6 +813,8 @@ const allowedPayments = (() => {
                       ? 'Đang hủy...'
                       : submitting === 'status'
                       ? 'Đang xử lý...'
+                      : (order.status === 'pending' && s === 'shipping')
+                      ? 'Đã xác nhận'
                       : STATUS_LABELS[s]}
                   </button>
                 ))}
@@ -808,6 +863,25 @@ const allowedPayments = (() => {
               </div>
             )}
           </section>
+
+          {/* XÁC NHẬN NHẬP KHO */}
+          {(order as any).deliveryStatus === 'RETURNED' && (
+            <section className="bg-orange-50 rounded-2xl border border-orange-200 shadow-sm p-6 space-y-3">
+              <h2 className="font-black text-orange-700 uppercase text-sm tracking-wider flex items-center gap-2">
+                <Package size={15} /> Hàng hoàn về kho
+              </h2>
+              <p className="text-sm text-orange-600">
+                Shipper đã xác nhận trả hàng về kho. Vui lòng kiểm tra và xác nhận nhập kho.
+              </p>
+              <button
+                onClick={handleConfirmWarehouseReceipt}
+                disabled={submitting === 'warehouse'}
+                className="w-full px-4 py-2.5 rounded-xl bg-orange-600 text-white text-sm font-black disabled:opacity-50 hover:bg-orange-700 transition-colors"
+              >
+                {submitting === 'warehouse' ? 'Đang xử lý...' : '✓ Xác nhận đã nhập kho'}
+              </button>
+            </section>
+          )}
 
           {/* THÔNG TIN GIAO HÀNG */}
           <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-3">
@@ -971,6 +1045,76 @@ const allowedPayments = (() => {
                 className="px-5 py-2 rounded-xl bg-blue-600 text-white text-sm font-black uppercase hover:bg-blue-700 disabled:opacity-60"
               >
                 {submitting === 'return' ? 'Đang xử lý...' : 'Xác nhận'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL CHỌN SHIPPER ─────────────────────────────────────────────── */}
+      {shipperModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="p-5 border-b border-gray-100">
+              <h3 className="font-black text-gray-800 text-base">Xác nhận & Phân công Shipper</h3>
+              <p className="text-xs text-gray-500 mt-1">Chọn shipper để giao đơn hàng này</p>
+            </div>
+
+            <div className="p-5 space-y-2 max-h-72 overflow-y-auto">
+              {shipperModalLoading ? (
+                <p className="text-center text-sm text-gray-400 py-6">Đang tải...</p>
+              ) : shippers.length === 0 ? (
+                <p className="text-center text-sm text-gray-400 py-6">Không có shipper khả dụng</p>
+              ) : (
+                shippers.map((s, idx) => {
+                  const isRecommended = idx === 0;
+                  const isSelected = selectedShipperId === s.id;
+                  return (
+                    <label
+                      key={s.id}
+                      className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                        isSelected
+                          ? 'border-violet-500 bg-violet-50'
+                          : isRecommended
+                          ? 'border-emerald-200 bg-emerald-50'
+                          : 'border-gray-100 hover:border-gray-200'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="shipper"
+                        checked={isSelected}
+                        onChange={() => setSelectedShipperId(s.id)}
+                        className="accent-violet-600"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-gray-800">{s.fullName}</span>
+                          {isRecommended && (
+                            <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Gợi ý</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500">{s.phone} · Đang có {s.activeOrders} đơn</div>
+                      </div>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="p-5 border-t border-gray-100 flex gap-3">
+              <button
+                onClick={() => setShipperModal(false)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleConfirmAndAssign}
+                disabled={!selectedShipperId || submitting === 'status'}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-black disabled:opacity-50 hover:bg-violet-700 transition-colors"
+              >
+                {submitting === 'status' ? 'Đang xử lý...' : 'Xác nhận & Phân công'}
               </button>
             </div>
           </div>

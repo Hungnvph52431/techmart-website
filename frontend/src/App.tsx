@@ -48,6 +48,14 @@ import { AdminReturns } from '@/features/admin/pages/AdminReturns';
 import { WalletPage } from '@/features/wallet/pages/WalletPage';
 import { AdminWalletTopups } from '@/features/admin/pages/AdminWalletTopups';
 
+// --- SHIPPER ---
+import { ShipperRouteGuard, BlockShipperGuard } from '@/features/shipper/components/ShipperRouteGuard';
+import { ShipperLayout } from '@/features/shipper/components/ShipperLayout';
+import { ShipperHomePage } from '@/features/shipper/pages/ShipperHomePage';
+import { ShipperCODPage } from '@/features/shipper/pages/ShipperCODPage';
+import { ShipperStatsPage } from '@/features/shipper/pages/ShipperStatsPage';
+import { ShipperOrderDetailPage } from '@/features/shipper/pages/ShipperOrderDetailPage';
+
 const CartRoute = () => {
   const authenticated = useAuthStore((state) => state.isAuthenticated)();
   return authenticated ? <CartPage /> : <Navigate to="/orders" replace />;
@@ -58,55 +66,64 @@ function App() {
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Toaster position="top-right" />
       <Routes>
-        {/* --- 1. ROUTES CHO NGƯỜI DÙNG --- */}
-        <Route path="/" element={<HomePage />} />
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/contact" element={<ContactPage />} />
-        <Route path="/policy" element={<PolicyPage />} />
-        <Route path="/shipping" element={<ShippingPage />} />
-        <Route path="/return" element={<ReturnPage />} />
-        <Route path="/payment" element={<PaymentPage />} />
-        <Route path="/faq" element={<FAQPage />} />
-        <Route path="/products" element={<ProductListPage />} />
-        <Route path="/products/:slug" element={<ProductDetailPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/cart" element={<CartRoute />} />
-        <Route path="/checkout" element={<CheckoutPage />} />
-        <Route path="/payment/result" element={<PaymentResultPage />} />
-        <Route path="/orders" element={<CustomerOrdersLayout />}>
-          <Route index element={<OrdersPage />} />
-          <Route path="lookup/:orderCode" element={<GuestOrderDetailPage />} />
-          <Route element={<CustomerRouteGuard />}>
-            <Route path=":id" element={<OrderDetailPage />} />
+        {/* --- 3. ROUTES CHO SHIPPER (ưu tiên trước) --- */}
+        <Route element={<ShipperRouteGuard />}>
+          <Route path="/shipper" element={<ShipperLayout />}>
+            <Route index element={<ShipperHomePage />} />
+            <Route path="orders/:id" element={<ShipperOrderDetailPage />} />
+            <Route path="cod" element={<ShipperCODPage />} />
+            <Route path="stats" element={<ShipperStatsPage />} />
           </Route>
         </Route>
-        {/* Bảo vệ các route cần đăng nhập */}
-        <Route element={<CustomerRouteGuard />}>
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/wallet" element={<WalletPage />} />
-        </Route>
 
-        {/* --- 2. ROUTES CHO ADMIN --- */}
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<AdminDashboard />} />
-          <Route path="categories" element={<AdminCategories />} />
-          <Route path="attributes" element={<AdminAttributes />} />
-          <Route path="products" element={<AdminProducts />} />
-          <Route path="banners" element={<AdminBanners />} />
+        {/* --- 1. ROUTES CHO NGƯỜI DÙNG & ADMIN (chặn shipper) --- */}
+        <Route element={<BlockShipperGuard />}>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/policy" element={<PolicyPage />} />
+          <Route path="/shipping" element={<ShippingPage />} />
+          <Route path="/return" element={<ReturnPage />} />
+          <Route path="/payment" element={<PaymentPage />} />
+          <Route path="/faq" element={<FAQPage />} />
+          <Route path="/products" element={<ProductListPage />} />
+          <Route path="/products/:slug" element={<ProductDetailPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/cart" element={<CartRoute />} />
+          <Route path="/checkout" element={<CheckoutPage />} />
+          <Route path="/payment/result" element={<PaymentResultPage />} />
+          <Route path="/orders" element={<CustomerOrdersLayout />}>
+            <Route index element={<OrdersPage />} />
+            <Route path="lookup/:orderCode" element={<GuestOrderDetailPage />} />
+            <Route element={<CustomerRouteGuard />}>
+              <Route path=":id" element={<OrderDetailPage />} />
+            </Route>
+          </Route>
+          <Route element={<CustomerRouteGuard />}>
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/wallet" element={<WalletPage />} />
+          </Route>
 
-          {/* Chốt dùng AdminProductFormPage cho đồng bộ */}
-          <Route path="products/new" element={<AdminProductFormPage />} />
-          <Route path="products/edit/:id" element={<AdminProductFormPage />} />
-          <Route path="orders" element={<AdminOrders />} />
-          <Route path="/admin/orders/:id" element={<AdminOrderDetail />} />
-          <Route path="users" element={<AdminUsers />} />
-          <Route path="brands" element={<AdminBrands />} />
-          <Route path="vouchers" element={<AdminVoucher />} />
-          <Route path="reviews" element={<AdminReviews />} />
-          <Route path="returns" element={<AdminReturns />} />
-          <Route path="wallet-topups" element={<AdminWalletTopups />} />
+          {/* --- 2. ROUTES CHO ADMIN --- */}
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<AdminDashboard />} />
+            <Route path="categories" element={<AdminCategories />} />
+            <Route path="attributes" element={<AdminAttributes />} />
+            <Route path="products" element={<AdminProducts />} />
+            <Route path="banners" element={<AdminBanners />} />
+            <Route path="products/new" element={<AdminProductFormPage />} />
+            <Route path="products/edit/:id" element={<AdminProductFormPage />} />
+            <Route path="orders" element={<AdminOrders />} />
+            <Route path="/admin/orders/:id" element={<AdminOrderDetail />} />
+            <Route path="users" element={<AdminUsers />} />
+            <Route path="brands" element={<AdminBrands />} />
+            <Route path="vouchers" element={<AdminVoucher />} />
+            <Route path="reviews" element={<AdminReviews />} />
+            <Route path="returns" element={<AdminReturns />} />
+            <Route path="wallet-topups" element={<AdminWalletTopups />} />
+          </Route>
         </Route>
 
         {/* Điều hướng mặc định nếu gõ sai URL */}

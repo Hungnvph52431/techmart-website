@@ -67,6 +67,7 @@ const ACTOR_ROLE_LABELS: Record<OrderActorRole, string> = {
   admin: 'Quản trị viên',
   staff: 'Nhân viên',
   warehouse: 'Kho vận',
+  shipper: 'Shipper',
   system: 'Hệ thống',
 };
 
@@ -194,10 +195,11 @@ const toReturn = (item: OrderReturn, actor: 'admin' | 'customer' | 'guest') => (
 const getReturnWindowMeta = (order: Order | OrderListItem) => {
   const deliveredAt = order.deliveredAt ? new Date(order.deliveredAt) : undefined;
   if (!deliveredAt) {
+    // Chưa giao → chưa bắt đầu return window → coi như expired
     return {
       returnDeadlineAt: undefined,
       returnWindowDays: RETURN_DEADLINE_DAYS,
-      returnWindowExpired: false,
+      returnWindowExpired: true,
     };
   }
 
@@ -217,7 +219,7 @@ const toLifecycleFlags = (
 ) => {
   const returnWindow = getReturnWindowMeta(order);
   const withinReturnWindow =
-    !returnWindow.returnWindowExpired || !returnWindow.returnDeadlineAt;
+    returnWindow.returnDeadlineAt != null && !returnWindow.returnWindowExpired;
 
   if (actorRole === 'guest') {
     return {

@@ -356,7 +356,20 @@ export const Header = () => {
                       <p className="text-[11px] text-gray-400 mt-0.5">{user?.email}</p>
                     </div>
 
-                    {user?.role === 'admin' || user?.role === 'staff' || user?.role === 'warehouse' ? (
+                    {user?.role === 'shipper' ? (
+                      <div className="py-2">
+                        <Link
+                          to="/shipper/orders"
+                          onClick={() => setIsUserMenuOpen(false)}
+                          className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-blue-700 hover:bg-blue-50 transition-colors"
+                        >
+                          <Shield className="h-4 w-4" />
+                          Trang Shipper
+                        </Link>
+                        <div className="border-t border-gray-100 mx-4 my-1" />
+                      </div>
+                    ) : null}
+                    {user?.role === 'admin' || user?.role === 'staff' ? (
                       <div className="py-2">
                         <Link
                           to="/admin"

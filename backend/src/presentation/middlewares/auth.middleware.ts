@@ -38,18 +38,26 @@ export const staffMiddleware = (req: AuthRequest, res: Response, next: NextFunct
   next();
 };
 
-// Admin + Staff + Warehouse (tất cả role nội bộ)
+// Admin + Staff + Shipper (tất cả role nội bộ)
 export const internalMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
-  if (!['admin', 'staff', 'warehouse'].includes(req.user?.role)) {
+  if (!['admin', 'staff', 'shipper'].includes(req.user?.role)) {
     return res.status(403).json({ message: 'Yêu cầu quyền nội bộ' });
   }
   next();
 };
 
-// Admin + Warehouse
+// Admin + Shipper
 export const warehouseMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
-  if (!['admin', 'warehouse'].includes(req.user?.role)) {
+  if (!['admin', 'shipper'].includes(req.user?.role)) {
     return res.status(403).json({ message: 'Yêu cầu quyền kho' });
+  }
+  next();
+};
+
+// Shipper only
+export const shipperMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (req.user?.role !== 'shipper') {
+    return res.status(403).json({ success: false, message: 'Yêu cầu quyền shipper' });
   }
   next();
 };

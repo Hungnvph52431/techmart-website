@@ -60,7 +60,14 @@ import { PaymentController } from './presentation/controllers/PaymentController'
 import { ReviewController } from './presentation/controllers/Reviewcontroller ';
 import { WalletUseCase } from './application/use-cases/WalletUseCase';
 import { WalletController } from './presentation/controllers/WalletController';
+import { ShipperRepository } from './infrastructure/repositories/ShipperRepository';
+import { ShipperUseCase } from './application/use-cases/ShipperUseCase';
+import { ShipperController } from './presentation/controllers/ShipperController';
 import { createWalletRoutes } from './presentation/routes/wallet.routes';
+import { createShipperRoutes } from './presentation/routes/shipper.routes';
+import { PaymentRepository } from './infrastructure/repositories/PaymentRepository';
+import { CODController } from './presentation/controllers/CODController';
+import { createCODRoutes } from './presentation/routes/cod.routes';
 // --- ROUTES ---
 import { createAddressRoutes } from './presentation/routes/address.routes';
 import { createPaymentRoutes } from './presentation/routes/payment.routes';
@@ -158,7 +165,12 @@ const walletUseCase = new WalletUseCase();
 const paymentController = new PaymentController(orderUseCase, walletUseCase);
 const addressController = new AddressController(addressRepository);
 const walletController = new WalletController(walletUseCase);
+const shipperRepository = new ShipperRepository();
+const shipperUseCase = new ShipperUseCase(shipperRepository);
+const shipperController = new ShipperController(shipperUseCase);
 const wishlistController = new WishlistController(wishlistUseCase);
+const codPaymentRepository = new PaymentRepository();
+const codController = new CODController(codPaymentRepository);
 // --- ROUTES MOUNTING ---
 // Public & Customer Routes
 app.use('/api/auth', createAuthRoutes(authController));
@@ -176,6 +188,8 @@ app.use('/api/reviews', createReviewRoutes(reviewController));
 app.use('/api/addresses', createAddressRoutes(addressController));
 app.use('/api/wallet', createWalletRoutes(walletController));
 app.use('/api/wishlist', createWishlistRoutes(wishlistController));
+app.use('/api/shipper', createShipperRoutes(shipperController));
+app.use('/api', createCODRoutes(codController));
 
 // Admin Routes
 app.use('/api/admin/products', createAdminProductRoutes(adminProductController));

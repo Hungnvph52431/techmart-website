@@ -10,7 +10,7 @@ USE mobile_shop;
 INSERT INTO users (email, password, name, phone, avatar_url, banner_url, role, status, points, membership_level, wallet_balance) VALUES
 ('admin@mobileshop.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Quản trị viên', '0901234567', NULL, NULL, 'admin', 'active', 0, 'platinum', 0.00),
 ('staff@mobileshop.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Nhân viên', '0902234567', NULL, NULL, 'staff', 'active', 0, 'bronze', 0.00),
-('warehouse@mobileshop.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Quản lý kho', '0903234567', NULL, NULL, 'warehouse', 'active', 0, 'bronze', 0.00),
+('shipper@mobileshop.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Nguyễn Shipper', '0903234567', NULL, NULL, 'shipper', 'active', 0, 'bronze', 0.00),
 ('customer1@gmail.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Nguyễn Văn A', '0904234567', NULL, NULL, 'customer', 'active', 150, 'silver', 0.00),
 ('customer2@gmail.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Trần Thị B', '0905234567', NULL, NULL, 'customer', 'active', 450, 'gold', 0.00),
 ('customer3@gmail.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Lê Văn C', '0906234567', NULL, NULL, 'customer', 'active', 80, 'bronze', 0.00);
@@ -227,12 +227,28 @@ INSERT INTO orders (order_code, user_id, shipping_name, shipping_phone, shipping
 ('ORD240101004', 6, 'Lê Văn C', '0906234567', '321 Võ Văn Tần', 'Phường 5', 'Quận 3', 'TP. Hồ Chí Minh', 5990000, 30000, 0, 6020000, 'cod', 'pending', NULL, 'shipping', NULL, DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY), NULL, DATE_SUB(NOW(), INTERVAL 1 DAY)),
 ('ORD240101005', 5, 'Trần Thị B', '0905234567', '789 Trần Hưng Đạo', 'Phường Cầu Kho', 'Quận 1', 'TP. Hồ Chí Minh', 18990000, 0, 0, 18990000, 'vnpay', 'paid', DATE_SUB(NOW(), INTERVAL 1 DAY), 'processing', NULL, DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY), NULL, NULL, NOW());
 
+-- Đơn hàng mẫu cho Shipper (user_id=3) - dùng để test flow giao hàng
+-- Đơn 6: WAITING_PICKUP - COD 500k, chưa lấy hàng
+INSERT INTO orders (order_code, user_id, customer_name, customer_email, customer_phone, shipping_name, shipping_phone, shipping_address, shipping_ward, shipping_district, shipping_city, subtotal, shipping_fee, discount_amount, total, payment_method, payment_status, status, shipper_id, delivery_status, cod_amount, cod_collected, customer_note, order_date, confirmed_at, shipped_at, updated_at) VALUES
+('SHIP-TEST-001', 4, 'Nguyễn Văn A', 'customer1@gmail.com', '0904234567', 'Nguyễn Văn A', '0904234567', '123 Nguyễn Huệ', 'Phường Bến Nghé', 'Quận 1', 'TP. Hồ Chí Minh', 17990000, 30000, 0, 18020000, 'cod', 'pending', 'shipping', 3, 'WAITING_PICKUP', 18020000, 0, 'Gọi trước khi giao', DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY), NOW(), NOW());
+
+-- Đơn 7: IN_DELIVERY - đã lấy hàng, đang giao, không COD
+INSERT INTO orders (order_code, user_id, customer_name, customer_email, customer_phone, shipping_name, shipping_phone, shipping_address, shipping_ward, shipping_district, shipping_city, subtotal, shipping_fee, discount_amount, total, payment_method, payment_status, status, shipper_id, delivery_status, cod_amount, cod_collected, customer_note, order_date, confirmed_at, shipped_at, updated_at) VALUES
+('SHIP-TEST-002', 5, 'Trần Thị B', 'customer2@gmail.com', '0905234567', 'Trần Thị B', '0905234567', '789 Trần Hưng Đạo', 'Phường Cầu Kho', 'Quận 1', 'TP. Hồ Chí Minh', 9490000, 0, 0, 9490000, 'bank_transfer', 'paid', 'shipping', 3, 'IN_DELIVERY', 0, 0, NULL, DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY), NOW());
+
+-- Đơn 8: DELIVERED - đã giao thành công
+INSERT INTO orders (order_code, user_id, customer_name, customer_email, customer_phone, shipping_name, shipping_phone, shipping_address, shipping_ward, shipping_district, shipping_city, subtotal, shipping_fee, discount_amount, total, payment_method, payment_status, payment_date, status, shipper_id, delivery_status, cod_amount, cod_collected, delivery_photo_url, customer_note, order_date, confirmed_at, shipped_at, delivered_at, updated_at) VALUES
+('SHIP-TEST-003', 6, 'Lê Văn C', 'customer3@gmail.com', '0906234567', 'Lê Văn C', '0906234567', '321 Võ Văn Tần', 'Phường 5', 'Quận 3', 'TP. Hồ Chí Minh', 7490000, 30000, 0, 7520000, 'cod', 'paid', DATE_SUB(NOW(), INTERVAL 1 DAY), 'delivered', 3, 'DELIVERED', 7520000, 1, '/uploads/delivery-proof-test.jpg', NULL, DATE_SUB(NOW(), INTERVAL 3 DAY), DATE_SUB(NOW(), INTERVAL 3 DAY), DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY));
+
 INSERT INTO order_details (order_id, product_id, product_name, sku, price, quantity, subtotal) VALUES
 (1,3,'iPhone 13','IP13-001',16990000,1,16990000),
 (2,1,'iPhone 15 Pro Max','IP15PM-001',28990000,1,28990000),
 (3,8,'Xiaomi Redmi Note 13 Pro','RN13P-001',7490000,1,7490000),
 (4,13,'AirPods Pro 2','APP2-001',5990000,1,5990000),
-(5,7,'Xiaomi 14 Pro','XM14P-001',18990000,1,18990000);
+(5,7,'Xiaomi 14 Pro','XM14P-001',18990000,1,18990000),
+(6,2,'iPhone 14 Pro','IP14P-001',17990000,1,17990000),
+(7,5,'Samsung Galaxy A54 5G','SSA54-001',9490000,1,9490000),
+(8,8,'Xiaomi Redmi Note 13 Pro','RN13P-001',7490000,1,7490000);
 
 INSERT INTO order_events (order_id, event_type, from_status, to_status, actor_user_id, actor_role, note, metadata, created_at) VALUES
 (1,'order_created',NULL,'pending',4,'customer','Đơn hàng được tạo từ website',JSON_OBJECT('paymentMethod','cod','itemCount',1),DATE_SUB(NOW(),INTERVAL 30 DAY)),
@@ -301,6 +317,22 @@ INSERT INTO settings (setting_key, setting_value, description, data_type, is_pub
 UPDATE products p
 SET rating_avg = (SELECT AVG(rating) FROM reviews r WHERE r.product_id = p.product_id AND r.status = 'approved'),
     review_count = (SELECT COUNT(*) FROM reviews r WHERE r.product_id = p.product_id AND r.status = 'approved');
+
+-- ==================================================
+-- SYNC COD PAYMENTS - Tạo payment records cho đơn COD hiện có
+-- ==================================================
+INSERT IGNORE INTO payments (order_id, method, amount, status, shipper_id)
+SELECT
+    o.order_id,
+    'cod',
+    o.cod_amount,
+    CASE
+        WHEN o.cod_collected = 1 THEN 'collected'
+        ELSE 'pending'
+    END,
+    o.shipper_id
+FROM orders o
+WHERE o.payment_method = 'cod' AND o.cod_amount > 0;
 
 -- ==================================================
 -- END OF SEED DATA

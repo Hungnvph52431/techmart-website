@@ -10,7 +10,7 @@ export interface User {
   phone?: string;
   
   // ENUM khớp 100% với DB
-  role: 'customer' | 'admin' | 'staff' | 'warehouse';  
+  role: 'customer' | 'admin' | 'staff' | 'warehouse' | 'shipper';
   status: 'active' | 'inactive' | 'banned';  
   points: number;
   
