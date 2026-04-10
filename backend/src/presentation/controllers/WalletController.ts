@@ -23,6 +23,61 @@ export class WalletController {
     }
   };
 
+  getSupportedBanks = async (_req: AuthRequest, res: Response) => {
+    try {
+      res.json(this.walletUseCase.getSupportedBanks());
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  };
+
+  getWithdrawalProfile = async (req: AuthRequest, res: Response) => {
+    try {
+      const profile = await this.walletUseCase.getWithdrawalProfile(req.user.userId);
+      res.json(profile);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  };
+
+  setupWithdrawalProfile = async (req: AuthRequest, res: Response) => {
+    try {
+      const profile = await this.walletUseCase.setupWithdrawalProfile(req.user.userId, {
+        bankCode: String(req.body.bankCode || ''),
+        accountNumber: String(req.body.accountNumber || ''),
+        accountHolderName: String(req.body.accountHolderName || ''),
+        branchName: String(req.body.branchName || ''),
+        pin: String(req.body.pin || ''),
+        confirmPin: String(req.body.confirmPin || ''),
+      });
+      res.status(201).json(profile);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  };
+
+  getWithdrawals = async (req: AuthRequest, res: Response) => {
+    try {
+      const withdrawals = await this.walletUseCase.getWithdrawals(req.user.userId);
+      res.json(withdrawals);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  };
+
+  createWithdrawal = async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await this.walletUseCase.createWithdrawal(req.user.userId, {
+        amount: Number(req.body.amount),
+        pin: String(req.body.pin || ''),
+        customerNote: req.body.customerNote ? String(req.body.customerNote) : undefined,
+      });
+      res.status(201).json(result);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  };
+
   createVNPayTopup = async (req: AuthRequest, res: Response) => {
     try {
       const { amount } = req.body;
@@ -47,6 +102,35 @@ export class WalletController {
       res.json(topups);
     } catch (e: any) {
       res.status(500).json({ message: e.message });
+    }
+  };
+
+  adminListWithdrawals = async (req: AuthRequest, res: Response) => {
+    try {
+      const status = req.query.status ? String(req.query.status) : 'all';
+      const days = req.query.days ? Number(req.query.days) : 30;
+      const withdrawals = await this.walletUseCase.adminListWithdrawals(status, days);
+      res.json(withdrawals);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  };
+
+  adminUpdateWithdrawalStatus = async (req: AuthRequest, res: Response) => {
+    try {
+      const requestId = Number(req.params.id);
+      if (Number.isNaN(requestId)) {
+        return res.status(400).json({ message: 'Mã yêu cầu rút tiền không hợp lệ' });
+      }
+
+      const result = await this.walletUseCase.adminUpdateWithdrawalStatus(requestId, req.user.userId, {
+        status: req.body.status,
+        adminNote: req.body.adminNote,
+      });
+
+      res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
     }
   };
 }
