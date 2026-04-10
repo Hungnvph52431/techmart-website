@@ -319,6 +319,19 @@ SET rating_avg = (SELECT AVG(rating) FROM reviews r WHERE r.product_id = p.produ
     review_count = (SELECT COUNT(*) FROM reviews r WHERE r.product_id = p.product_id AND r.status = 'approved');
 
 -- ==================================================
+-- DELIVERY_ATTEMPTS - Lịch sử giao hàng shipper
+-- ==================================================
+INSERT INTO delivery_attempts (order_id, shipper_id, status, photo_url, attempted_at) VALUES
+(8, 3, 'SUCCESS', '/uploads/delivery-proof-test.jpg', DATE_SUB(NOW(), INTERVAL 1 DAY));
+
+-- ==================================================
+-- USER_BANK_ACCOUNTS - Tài khoản ngân hàng mẫu
+-- ==================================================
+INSERT INTO user_bank_accounts (user_id, bank_code, bank_name, account_number, account_holder_name, branch_name) VALUES
+(4, 'VCB', 'Vietcombank', '1234567890', 'NGUYEN VAN A', 'CN Hồ Chí Minh'),
+(5, 'TCB', 'Techcombank', '9876543210', 'TRAN THI B', 'CN Hà Nội');
+
+-- ==================================================
 -- SYNC COD PAYMENTS - Tạo payment records cho đơn COD hiện có
 -- ==================================================
 INSERT IGNORE INTO payments (order_id, method, amount, status, shipper_id)
