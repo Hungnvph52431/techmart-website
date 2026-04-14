@@ -268,36 +268,20 @@ export class OrderUseCase {
     orderData.shippingCity = province.name;
     orderData.shippingDistrict = orderData.shippingDistrict?.trim() || undefined;
 
-    // Kiểm tra tồn kho trước khi đặt hàng
+    // Validate cơ bản (stock check atomic nằm trong OrderRepository.create transaction)
     for (const item of orderData.items) {
       if (item.quantity <= 0) throw new Error('Số lượng sản phẩm phải lớn hơn 0');
 
       const product = await this.productRepository.findById(item.productId);
       if (!product) throw new Error(`Sản phẩm mã ${item.productId} không tồn tại`);
 
-      // Kiểm tra biến thể (Màu sắc/Dung lượng) nếu có
       if (item.variantId) {
         const variant = await this.productRepository.findVariantById(item.variantId);
         if (!variant || variant.productId !== item.productId || !variant.isActive) {
           throw new Error(`Phiên bản sản phẩm ${item.variantId} không khả dụng`);
         }
-        const availableVariantStock = await this.productRepository.getAvailableVariantStock(item.variantId);
-        if (availableVariantStock < item.quantity) {
-          throw new Error(`Kho không đủ máy ${variant.variantName} (Còn ${availableVariantStock})`);
-        }
-        const availableProductStock = await this.productRepository.getAvailableProductStock(item.productId);
-        if (availableProductStock < item.quantity) {
-          throw new Error(`Sản phẩm ${product.name} đã hết hàng hoặc không đủ số lượng`);
-        }
-      } else {
-        const availableProductStock = await this.productRepository.getAvailableProductStock(item.productId);
-        if (availableProductStock < item.quantity) {
-          throw new Error(`Sản phẩm ${product.name} đã hết hàng hoặc không đủ số lượng`);
-        }
       }
     }
-
-    // Tạo đơn chỉ giữ reserved stock qua trạng thái đơn, chưa trừ kho vật lý ngay tại đây
     const newOrder = await this.orderRepository.create(orderData);
 
     // Gửi email thông báo đặt hàng thành công (fire-and-forget, mọi phương thức)
@@ -334,7 +318,7 @@ export class OrderUseCase {
   }
 
   // --- XÁC NHẬN NHẬP KHO (Admin) ---
-  async confirmWarehouseReceipt(orderId: number, adminId: number) {
+  async confirmWarehouseReceipt(orderId: number, adminId: number, condition: 'good' | 'defective') {
     const order = await this.orderRepository.findById(orderId);
     if (!order) throw new Error('Không tìm thấy đơn hàng');
     const deliveryStatus = (order as any).deliveryStatus as string | undefined;
@@ -344,9 +328,15 @@ export class OrderUseCase {
     if (order.warehouseReceivedAt) {
       throw new Error(`Đơn hàng đã được xác nhận nhập kho lúc ${order.warehouseReceivedAt.toLocaleString('vi-VN')}`);
     }
-    await this.orderRepository.updateWarehouseReceivedAt(orderId);
-    await this.orderRepository.logEvent(orderId, adminId, 'admin', 'status_changed', 'returned', 'returned', 'Admin xác nhận nhập kho');
-    return { success: true, orderId, message: 'Đã xác nhận nhập kho' };
+    await this.orderRepository.updateWarehouseReceivedAt(orderId, condition);
+    if (condition === 'good') {
+      await this.orderRepository.restockForWarehouseReceipt(orderId, adminId);
+    }
+    const note = condition === 'good'
+      ? 'Admin xác nhận nhập kho - Hàng tốt, đã nhập lại kho'
+      : 'Admin xác nhận nhập kho - Hàng lỗi, không nhập lại kho';
+    await this.orderRepository.logEvent(orderId, adminId, 'admin', 'status_changed', 'returned', 'returned', note);
+    return { success: true, orderId, condition, message: condition === 'good' ? 'Đã nhập kho hàng tốt' : 'Đã ghi nhận hàng lỗi' };
   }
 
   // --- QUẢN LÝ TRẠNG THÁI & HỦY ĐƠN ---

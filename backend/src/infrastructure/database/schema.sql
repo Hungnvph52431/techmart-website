@@ -371,6 +371,7 @@ CREATE TABLE orders (
     delivered_at TIMESTAMP NULL,
     cancelled_at TIMESTAMP NULL,
     warehouse_received_at TIMESTAMP NULL,
+    warehouse_condition ENUM('good', 'defective') NULL,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL DEFAULT NULL,
 

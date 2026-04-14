@@ -215,6 +215,52 @@ export class OrderRepository implements IOrderRepository {
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
+
+      // ── Atomic stock check: FOR UPDATE lock chặn race condition ──
+      for (const item of orderData.items) {
+        const [productRows] = await connection.execute<RowDataPacket[]>(
+          `SELECT p.name, p.stock_quantity,
+                  COALESCE((
+                    SELECT SUM(od.quantity) FROM order_details od
+                    JOIN orders o ON o.order_id = od.order_id
+                    WHERE od.product_id = p.product_id
+                      AND o.deleted_at IS NULL
+                      AND o.status IN ('pending','confirmed','processing','shipping')
+                  ), 0) AS reserved
+           FROM products p
+           WHERE p.product_id = ? AND p.deleted_at IS NULL
+           FOR UPDATE`,
+          [item.productId]
+        );
+        if (!productRows[0]) throw new Error(`Sản phẩm mã ${item.productId} không tồn tại`);
+        const availableProduct = Number(productRows[0].stock_quantity) - Number(productRows[0].reserved);
+        if (availableProduct < item.quantity) {
+          throw new Error(`Sản phẩm ${productRows[0].name} đã hết hàng hoặc không đủ số lượng (còn ${availableProduct})`);
+        }
+
+        if (item.variantId) {
+          const [variantRows] = await connection.execute<RowDataPacket[]>(
+            `SELECT pv.variant_name, pv.stock_quantity,
+                    COALESCE((
+                      SELECT SUM(od.quantity) FROM order_details od
+                      JOIN orders o ON o.order_id = od.order_id
+                      WHERE od.variant_id = pv.variant_id
+                        AND o.deleted_at IS NULL
+                        AND o.status IN ('pending','confirmed','processing','shipping')
+                    ), 0) AS reserved
+             FROM product_variants pv
+             WHERE pv.variant_id = ? AND pv.product_id = ?
+             FOR UPDATE`,
+            [item.variantId, item.productId]
+          );
+          if (!variantRows[0]) throw new Error(`Phiên bản sản phẩm ${item.variantId} không khả dụng`);
+          const availableVariant = Number(variantRows[0].stock_quantity) - Number(variantRows[0].reserved);
+          if (availableVariant < item.quantity) {
+            throw new Error(`Kho không đủ máy ${variantRows[0].variant_name} (Còn ${availableVariant})`);
+          }
+        }
+      }
+
       const now = new Date();
       const orderCode = this.generateOrderCode();
       const subtotal = orderData.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -556,11 +602,37 @@ export class OrderRepository implements IOrderRepository {
     );
   }
 
-  async updateWarehouseReceivedAt(orderId: number): Promise<void> {
+  async updateWarehouseReceivedAt(orderId: number, condition: 'good' | 'defective'): Promise<void> {
     await pool.query(
-      `UPDATE orders SET warehouse_received_at = NOW() WHERE order_id = ? AND warehouse_received_at IS NULL`,
-      [orderId]
+      `UPDATE orders SET warehouse_received_at = NOW(), warehouse_condition = ? WHERE order_id = ? AND warehouse_received_at IS NULL`,
+      [condition, orderId]
     );
+  }
+
+  async restockForWarehouseReceipt(orderId: number, adminId: number): Promise<void> {
+    const details = await this.getOrderDetails(orderId);
+    for (const detail of details) {
+      if (detail.variantId) {
+        await pool.execute(
+          'UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE variant_id = ?',
+          [detail.quantity, detail.variantId]
+        );
+      }
+      await pool.execute(
+        'UPDATE products SET stock_quantity = stock_quantity + ? WHERE product_id = ?',
+        [detail.quantity, detail.productId]
+      );
+      await this.appendInventoryTransaction(pool, {
+        productId: detail.productId,
+        variantId: detail.variantId,
+        transactionType: 'return',
+        quantity: detail.quantity,
+        referenceType: 'order',
+        referenceId: orderId,
+        notes: 'Nhập kho hàng hoàn - tình trạng tốt',
+        createdBy: adminId,
+      });
+    }
   }
 
   async cancel(input: CancelOrderDTO): Promise<Order | null> {
@@ -1467,6 +1539,7 @@ export class OrderRepository implements IOrderRepository {
       deliveredAt: row.delivered_at ?? undefined,
       cancelledAt: row.cancelled_at ?? undefined,
       warehouseReceivedAt: row.warehouse_received_at ?? undefined,
+      warehouseCondition: row.warehouse_condition ?? undefined,
       updatedAt: row.updated_at,
     };
   }

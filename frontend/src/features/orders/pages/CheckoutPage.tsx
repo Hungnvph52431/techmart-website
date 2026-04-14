@@ -311,8 +311,9 @@ export const CheckoutPage = () => {
           state: { email: deliveryForm.customerEmail.trim() },
         });
       }
-    } catch (error) {
-      toast.error("Đặt hàng thất bại, vui lòng thử lại!");
+    } catch (error: any) {
+      const msg = error?.response?.data?.message || "Đặt hàng thất bại, vui lòng thử lại!";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

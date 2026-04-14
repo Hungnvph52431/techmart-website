@@ -78,6 +78,7 @@ export interface Order {
   deliveredAt?: Date;
   cancelledAt?: Date;
   warehouseReceivedAt?: Date;
+  warehouseCondition?: 'good' | 'defective';
   updatedAt: Date;
 }
 

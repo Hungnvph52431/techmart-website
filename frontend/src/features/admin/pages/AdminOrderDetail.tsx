@@ -275,11 +275,11 @@ export const AdminOrderDetail = () => {
     }
   };
 
-  const handleConfirmWarehouseReceipt = async () => {
+  const handleConfirmWarehouseReceipt = async (condition: 'good' | 'defective') => {
     try {
-      setSubmitting('warehouse');
-      await adminOrderService.confirmWarehouseReceipt(orderId);
-      toast.success('Đã xác nhận nhập kho thành công');
+      setSubmitting(condition === 'good' ? 'warehouse-good' : 'warehouse-defective');
+      await adminOrderService.confirmWarehouseReceipt(orderId, condition);
+      toast.success(condition === 'good' ? 'Đã nhập kho hàng tốt' : 'Đã ghi nhận hàng lỗi');
       await loadDetail();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Xác nhận nhập kho thất bại');
@@ -870,16 +870,35 @@ const allowedPayments = (() => {
               <h2 className="font-black text-orange-700 uppercase text-sm tracking-wider flex items-center gap-2">
                 <Package size={15} /> Hàng hoàn về kho
               </h2>
-              <p className="text-sm text-orange-600">
-                Shipper đã xác nhận trả hàng về kho. Vui lòng kiểm tra và xác nhận nhập kho.
-              </p>
-              <button
-                onClick={handleConfirmWarehouseReceipt}
-                disabled={submitting === 'warehouse'}
-                className="w-full px-4 py-2.5 rounded-xl bg-orange-600 text-white text-sm font-black disabled:opacity-50 hover:bg-orange-700 transition-colors"
-              >
-                {submitting === 'warehouse' ? 'Đang xử lý...' : '✓ Xác nhận đã nhập kho'}
-              </button>
+              {(order as any).warehouseCondition ? (
+                <p className="text-sm font-semibold">
+                  {(order as any).warehouseCondition === 'good'
+                    ? '✓ Đã nhập kho - Hàng tốt, đã cộng lại tồn kho'
+                    : '✗ Đã ghi nhận - Hàng lỗi, không nhập lại kho'}
+                </p>
+              ) : (
+                <>
+                  <p className="text-sm text-orange-600">
+                    Shipper đã xác nhận trả hàng về kho. Vui lòng kiểm tra tình trạng hàng và xác nhận.
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => handleConfirmWarehouseReceipt('good')}
+                      disabled={submitting === 'warehouse-good' || submitting === 'warehouse-defective'}
+                      className="flex-1 px-4 py-2.5 rounded-xl bg-green-600 text-white text-sm font-black disabled:opacity-50 hover:bg-green-700 transition-colors"
+                    >
+                      {submitting === 'warehouse-good' ? 'Đang xử lý...' : '✓ Hàng tốt - Nhập lại kho'}
+                    </button>
+                    <button
+                      onClick={() => handleConfirmWarehouseReceipt('defective')}
+                      disabled={submitting === 'warehouse-good' || submitting === 'warehouse-defective'}
+                      className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-black disabled:opacity-50 hover:bg-red-700 transition-colors"
+                    >
+                      {submitting === 'warehouse-defective' ? 'Đang xử lý...' : '✗ Hàng lỗi - Không bán lại'}
+                    </button>
+                  </div>
+                </>
+              )}
             </section>
           )}
 
