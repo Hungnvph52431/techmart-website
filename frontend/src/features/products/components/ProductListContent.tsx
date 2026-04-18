@@ -46,6 +46,10 @@ export const ProductListContent = ({
           chip: searchParams.get("chip") || undefined,
           minPrice: searchParams.get("minPrice") || undefined,
           maxPrice: searchParams.get("maxPrice") || undefined,
+          onSale: searchParams.get("onSale") === "true" ? true : undefined,
+          isFeatured: searchParams.get("isFeatured") === "true" ? true : undefined,
+          isNew: searchParams.get("isNew") === "true" ? true : undefined,
+          isBestseller: searchParams.get("isBestseller") === "true" ? true : undefined,
           page,
           limit: 15,
         };

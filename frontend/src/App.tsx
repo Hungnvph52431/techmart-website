@@ -4,6 +4,7 @@ import { useAuthStore } from '@/store/authStore';
 
 // --- PAGES CÔNG KHAI ---
 import { HomePage } from '@/pages/HomePage';
+import { LandingPage } from '@/pages/LandingPage';
 import { AboutPage } from '@/pages/AboutPage';
 import { ContactPage } from '@/pages/ContactPage';
 import { PolicyPage } from '@/pages/PolicyPage';
@@ -79,7 +80,8 @@ function App() {
 
         {/* --- 1. ROUTES CHO NGƯỜI DÙNG & ADMIN (chặn shipper) --- */}
         <Route element={<BlockShipperGuard />}>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/home" element={<HomePage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/policy" element={<PolicyPage />} />

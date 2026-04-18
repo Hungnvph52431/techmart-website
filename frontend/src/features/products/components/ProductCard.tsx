@@ -1,11 +1,12 @@
 import { useState, type MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Heart, ShoppingCart, Star } from "lucide-react";
+import { Heart, ShoppingCart, Star, Layers } from "lucide-react";
 import { Product } from "@/types";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
 import { useCheckoutSessionStore } from "@/store/checkoutSessionStore";
 import { useWishlistStore } from "@/store/wishlistStore";
+import { useRecentlyViewedStore } from "@/store/recentlyViewedStore";
 import { productService } from "@/services/product.service";
 import toast from "react-hot-toast";
 import { VariantPickerModal } from "./VariantPickerModal";
@@ -29,6 +30,7 @@ export const ProductCard = ({ product }: ProductCardProps) => {
   const startDirectCheckout = useCheckoutSessionStore(
     (state) => state.startDirectCheckout,
   );
+  const addRecentlyViewed = useRecentlyViewedStore((state) => state.addProduct);
   const toggleWishlist = useWishlistStore((state) => state.toggleWishlist);
   const isFavorite = useWishlistStore((state) =>
     state.productIds.includes(product.productId)
@@ -162,6 +164,7 @@ export const ProductCard = ({ product }: ProductCardProps) => {
           <Link
             to={`/products/${product.slug}`}
             className="flex flex-1 flex-col"
+            onClick={() => addRecentlyViewed(product)}
           >
             {/* 1. CONTAINER ẢNH & BADGES */}
             <div className="relative pt-[100%] overflow-hidden bg-gray-50">
@@ -208,15 +211,24 @@ export const ProductCard = ({ product }: ProductCardProps) => {
                   </span>
                 </div>
               )}
+
             </div>
 
             {/* 2. NỘI DUNG SẢN PHẨM */}
             <div className="flex flex-1 flex-col px-4 py-3">
-              {product.brandName && (
-                <div className="mb-1 text-xs font-bold uppercase tracking-wider text-blue-600">
-                  {product.brandName}
-                </div>
-              )}
+              <div className="mb-1 flex items-center justify-between gap-2 min-h-[16px]">
+                {product.brandName ? (
+                  <span className="text-xs font-bold uppercase tracking-wider text-blue-600 truncate">
+                    {product.brandName}
+                  </span>
+                ) : <span />}
+                {hasVariants && (product.variantCount ?? 0) > 0 && (
+                  <span className="flex items-center gap-1 text-[10px] font-semibold text-gray-400 shrink-0">
+                    <Layers size={11} />
+                    {product.variantCount} phiên bản
+                  </span>
+                )}
+              </div>
 
               <h3 className="mb-2 line-clamp-2 min-h-[48px] text-sm font-semibold text-gray-800 leading-snug transition-colors group-hover:text-blue-600">
                 {product.name}
@@ -237,13 +249,16 @@ export const ProductCard = ({ product }: ProductCardProps) => {
 
           <div className="space-y-2.5 px-4 pb-3">
             <div className="flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <div className="flex items-center rounded-md bg-yellow-50 px-2 py-0.5">
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="flex items-center rounded-md bg-yellow-50 px-1.5 py-0.5 border border-yellow-100">
                   <Star className="h-3 w-3 fill-current text-yellow-500" />
                   <span className="ml-1 text-xs font-bold text-yellow-700">{ratingValue}</span>
+                  {Number(product.reviewCount ?? 0) > 0 && (
+                    <span className="ml-0.5 text-[10px] text-yellow-600/70">({product.reviewCount})</span>
+                  )}
                 </div>
-                <span className="truncate text-xs font-medium text-gray-400">
-                  Đã bán {soldQuantityText}
+                <span className="truncate text-xs font-semibold text-gray-500">
+                  Đã bán <span className="text-gray-700">{soldQuantityText}</span>
                 </span>
               </div>
 

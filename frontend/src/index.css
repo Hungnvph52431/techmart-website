@@ -6,32 +6,41 @@
   body {
     @apply bg-white text-gray-900;
     font-family: 'Inter', sans-serif;
-  }
-}
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer base {
-  body {
-    @apply bg-white text-gray-900;
-    font-family: 'Inter', sans-serif;
+    zoom: 0.9;
   }
 
-  /* THÊM ĐOẠN NÀY ĐỂ ÉP CÁC BOX VỀ MÀU TRẮNG */
   input, select, textarea {
     background-color: #ffffff !important;
     color: #000000 !important;
-    color-scheme: light !important; /* Lệnh này cấm trình duyệt áp Dark Mode vào input */
+    color-scheme: light !important;
   }
 
-  /* THÊM ĐOẠN NÀY ĐỂ FIX LỖI AUTO-FILL CỦA CHROME (Khi bấm vào nó tự điền màu đen) */
   input:-webkit-autofill,
-  input:-webkit-autofill:hover, 
-  input:-webkit-autofill:focus, 
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
   input:-webkit-autofill:active {
     -webkit-box-shadow: 0 0 0 50px white inset !important;
     -webkit-text-fill-color: black !important;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  .animate-marquee {
+    animation: marquee 35s linear infinite;
+  }
+  .animate-marquee:hover {
+    animation-play-state: paused;
   }
 }

@@ -54,6 +54,7 @@ services:
       - VNPAY_TMN_CODE=LGZKF5XY
       - VNPAY_HASH_SECRET=L25C1P0I1GSXW0TBC49HYQZ5QS95ZZA6
       - VNPAY_RETURN_URL=http://localhost:5001/api/payment/vnpay/return
+      - GROQ_API_KEY=${GROQ_API_KEY}
     volumes:
       - ./backend:/app
       - /app/node_modules

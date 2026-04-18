@@ -215,10 +215,10 @@ INSERT INTO promotions (name, description, promotion_type, discount_type, discou
 INSERT INTO promotion_products (promotion_id, product_id) VALUES (1,3),(1,5),(1,8),(1,10),(2,1),(2,2),(2,3);
 
 INSERT INTO banners (title, image_url, link_url, position, display_order, is_active, valid_from, valid_to) VALUES
-('iPhone 15 Pro Max - Ra Mắt', '/images/banners/iphone-15-banner.jpg', '/products/iphone-15-pro-max', 'home_slider', 1, TRUE, NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY)),
-('Flash Sale Cuối Tuần', '/images/banners/flash-sale-banner.jpg', '/promotions/flash-sale', 'home_slider', 2, TRUE, NOW(), DATE_ADD(NOW(), INTERVAL 7 DAY)),
-('Samsung Galaxy S24 Ultra', '/images/banners/s24-ultra-banner.jpg', '/products/samsung-galaxy-s24-ultra', 'home_slider', 3, TRUE, NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY)),
-('Giảm giá phụ kiện', '/images/banners/phu-kien-banner.jpg', '/categories/phu-kien', 'home_middle', 1, TRUE, NOW(), DATE_ADD(NOW(), INTERVAL 60 DAY));
+('iPhone 15 Pro Max - Ra Mắt', 'https://images.unsplash.com/photo-1592899677977-9c10ca588bbd?w=1600&q=85', '/products/iphone-15-pro-max', 'home_slider', 1, TRUE, NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY)),
+('Flash Sale Cuối Tuần', 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1600&q=85', '/products?onSale=true', 'home_slider', 2, TRUE, NOW(), DATE_ADD(NOW(), INTERVAL 7 DAY)),
+('Samsung Galaxy S24 Ultra', 'https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=1600&q=85', '/products/samsung-galaxy-s24-ultra', 'home_slider', 3, TRUE, NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY)),
+('Giảm giá phụ kiện', 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=1200&q=85', '/products?category=phu-kien', 'home_middle', 1, TRUE, NOW(), DATE_ADD(NOW(), INTERVAL 60 DAY));
 
 INSERT INTO orders (order_code, user_id, shipping_name, shipping_phone, shipping_address, shipping_ward, shipping_district, shipping_city, subtotal, shipping_fee, discount_amount, total, payment_method, payment_status, payment_date, status, customer_note, order_date, confirmed_at, shipped_at, delivered_at, updated_at) VALUES
 ('ORD240101001', 4, 'Nguyễn Văn A', '0904234567', '123 Nguyễn Huệ', 'Phường Bến Nghé', 'Quận 1', 'TP. Hồ Chí Minh', 16990000, 0, 0, 16990000, 'cod', 'paid', DATE_SUB(NOW(), INTERVAL 26 DAY), 'delivered', 'Giao giờ hành chính', DATE_SUB(NOW(), INTERVAL 30 DAY), DATE_SUB(NOW(), INTERVAL 29 DAY), DATE_SUB(NOW(), INTERVAL 28 DAY), DATE_SUB(NOW(), INTERVAL 26 DAY), DATE_SUB(NOW(), INTERVAL 26 DAY)),

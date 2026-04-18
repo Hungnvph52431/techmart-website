@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingCart, User, Search, Wallet, X, Flame, UserCircle, Package, LogOut, Shield } from 'lucide-react';
+import { ShoppingCart, User, Search, Wallet, X, Flame, UserCircle, Package, LogOut, Shield, Truck, ShieldCheck, Phone, RefreshCw, FileText, BadgeCheck } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useCartStore } from '@/store/cartStore';
 import { useCheckoutSessionStore } from '@/store/checkoutSessionStore';
@@ -28,6 +28,7 @@ export const Header = () => {
   const { clearDirectCheckout } = useCheckoutSessionStore();
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
 
   // Search states
@@ -132,34 +133,76 @@ export const Header = () => {
   };
 
   return (
-    <header className="bg-white shadow-md sticky top-0 z-50">
+    <>
+      {/* Trust bar - brand blue marquee */}
+      <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white hidden sm:block overflow-hidden">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center h-8 text-xs gap-4">
+            {/* Left: scrolling marquee */}
+            <div className="flex-1 overflow-hidden">
+              <div className="flex animate-marquee whitespace-nowrap w-max">
+                {[...Array(2)].flatMap((_, dup) => [
+                  { icon: <BadgeCheck size={13} className="text-amber-300" />, text: 'Sản phẩm Chính hãng - Xuất VAT đầy đủ' },
+                  { icon: <Truck size={13} className="text-cyan-300" />, text: 'Giao nhanh - Miễn phí cho đơn 300K' },
+                  { icon: <RefreshCw size={13} className="text-emerald-300" />, text: 'Thu cũ giá ngon - Lên đời tiết kiệm' },
+                  { icon: <ShieldCheck size={13} className="text-pink-300" />, text: 'Bảo hành chính hãng 24 tháng' },
+                ].map((item, i) => (
+                  <span key={`${dup}-${i}`} className="flex items-center gap-1.5 px-5 font-medium">
+                    {item.icon}
+                    <span>{item.text}</span>
+                    <span className="ml-4 text-white/40">•</span>
+                  </span>
+                )))}
+              </div>
+            </div>
+
+            {/* Right: fixed links */}
+            <div className="flex items-center gap-3 shrink-0 pl-4 border-l border-white/25">
+              <Link to="/orders" className="flex items-center gap-1.5 font-medium hover:text-amber-300 transition-colors">
+                <FileText size={13} /> Tra cứu đơn hàng
+              </Link>
+              <span className="text-white/40">|</span>
+              <a href="tel:1900xxxx" className="flex items-center gap-1.5 font-semibold hover:text-amber-300 transition-colors">
+                <Phone size={13} /> 1900 xxxx
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    <header className="bg-white sticky top-0 z-50 border-b border-gray-100 shadow-sm">
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link to="/" className="text-2xl font-black text-blue-600 uppercase italic tracking-tighter">
-            TechMart
+        <div className="flex items-center gap-6 h-16">
+          {/* Logo with icon */}
+          <Link to="/home" className="flex items-center gap-2 shrink-0">
+            <div className="bg-gradient-to-br from-blue-600 to-indigo-600 w-9 h-9 rounded-xl flex items-center justify-center shadow-md shadow-blue-500/30">
+              <span className="text-white font-black text-lg leading-none">T</span>
+            </div>
+            <span className="text-xl font-black tracking-tight hidden sm:block">
+              <span className="text-blue-600">Tech</span><span className="text-gray-900">Mart</span>
+            </span>
           </Link>
 
           {/* Search */}
-          <div ref={searchRef} className="flex-1 max-w-xl mx-8 hidden md:block relative">
+          <div ref={searchRef} className="flex-1 max-w-2xl hidden md:block relative">
             <form onSubmit={handleSearchSubmit} className="relative">
-              <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400 pointer-events-none" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
               <input
                 ref={inputRef}
                 type="text"
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 onFocus={() => { if (searchQuery.trim()) setSearchOpen(true); }}
-                placeholder="Tìm kiếm iPhone, Samsung..."
-                className="w-full px-4 py-2 pl-10 pr-10 border-2 border-gray-100 rounded-2xl focus:outline-none focus:border-blue-500 transition-all text-sm font-bold"
+                placeholder="Bạn đang tìm gì hôm nay?"
+                className="w-full bg-gray-50 border border-gray-200 rounded-full pl-11 pr-10 py-2.5 text-sm focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={handleSearchClear}
-                  className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-4 w-4" />
                 </button>
               )}
             </form>
@@ -265,13 +308,22 @@ export const Header = () => {
             )}
           </div>
 
+          {/* Mobile search button */}
+          <button
+            onClick={() => { setMobileSearchOpen(true); setTimeout(() => inputRef.current?.focus(), 100); }}
+            className="md:hidden p-2 hover:bg-gray-50 rounded-full transition-colors"
+            aria-label="Tìm kiếm"
+          >
+            <Search className="h-5 w-5 text-gray-700" />
+          </button>
+
           {/* Actions */}
-          <div className="flex items-center space-x-6">
+          <div className="flex items-center gap-2 ml-auto">
 
             {authenticated ? (
               <div className="relative group">
-                <Link to="/cart" className="relative p-2 hover:bg-gray-50 rounded-full transition-colors flex items-center">
-                  <ShoppingCart className="h-6 w-6 text-gray-700" />
+                <Link to="/cart" className="relative p-2.5 hover:bg-gray-100 rounded-full transition-colors flex items-center">
+                  <ShoppingCart className="h-5 w-5 text-gray-700" />
                   {getTotalItems() > 0 && (
                     <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black rounded-full h-5 w-5 flex items-center justify-center border-2 border-white shadow-sm">
                       {getTotalItems()}
@@ -327,23 +379,26 @@ export const Header = () => {
             ) : (
               <Link
                 to="/orders"
-                className="relative p-2 hover:bg-gray-50 rounded-full transition-colors flex items-center"
+                className="relative p-2.5 hover:bg-gray-100 rounded-full transition-colors flex items-center"
                 aria-label="Tra cứu đơn hàng"
                 title="Tra cứu đơn hàng"
               >
-                <Package className="h-6 w-6 text-gray-700" />
+                <Package className="h-5 w-5 text-gray-700" />
               </Link>
             )}
+
+            {/* Divider */}
+            <div className="h-6 w-px bg-gray-200 mx-1" />
 
             {/* --- KHỐI TÀI KHOẢN (USER MENU) --- */}
             {isAuthenticated() ? (
               <div ref={userMenuRef} className="relative">
                 <button
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  className="flex items-center space-x-2 py-1.5 px-3 rounded-2xl hover:bg-gray-50 transition-all border border-transparent hover:border-gray-100"
+                  className="flex items-center gap-2 py-1.5 px-3 rounded-full hover:bg-gray-50 transition-all border border-transparent hover:border-gray-200"
                 >
-                  <User className="h-6 w-6 text-gray-700" />
-                  <span className="text-xs font-black text-gray-800 hidden md:block uppercase tracking-tighter">
+                  <User className="h-5 w-5 text-gray-700" />
+                  <span className="text-sm font-semibold text-gray-800 hidden md:block max-w-[140px] truncate">
                     {displayName}
                   </span>
                 </button>
@@ -447,7 +502,7 @@ export const Header = () => {
             ) : (
               <Link
                 to="/login"
-                className="bg-blue-600 text-white px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-blue-700 shadow-xl shadow-blue-100 transition-all active:scale-95"
+                className="bg-blue-600 text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all active:scale-95"
               >
                 Đăng nhập
               </Link>
@@ -455,6 +510,96 @@ export const Header = () => {
           </div>
         </div>
       </div>
+      {/* Mobile Search Overlay */}
+      {mobileSearchOpen && (
+        <div className="md:hidden fixed inset-0 z-50 bg-white">
+          <div className="flex items-center gap-2 p-3 border-b border-gray-100">
+            <form onSubmit={(e) => { handleSearchSubmit(e); setMobileSearchOpen(false); }} className="flex-1 relative">
+              <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400 pointer-events-none" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder="Tìm kiếm iPhone, Samsung..."
+                className="w-full px-4 py-2.5 pl-10 pr-10 border-2 border-gray-100 rounded-2xl focus:outline-none focus:border-blue-500 transition-all text-sm font-bold"
+                autoFocus
+              />
+              {searchQuery && (
+                <button type="button" onClick={handleSearchClear} className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600">
+                  <X className="h-5 w-5" />
+                </button>
+              )}
+            </form>
+            <button
+              onClick={() => { setMobileSearchOpen(false); setSearchOpen(false); }}
+              className="text-sm font-bold text-gray-500 px-2 py-2 shrink-0"
+            >
+              Huỷ
+            </button>
+          </div>
+
+          {/* Mobile search results */}
+          {searchQuery.trim() && (
+            <div className="overflow-y-auto max-h-[calc(100vh-60px)]">
+              {suggestedCategories.length > 0 && (
+                <div className="px-4 pt-4 pb-2">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Search className="h-4 w-4 text-red-500" />
+                    <span className="text-sm font-black text-gray-800">Có phải bạn muốn tìm</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {suggestedCategories.map((cat) => (
+                      <button key={cat.categoryId}
+                        onClick={() => { setMobileSearchOpen(false); setSearchQuery(''); navigate(`/products?categorySlug=${cat.slug}`); }}
+                        className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-all text-left">
+                        {cat.imageUrl && <img src={getImageUrl(cat.imageUrl)} alt={cat.name} className="w-10 h-10 object-contain rounded-lg bg-gray-50" />}
+                        <span className="text-sm font-bold text-gray-700 line-clamp-1">{cat.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {suggestedProducts.length > 0 && (
+                <div className="px-4 pt-3 pb-2 border-t border-gray-100">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Flame className="h-4 w-4 text-orange-500" />
+                    <span className="text-sm font-black text-gray-800">Sản phẩm gợi ý</span>
+                  </div>
+                  <div className="space-y-1">
+                    {suggestedProducts.map((product) => (
+                      <button key={product.productId}
+                        onClick={() => { setMobileSearchOpen(false); setSearchQuery(''); navigate(`/products/${product.slug || product.productId}`); }}
+                        className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-all text-left">
+                        <img src={getImageUrl(product.mainImage)} alt={product.name} className="w-12 h-12 object-contain rounded-lg bg-gray-50 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-gray-800 line-clamp-1">{product.name}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-sm font-black text-red-600">{(product.salePrice || product.price).toLocaleString('vi-VN')}đ</span>
+                            {product.salePrice && product.salePrice < product.price && (
+                              <span className="text-xs text-gray-400 line-through">{product.price.toLocaleString('vi-VN')}đ</span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {searchLoading && suggestedProducts.length === 0 && suggestedCategories.length === 0 && (
+                <div className="px-4 py-8 text-center"><p className="text-sm text-gray-400 font-bold">Đang tìm kiếm...</p></div>
+              )}
+
+              {!searchLoading && suggestedProducts.length === 0 && suggestedCategories.length === 0 && (
+                <div className="px-4 py-8 text-center"><p className="text-sm text-gray-400 font-bold">Không tìm thấy kết quả</p></div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </header>
+    </>
   );
 };
