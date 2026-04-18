@@ -272,6 +272,7 @@ export class OrderController {
         Number(req.params.id),
         req.user.userId,
         {
+          refundDestination: req.body.refundDestination,
           reason: req.body.reason,
           customerNote: req.body.customerNote,
           items,
@@ -310,6 +311,7 @@ export class OrderController {
         orderCode,
         email,
         {
+          refundDestination: req.body.refundDestination,
           reason: req.body.reason,
           customerNote: req.body.customerNote,
           items,
@@ -395,6 +397,7 @@ export class OrderController {
         req.user.userId,
         req.user.role,
         req.body.adminNote,
+        req.file ? `/images/receipts/${req.file.filename}` : undefined,
       );
       if (!result)
         return res

@@ -119,6 +119,7 @@ export const orderService = {
     const formData = new FormData();
     formData.append('reason', payload.reason);
     if (payload.customerNote) formData.append('customerNote', payload.customerNote);
+    if (payload.refundDestination) formData.append('refundDestination', payload.refundDestination);
     formData.append('items', JSON.stringify(payload.items));
     if (payload.evidenceImages) {
       for (const file of payload.evidenceImages) {
@@ -139,6 +140,7 @@ export const orderService = {
     const formData = new FormData();
     formData.append('reason', payload.reason);
     if (payload.customerNote) formData.append('customerNote', payload.customerNote);
+    if (payload.refundDestination) formData.append('refundDestination', payload.refundDestination);
     formData.append('items', JSON.stringify(payload.items));
     if (payload.evidenceImages) {
       for (const file of payload.evidenceImages) {
@@ -218,8 +220,18 @@ export const orderService = {
     return response.data;
   },
 
-  adminRefundReturn: async (orderId: number, returnId: number, adminNote?: string): Promise<OrderReturnView> => {
-    const response = await api.patch(`/orders/${orderId}/returns/${returnId}/refund`, { adminNote });
+  adminRefundReturn: async (
+    orderId: number,
+    returnId: number,
+    adminNote?: string,
+    receiptImage?: File
+  ): Promise<OrderReturnView> => {
+    const formData = new FormData();
+    if (adminNote) formData.append('adminNote', adminNote);
+    if (receiptImage) formData.append('refundReceiptImage', receiptImage);
+    const response = await api.patch(`/orders/${orderId}/returns/${returnId}/refund`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return response.data;
   },
 };

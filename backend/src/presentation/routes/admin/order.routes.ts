@@ -3,6 +3,7 @@ import { RowDataPacket } from 'mysql2';
 import { AdminOrderController } from '../../controllers/AdminOrderController';
 import { adminMiddleware, authMiddleware, staffMiddleware, internalMiddleware } from '../../middlewares/auth.middleware';
 import pool from '../../../infrastructure/database/connection';
+import { uploadReceiptImage } from '../../middlewares/upload.middleware';
 
 export const createAdminOrderRoutes = (adminOrderController: AdminOrderController) => {
   const router = Router();
@@ -58,7 +59,12 @@ export const createAdminOrderRoutes = (adminOrderController: AdminOrderControlle
   router.post('/:id/cancel', staffMiddleware, adminOrderController.cancel);
   router.post('/:id/returns/:returnId/review', staffMiddleware, adminOrderController.reviewReturn);
   router.post('/:id/returns/:returnId/receive', staffMiddleware, adminOrderController.receiveReturn);
-  router.post('/:id/returns/:returnId/refund', staffMiddleware, adminOrderController.refundReturn);
+  router.post(
+    '/:id/returns/:returnId/refund',
+    staffMiddleware,
+    uploadReceiptImage.single('refundReceiptImage'),
+    adminOrderController.refundReturn,
+  );
   router.post('/:id/returns/:returnId/close', staffMiddleware, adminOrderController.closeReturn);
 
   // Admin only: cập nhật trạng thái thanh toán

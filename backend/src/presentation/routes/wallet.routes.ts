@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { WalletController } from '../controllers/WalletController';
 import { authMiddleware, adminMiddleware } from '../middlewares/auth.middleware';
+import { uploadReceiptImage } from '../middlewares/upload.middleware';
 
 export const createWalletRoutes = (walletController: WalletController) => {
   const router = Router();
@@ -20,7 +21,13 @@ export const createWalletRoutes = (walletController: WalletController) => {
   router.get('/admin/withdrawal-notifications', authMiddleware, adminMiddleware, walletController.adminListWithdrawalNotifications);
   router.patch('/admin/withdrawal-notifications/:id/read', authMiddleware, adminMiddleware, walletController.adminMarkWithdrawalNotificationRead);
   router.get('/admin/withdrawals', authMiddleware, adminMiddleware, walletController.adminListWithdrawals);
-  router.patch('/admin/withdrawals/:id/status', authMiddleware, adminMiddleware, walletController.adminUpdateWithdrawalStatus);
+  router.patch(
+    '/admin/withdrawals/:id/status',
+    authMiddleware,
+    adminMiddleware,
+    uploadReceiptImage.single('transferReceiptImage'),
+    walletController.adminUpdateWithdrawalStatus,
+  );
 
   return router;
 };

@@ -9,6 +9,7 @@ import {
   Package,
   MapPin,
   CreditCard,
+  Wallet,
   FileText,
   Clock,
   CheckCircle2,
@@ -21,6 +22,10 @@ import {
   Trash2,
 } from "lucide-react";
 import { orderService } from "@/services/order.service";
+import {
+  walletService,
+  type WalletWithdrawalProfile,
+} from "@/services/wallet.service";
 import {
   reviewService,
   type OrderReviewItemSummary,
@@ -148,6 +153,11 @@ const RETURN_STATUS_STYLES: Record<string, string> = {
   received: "bg-violet-100 text-violet-800",
   refunded: "bg-emerald-100 text-emerald-800",
   closed: "bg-slate-100 text-slate-600",
+};
+
+const RETURN_REFUND_DESTINATION_LABELS: Record<string, string> = {
+  wallet: "Ví TechMart",
+  bank_account: "Tài khoản ngân hàng",
 };
 
 const PAYMENT_BADGE_STYLES: Record<string, string> = {
@@ -424,7 +434,6 @@ const ReturnModal = ({
   orderId,
   returnedOrderDetailIds = new Set(),
   refundedOrderDetailIds = new Set(),
-  rejectedOrderDetailIds = new Set(),
   onClose,
   onSubmitted,
 }: {
@@ -433,7 +442,6 @@ const ReturnModal = ({
   orderId: number;
   returnedOrderDetailIds?: Set<number>;
   refundedOrderDetailIds?: Set<number>;
-  rejectedOrderDetailIds?: Set<number>;
   onClose: () => void;
   onSubmitted: () => void;
 }) => {
@@ -441,6 +449,12 @@ const ReturnModal = ({
   const [customReason, setCustomReason] = useState("");
   const [customerNote, setCustomerNote] = useState("");
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
+  const [refundDestination, setRefundDestination] = useState<
+    "wallet" | "bank_account"
+  >("wallet");
+  const [withdrawalProfile, setWithdrawalProfile] =
+    useState<WalletWithdrawalProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [selected, setSelected] = useState<
     Record<number, { checked: boolean; quantity: number }>
   >(() =>
@@ -463,6 +477,36 @@ const ReturnModal = ({
   ); // Tổng tiền voucher
 
   const finalReason = reason === "Khác" ? customReason : reason;
+  const linkedBank = withdrawalProfile?.bankAccount ?? null;
+  const canRefundToBank = Boolean(linkedBank);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadWithdrawalProfile = async () => {
+      try {
+        setProfileLoading(true);
+        const profile = await walletService.getWithdrawalProfile();
+        if (active) {
+          setWithdrawalProfile(profile);
+        }
+      } catch {
+        if (active) {
+          toast.error("Không thể tải thông tin ngân hàng liên kết");
+        }
+      } finally {
+        if (active) {
+          setProfileLoading(false);
+        }
+      }
+    };
+
+    void loadWithdrawalProfile();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleAddImages = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -478,7 +522,10 @@ const ReturnModal = ({
     setSelected((p) => ({ ...p, [id]: { ...p[id], quantity: qty } }));
 
   const canSubmit =
-    finalReason.trim().length > 0 && evidenceFiles.length > 0 && !submitting;
+    finalReason.trim().length > 0 &&
+    evidenceFiles.length > 0 &&
+    !submitting &&
+    (refundDestination === "wallet" || canRefundToBank);
 
   const handleSubmit = async () => {
     if (!finalReason.trim()) {
@@ -488,6 +535,12 @@ const ReturnModal = ({
     if (evidenceFiles.length === 0) {
       toast.error(
         "Vui lòng upload ít nhất 1 ảnh/video bằng chứng sản phẩm lỗi",
+      );
+      return;
+    }
+    if (refundDestination === "bank_account" && !canRefundToBank) {
+      toast.error(
+        "Vui lòng liên kết tài khoản ngân hàng trong ví TechMart trước khi chọn hoàn tiền về ngân hàng",
       );
       return;
     }
@@ -506,6 +559,7 @@ const ReturnModal = ({
       await orderService.createReturn(orderId, {
         reason: finalReason.trim(),
         customerNote: customerNote.trim() || undefined,
+        refundDestination,
         items: returnItems,
         evidenceImages: evidenceFiles.length > 0 ? evidenceFiles : undefined,
       });
@@ -729,6 +783,97 @@ const ReturnModal = ({
                 className="mt-2 w-full border-2 border-orange-300 rounded-xl px-4 py-2.5 text-sm focus:border-orange-400 focus:outline-none resize-none"
               />
             )}
+          </div>
+
+          <div>
+            <p className="text-sm font-bold text-slate-700 mb-2">
+              Nhận tiền hoàn về <span className="text-rose-500">*</span>
+            </p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setRefundDestination("wallet")}
+                className={`rounded-2xl border-2 px-4 py-3 text-left transition-colors ${
+                  refundDestination === "wallet"
+                    ? "border-orange-400 bg-orange-50"
+                    : "border-slate-100 bg-slate-50 hover:border-slate-200"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Wallet size={16} className="text-orange-500" />
+                  <span className="text-sm font-black text-slate-800">
+                    Ví TechMart
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  Hoàn tiền trực tiếp vào ví TechMart của bạn.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setRefundDestination("bank_account")}
+                className={`rounded-2xl border-2 px-4 py-3 text-left transition-colors ${
+                  refundDestination === "bank_account"
+                    ? "border-blue-400 bg-blue-50"
+                    : "border-slate-100 bg-slate-50 hover:border-slate-200"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <CreditCard size={16} className="text-blue-500" />
+                  <span className="text-sm font-black text-slate-800">
+                    Tài khoản ngân hàng
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  Dùng tài khoản ngân hàng đã liên kết với ví TechMart.
+                </p>
+              </button>
+            </div>
+
+            <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              {refundDestination === "wallet" ? (
+                <p className="text-xs font-medium text-slate-600">
+                  Khi yêu cầu được duyệt và hoàn tiền, tiền sẽ được cộng lại vào
+                  ví TechMart của bạn.
+                </p>
+              ) : profileLoading ? (
+                <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-400 border-t-transparent" />
+                  Đang tải thông tin ngân hàng liên kết...
+                </div>
+              ) : linkedBank ? (
+                <div className="space-y-1">
+                  <p className="text-xs font-black uppercase tracking-wider text-slate-500">
+                    Tài khoản ngân hàng liên kết
+                  </p>
+                  <p className="text-sm font-black text-slate-800">
+                    {linkedBank.bankName}
+                  </p>
+                  <p className="text-xs text-slate-600">
+                    Số tài khoản: {linkedBank.accountNumberMasked}
+                  </p>
+                  <p className="text-xs text-slate-600">
+                    Chủ tài khoản: {linkedBank.accountHolderName}
+                  </p>
+                  <p className="text-xs text-slate-600">
+                    Chi nhánh: {linkedBank.branchName}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-rose-600">
+                    Bạn chưa liên kết tài khoản ngân hàng với ví TechMart.
+                  </p>
+                  <Link
+                    to="/wallet"
+                    className="inline-flex rounded-xl bg-blue-600 px-3 py-2 text-xs font-black uppercase tracking-wide text-white transition-colors hover:bg-blue-700"
+                  >
+                    Liên kết ngân hàng ngay
+                  </Link>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Ghi chú thêm */}
@@ -1073,7 +1218,6 @@ export const OrderDetailPage = () => {
           orderId={orderId}
           returnedOrderDetailIds={returnedOrderDetailIds}
           refundedOrderDetailIds={refundedOrderDetailIds}
-          rejectedOrderDetailIds={rejectedOrderDetailIds}
           onClose={() => setShowReturnModal(false)}
           onSubmitted={() => {
             setShowReturnModal(false);
@@ -1500,6 +1644,51 @@ export const OrderDetailPage = () => {
                             "{ret.customerNote}"
                           </p>
                         )}
+                        <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
+                            Nhận tiền hoàn về
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-gray-800">
+                            {RETURN_REFUND_DESTINATION_LABELS[
+                              ret.refundDestination
+                            ] || "Ví TechMart"}
+                          </p>
+                          {ret.refundDestination === "bank_account" &&
+                            ret.refundBankName && (
+                              <div className="mt-2 space-y-1 text-xs text-gray-600">
+                                <p>
+                                  Ngân hàng:{" "}
+                                  <span className="font-semibold text-gray-800">
+                                    {ret.refundBankName}
+                                  </span>
+                                </p>
+                                {ret.refundAccountNumberMasked && (
+                                  <p>
+                                    Số tài khoản:{" "}
+                                    <span className="font-semibold text-gray-800">
+                                      {ret.refundAccountNumberMasked}
+                                    </span>
+                                  </p>
+                                )}
+                                {ret.refundAccountHolderName && (
+                                  <p>
+                                    Chủ tài khoản:{" "}
+                                    <span className="font-semibold text-gray-800">
+                                      {ret.refundAccountHolderName}
+                                    </span>
+                                  </p>
+                                )}
+                                {ret.refundBranchName && (
+                                  <p>
+                                    Chi nhánh:{" "}
+                                    <span className="font-semibold text-gray-800">
+                                      {ret.refundBranchName}
+                                    </span>
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                        </div>
                         {/* Ảnh bằng chứng */}
                         {ret.evidenceImages &&
                           ret.evidenceImages.length > 0 && (
@@ -1526,6 +1715,28 @@ export const OrderDetailPage = () => {
                               </div>
                             </div>
                           )}
+                        {ret.refundReceiptImageUrl && (
+                          <div>
+                            <p className="text-xs font-bold text-gray-500 mb-1.5">
+                              Biên lai hoàn tiền:
+                            </p>
+                            <a
+                              href={getImageUrl(ret.refundReceiptImageUrl)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block w-24 h-24 rounded-lg overflow-hidden border border-emerald-200 hover:border-emerald-400 transition-colors"
+                            >
+                              <img
+                                src={getImageUrl(ret.refundReceiptImageUrl)}
+                                alt={`refund-receipt-${ret.orderReturnId}`}
+                                className="w-full h-full object-cover"
+                              />
+                            </a>
+                            <p className="mt-1 text-[10px] font-bold text-emerald-600">
+                              TechMart đã cập nhật ảnh biên lai cho khoản hoàn tiền này.
+                            </p>
+                          </div>
+                        )}
                         {/* Sản phẩm trong phiếu trả */}
                         {ret.items?.length > 0 && (
                           <div className="space-y-1.5">

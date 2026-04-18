@@ -25,10 +25,7 @@ import {
 } from '../../domain/entities/Order';
 
 type SqlExecutor = {
-  execute: <T extends RowDataPacket[] | ResultSetHeader>(
-    sql: string,
-    values?: any[]
-  ) => Promise<[T, any]>;
+  execute: <T = any>(...args: any[]) => Promise<[T, any]>;
 };
 
 export class OrderRepository implements IOrderRepository {
@@ -43,6 +40,13 @@ export class OrderRepository implements IOrderRepository {
     const timestamp = Date.now().toString(36).toUpperCase();
     const random = Math.random().toString(36).substring(2, 6).toUpperCase();
     return `RET-${timestamp}-${random}`;
+  }
+
+  private maskAccountNumber(accountNumber?: string | null): string | undefined {
+    if (!accountNumber) return undefined;
+    const normalized = String(accountNumber);
+    if (normalized.length <= 4) return normalized;
+    return `${'*'.repeat(Math.max(0, normalized.length - 4))}${normalized.slice(-4)}`;
   }
 
   private buildCancellationNotificationMessage(orderCode: string, reason: string, refundMessage?: string) {
@@ -78,6 +82,39 @@ export class OrderRepository implements IOrderRepository {
         input.createdAt,
       ]
     );
+  }
+
+  private async getLinkedBankSnapshot(
+    executor: SqlExecutor,
+    userId: number
+  ): Promise<{
+    refundBankAccountId: number;
+    refundBankCode: string;
+    refundBankName: string;
+    refundAccountNumber: string;
+    refundAccountHolderName: string;
+    refundBranchName: string;
+  } | null> {
+    const [rows] = await executor.execute(
+      `SELECT bank_account_id, bank_code, bank_name, account_number, account_holder_name, branch_name
+       FROM user_bank_accounts
+       WHERE user_id = ?
+       LIMIT 1`,
+      [userId]
+    );
+
+    const bankRows = rows as RowDataPacket[];
+    if (!bankRows.length) return null;
+
+    const row = bankRows[0];
+    return {
+      refundBankAccountId: Number(row.bank_account_id),
+      refundBankCode: row.bank_code,
+      refundBankName: row.bank_name,
+      refundAccountNumber: row.account_number,
+      refundAccountHolderName: row.account_holder_name,
+      refundBranchName: row.branch_name,
+    };
   }
 
   // --- FINDERS ---
@@ -900,7 +937,7 @@ export class OrderRepository implements IOrderRepository {
       'SELECT * FROM order_returns WHERE order_id = ? ORDER BY requested_at DESC',
       [orderId]
     );
-    const returns = rows.map(this.mapRowToOrderReturn);
+    const returns = rows.map((row) => this.mapRowToOrderReturn(row));
 
     if (returns.length === 0) return returns;
 
@@ -928,8 +965,8 @@ export class OrderRepository implements IOrderRepository {
     }
 
     for (const ret of returns) {
-      ret.items = (itemsByReturnId.get(ret.orderReturnId) ?? []).map(
-        this.mapRowToOrderReturnItem
+      ret.items = (itemsByReturnId.get(ret.orderReturnId) ?? []).map((row) =>
+        this.mapRowToOrderReturnItem(row)
       );
     }
 
@@ -960,7 +997,7 @@ export class OrderRepository implements IOrderRepository {
        WHERE ori.order_return_id = ?`,
       [orderReturnId]
     );
-    orderReturn.items = itemRows.map(this.mapRowToOrderReturnItem);
+    orderReturn.items = itemRows.map((row) => this.mapRowToOrderReturnItem(row));
     return orderReturn;
   }
 
@@ -970,15 +1007,49 @@ export class OrderRepository implements IOrderRepository {
       await connection.beginTransaction();
       const now = new Date();
       const requestCode = this.generateReturnCode();
+      const refundDestination = input.refundDestination === 'bank_account' ? 'bank_account' : 'wallet';
 
       const evidenceJson = input.evidenceImages?.length
         ? JSON.stringify(input.evidenceImages)
         : null;
 
+      let refundBankSnapshot: Awaited<ReturnType<OrderRepository['getLinkedBankSnapshot']>> = null;
+      if (refundDestination === 'bank_account') {
+        if (!input.requestedBy) {
+          throw new Error('Chỉ tài khoản đã đăng nhập mới có thể chọn hoàn tiền về ngân hàng');
+        }
+
+        refundBankSnapshot = await this.getLinkedBankSnapshot(connection, input.requestedBy);
+        if (!refundBankSnapshot) {
+          throw new Error('Bạn chưa liên kết tài khoản ngân hàng với ví TechMart');
+        }
+      }
+
       const [result] = await connection.execute<ResultSetHeader>(
-        `INSERT INTO order_returns (order_id, request_code, requested_by, status, reason, customer_note, evidence_images, requested_at, updated_at)
-         VALUES (?, ?, ?, 'requested', ?, ?, ?, ?, ?)`,
-        [input.orderId, requestCode, input.requestedBy, input.reason, input.customerNote || null, evidenceJson, now, now]
+        `INSERT INTO order_returns (
+            order_id, request_code, requested_by, refund_destination,
+            refund_bank_account_id, refund_bank_code, refund_bank_name, refund_account_number,
+            refund_account_holder_name, refund_branch_name,
+            status, reason, customer_note, evidence_images, requested_at, updated_at
+         )
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'requested', ?, ?, ?, ?, ?)`,
+        [
+          input.orderId,
+          requestCode,
+          input.requestedBy,
+          refundDestination,
+          refundBankSnapshot?.refundBankAccountId ?? null,
+          refundBankSnapshot?.refundBankCode ?? null,
+          refundBankSnapshot?.refundBankName ?? null,
+          refundBankSnapshot?.refundAccountNumber ?? null,
+          refundBankSnapshot?.refundAccountHolderName ?? null,
+          refundBankSnapshot?.refundBranchName ?? null,
+          input.reason,
+          input.customerNote || null,
+          evidenceJson,
+          now,
+          now,
+        ]
       );
       const orderReturnId = result.insertId;
 
@@ -996,7 +1067,10 @@ export class OrderRepository implements IOrderRepository {
         toStatus: 'requested',
         actorUserId: input.requestedBy,
         actorRole: 'customer',
-        note: input.reason,
+        note:
+          refundDestination === 'bank_account'
+            ? `${input.reason} | Hoàn tiền về tài khoản ngân hàng liên kết`
+            : `${input.reason} | Hoàn tiền về ví TechMart`,
       });
 
       await connection.commit();
@@ -1123,10 +1197,19 @@ export class OrderRepository implements IOrderRepository {
 
       // Lấy userId và payment_status từ phiếu trả + đơn hàng
       const [retRows] = await connection.execute<RowDataPacket[]>(
-        'SELECT requested_by FROM order_returns WHERE order_return_id = ?',
+        `SELECT requested_by, request_code, refund_destination, refund_bank_name,
+                refund_account_number, refund_account_holder_name, refund_branch_name
+         FROM order_returns
+         WHERE order_return_id = ?`,
         [input.orderReturnId]
       );
       const userId = retRows[0]?.requested_by;
+      const requestCode = retRows[0]?.request_code ?? `RET-${input.orderReturnId}`;
+      const refundDestination = retRows[0]?.refund_destination === 'bank_account' ? 'bank_account' : 'wallet';
+      const refundBankName = retRows[0]?.refund_bank_name ?? null;
+      const refundAccountNumber = retRows[0]?.refund_account_number ?? null;
+      const refundAccountHolderName = retRows[0]?.refund_account_holder_name ?? null;
+      const refundBranchName = retRows[0]?.refund_branch_name ?? null;
 
       const [orderRows] = await connection.execute<RowDataPacket[]>(
         'SELECT payment_status, payment_method FROM orders WHERE order_id = ?',
@@ -1134,12 +1217,20 @@ export class OrderRepository implements IOrderRepository {
       );
       const paymentStatus = orderRows[0]?.payment_status;
       const paymentMethod = orderRows[0]?.payment_method;
+      const shouldRequireReceipt =
+        refundDestination === 'bank_account' &&
+        refundAmount > 0 &&
+        paymentStatus === 'paid';
+
+      if (shouldRequireReceipt && !input.receiptImageUrl) {
+        throw new Error('Vui lòng tải lên ảnh biên lai chuyển khoản trước khi xác nhận hoàn tiền');
+      }
 
       // Chỉ hoàn tiền vào ví khi payment_status === 'paid'
       // COD chưa xác nhận thanh toán (pending) = khách chưa trả tiền → không hoàn
       // Admin cần bấm "Đã thanh toán" trước khi duyệt hoàn trả nếu khách COD đã trả tiền mặt
       let refundNote = '';
-      if (userId && refundAmount > 0 && paymentStatus === 'paid') {
+      if (refundDestination === 'wallet' && userId && refundAmount > 0 && paymentStatus === 'paid') {
         // Cộng tiền về ví khách
         await connection.execute(
           'UPDATE users SET wallet_balance = wallet_balance + ? WHERE user_id = ?',
@@ -1157,14 +1248,39 @@ export class OrderRepository implements IOrderRepository {
           [userId, refundAmount, newBalance, input.orderReturnId, `Hoàn tiền trả hàng đơn #${input.orderId}`, now]
         );
         refundNote = `Hoàn ${refundAmount.toLocaleString('vi-VN')}đ vào ví`;
+      } else if (refundDestination === 'bank_account' && refundAmount > 0 && paymentStatus === 'paid') {
+        const bankSummaryParts = [
+          refundBankName,
+          refundAccountHolderName,
+          refundBranchName,
+        ].filter(Boolean);
+        refundNote = bankSummaryParts.length > 0
+          ? `Đã chuyển khoản ${refundAmount.toLocaleString('vi-VN')}đ về tài khoản ngân hàng liên kết (${bankSummaryParts.join(' • ')})`
+          : `Đã chuyển khoản ${refundAmount.toLocaleString('vi-VN')}đ về tài khoản ngân hàng liên kết`;
       } else if (paymentStatus !== 'paid') {
-        refundNote = `Đơn ${paymentMethod?.toUpperCase()} chưa thanh toán — không hoàn tiền vào ví`;
+        refundNote = `Đơn ${paymentMethod?.toUpperCase()} chưa thanh toán — chưa phát sinh hoàn tiền`;
       }
 
       const [updateResult] = await connection.execute<ResultSetHeader>(
-        `UPDATE order_returns SET status = 'refunded', refunded_at = ?, admin_note = ?, updated_at = ?
+        `UPDATE order_returns
+         SET status = 'refunded',
+             refunded_at = ?,
+             admin_note = ?,
+             refund_receipt_image_url = ?,
+             refund_receipt_uploaded_at = ?,
+             refund_receipt_uploaded_by = ?,
+             updated_at = ?
          WHERE order_return_id = ? AND order_id = ? AND status = 'received'`,
-        [now, input.adminNote || null, now, input.orderReturnId, input.orderId]
+        [
+          now,
+          input.adminNote || null,
+          input.receiptImageUrl || null,
+          input.receiptImageUrl ? now : null,
+          input.receiptImageUrl ? input.actorUserId : null,
+          now,
+          input.orderReturnId,
+          input.orderId,
+        ]
       );
 
       if (updateResult.affectedRows === 0) {
@@ -1185,8 +1301,46 @@ export class OrderRepository implements IOrderRepository {
         toStatus: 'refunded',
         actorUserId: input.actorUserId,
         actorRole: input.actorRole,
-        note: input.adminNote || refundNote,
+        note:
+          input.adminNote ||
+          (refundDestination === 'bank_account'
+            ? `Đã hoàn tiền về tài khoản ngân hàng liên kết${input.receiptImageUrl ? ' và đính kèm biên lai chuyển khoản' : ''}`
+            : refundNote),
       });
+
+      if (userId) {
+        const bankSummaryParts = [
+          refundBankName,
+          this.maskAccountNumber(refundAccountNumber),
+          refundAccountHolderName,
+          refundBranchName,
+        ].filter(Boolean);
+
+        const notificationMessage =
+          refundDestination === 'bank_account' && paymentStatus === 'paid'
+            ? [
+                `Yêu cầu hoàn trả ${requestCode} đã được chuyển khoản hoàn tiền ${refundAmount.toLocaleString('vi-VN')}đ.`,
+                bankSummaryParts.length ? `Tài khoản nhận: ${bankSummaryParts.join(' • ')}.` : undefined,
+                input.receiptImageUrl ? 'Biên lai chuyển khoản đã được cập nhật trong chi tiết đơn hàng.' : undefined,
+              ]
+                .filter(Boolean)
+                .join(' ')
+            : refundDestination === 'wallet' && paymentStatus === 'paid'
+              ? `Yêu cầu hoàn trả ${requestCode} đã được hoàn ${refundAmount.toLocaleString('vi-VN')}đ vào ví TechMart của bạn.`
+              : `Yêu cầu hoàn trả ${requestCode} đã được xử lý hoàn tiền.`;
+
+        await this.createNotificationWithConnection(connection, {
+          userId: Number(userId),
+          title:
+            refundDestination === 'bank_account' && paymentStatus === 'paid'
+              ? 'Hoàn tiền trả hàng đã chuyển khoản'
+              : 'Yêu cầu hoàn trả đã được hoàn tiền',
+          message: notificationMessage,
+          type: 'order',
+          referenceId: input.orderId,
+          createdAt: now,
+        });
+      }
 
       await connection.commit();
       return this.getReturnById(input.orderId, input.orderReturnId);
@@ -1609,11 +1763,22 @@ export class OrderRepository implements IOrderRepository {
       orderId:       row.order_id,
       requestCode:   row.request_code,
       requestedBy:   row.requested_by ?? null,
+      refundDestination: row.refund_destination === 'bank_account' ? 'bank_account' : 'wallet',
+      refundBankAccountId: row.refund_bank_account_id ?? null,
+      refundBankCode: row.refund_bank_code ?? undefined,
+      refundBankName: row.refund_bank_name ?? undefined,
+      refundAccountNumber: row.refund_account_number ?? undefined,
+      refundAccountNumberMasked: this.maskAccountNumber(row.refund_account_number),
+      refundAccountHolderName: row.refund_account_holder_name ?? undefined,
+      refundBranchName: row.refund_branch_name ?? undefined,
       status:        row.status,
       reason:        row.reason,
       customerNote:  row.customer_note ?? undefined,
       adminNote:     row.admin_note ?? undefined,
       evidenceImages,
+      refundReceiptImageUrl: row.refund_receipt_image_url ?? undefined,
+      refundReceiptUploadedAt: row.refund_receipt_uploaded_at ?? undefined,
+      refundReceiptUploadedBy: row.refund_receipt_uploaded_by ?? null,
       requestedAt:   row.requested_at,
       approvedAt:    row.approved_at ?? undefined,
       rejectedAt:    row.rejected_at ?? undefined,

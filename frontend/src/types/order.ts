@@ -20,6 +20,7 @@ export type ReturnStatus =
   | 'closed';
 
 export type ReturnRestockAction = 'restock' | 'inspect' | 'discard';
+export type ReturnRefundDestination = 'wallet' | 'bank_account';
 
 export interface OrderCustomerInfo {
   userId?: number;
@@ -116,11 +117,21 @@ export interface OrderReturnView {
   orderId: number;
   requestCode: string;
   requestedBy: number | null;
+  refundDestination: ReturnRefundDestination;
+  refundBankCode?: string;
+  refundBankName?: string;
+  refundAccountNumber?: string;
+  refundAccountNumberMasked?: string;
+  refundAccountHolderName?: string;
+  refundBranchName?: string;
   status: ReturnStatus;
   reason: string;
   customerNote?: string;
   adminNote?: string;
   evidenceImages?: string[];
+  refundReceiptImageUrl?: string;
+  refundReceiptUploadedAt?: string;
+  refundReceiptUploadedBy?: number;
   requestedAt: string;
   approvedAt?: string;
   rejectedAt?: string;
@@ -178,6 +189,7 @@ export interface CreateOrderPayload {
 export interface CreateOrderReturnPayload {
   reason: string;
   customerNote?: string;
+  refundDestination?: ReturnRefundDestination;
   items: Array<{
     orderDetailId: number;
     quantity: number;

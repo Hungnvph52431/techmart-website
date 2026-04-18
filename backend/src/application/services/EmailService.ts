@@ -19,6 +19,28 @@ function getTransporter(): Transporter {
   return _transporter;
 }
 
+function getBackendPublicUrl(): string {
+  const explicitUrl = process.env.BACKEND_PUBLIC_URL || process.env.API_PUBLIC_URL;
+  if (explicitUrl) {
+    return explicitUrl.replace(/\/api\/?$/, "").replace(/\/$/, "");
+  }
+
+  // Frontend local dev của dự án đang truy cập backend qua cổng 5001.
+  if (process.env.NODE_ENV !== "production") {
+    return "http://localhost:5001";
+  }
+
+  return `http://localhost:${process.env.PORT || 5000}`.replace(/\/$/, "");
+}
+
+function toAbsoluteAssetUrl(assetPath?: string): string | undefined {
+  if (!assetPath) return undefined;
+  if (assetPath.startsWith('http://') || assetPath.startsWith('https://')) {
+    return assetPath;
+  }
+  return `${getBackendPublicUrl()}${assetPath.startsWith('/') ? '' : '/'}${assetPath}`;
+}
+
 // ──────────────────────────────────────────────────────────────
 // Gửi email thông báo thanh toán thành công
 // ──────────────────────────────────────────────────────────────
@@ -197,6 +219,22 @@ interface OrderCancelledData {
   orderUrl?: string;
   cancelReason: string;
   refundMessage?: string;
+}
+
+interface OrderReturnRefundedData {
+  customerName: string;
+  customerEmail: string;
+  orderCode: string;
+  orderId: number;
+  orderUrl?: string;
+  requestCode: string;
+  refundAmount: number;
+  refundDestination: 'wallet' | 'bank_account';
+  paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
+  refundBankName?: string;
+  refundAccountNumberMasked?: string;
+  receiptImageUrl?: string;
+  adminNote?: string;
 }
 
 export async function sendOrderCreatedEmail(
@@ -379,6 +417,112 @@ export async function sendOrderCancelledEmail(
   }
 }
 
+export async function sendOrderReturnRefundedEmail(
+  data: OrderReturnRefundedData,
+): Promise<void> {
+  if (!process.env.SMTP_USER) {
+    console.warn("[Email] SMTP_USER chưa cấu hình — bỏ qua gửi email");
+    return;
+  }
+
+  const fromName = process.env.SMTP_FROM_NAME || "TechMart";
+  const fromEmail = process.env.SMTP_USER;
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+  const orderUrl = data.orderUrl || `${frontendUrl}/orders/${data.orderId}`;
+  const receiptUrl = toAbsoluteAssetUrl(data.receiptImageUrl);
+
+  const receiptBlock = receiptUrl
+    ? `
+      <div style="margin:20px 0;padding:16px;border:1px solid #dbeafe;background:#eff6ff;border-radius:12px;">
+        <p style="margin:0 0 10px;font-size:14px;font-weight:700;color:#1d4ed8;">Biên lai chuyển khoản</p>
+        <p style="margin:0 0 12px;font-size:13px;color:#475569;">
+          TechMart đã cập nhật ảnh biên lai cho khoản hoàn tiền của bạn.
+        </p>
+        <a href="${receiptUrl}" style="display:inline-block;background:#2563eb;color:#fff;font-weight:bold;font-size:14px;padding:12px 20px;border-radius:8px;text-decoration:none;">
+          Xem ảnh biên lai
+        </a>
+      </div>`
+    : "";
+
+  const payoutBlock =
+    data.refundDestination === "bank_account"
+      ? `
+        <tr>
+          <td style="padding:8px 12px;"><strong>Hình thức hoàn tiền</strong></td>
+          <td style="padding:8px 12px;">Chuyển khoản ngân hàng</td>
+        </tr>
+        <tr style="background:#f9fafb;">
+          <td style="padding:8px 12px;"><strong>Ngân hàng nhận</strong></td>
+          <td style="padding:8px 12px;">${data.refundBankName || "Tài khoản liên kết"}${data.refundAccountNumberMasked ? ` - ${data.refundAccountNumberMasked}` : ""}</td>
+        </tr>`
+      : `
+        <tr>
+          <td style="padding:8px 12px;"><strong>Hình thức hoàn tiền</strong></td>
+          <td style="padding:8px 12px;">Ví TechMart</td>
+        </tr>`;
+
+  const noteRow = data.adminNote
+    ? `<tr>
+         <td style="padding:8px 12px;"><strong>Ghi chú</strong></td>
+         <td style="padding:8px 12px;">${data.adminNote}</td>
+       </tr>`
+    : "";
+
+  const statusMessage =
+    data.paymentStatus === "refunded"
+      ? data.refundDestination === "bank_account"
+        ? "TechMart đã hoàn tiền thành công về tài khoản ngân hàng liên kết của bạn."
+        : "TechMart đã hoàn tiền thành công vào ví TechMart của bạn."
+      : "Yêu cầu hoàn trả của bạn đã được xử lý, nhưng đơn hàng chưa phát sinh thanh toán nên không có khoản tiền cần hoàn lại.";
+
+  const html = `
+  <div style="max-width:600px;margin:0 auto;font-family:'Segoe UI',Arial,sans-serif;color:#333;">
+    <div style="background:#16a34a;padding:24px;text-align:center;border-radius:8px 8px 0 0;">
+      <h1 style="color:#fff;margin:0;font-size:22px;">Hoàn tiền yêu cầu trả hàng thành công</h1>
+    </div>
+    <div style="padding:24px;background:#fff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
+      <p>Xin chào <strong>${data.customerName}</strong>,</p>
+      <p>${statusMessage}</p>
+
+      <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+        <tr style="background:#f9fafb;">
+          <td style="padding:8px 12px;"><strong>Mã đơn hàng</strong></td>
+          <td style="padding:8px 12px;">${data.orderCode}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 12px;"><strong>Mã yêu cầu hoàn trả</strong></td>
+          <td style="padding:8px 12px;">${data.requestCode}</td>
+        </tr>
+        <tr style="background:#f9fafb;">
+          <td style="padding:8px 12px;"><strong>Số tiền hoàn</strong></td>
+          <td style="padding:8px 12px;color:#16a34a;font-weight:bold;font-size:18px;">${formatCurrency(data.refundAmount)}</td>
+        </tr>
+        ${payoutBlock}
+        ${noteRow}
+      </table>
+
+      ${receiptBlock}
+
+      <div style="text-align:center;margin:28px 0;">
+        <a href="${orderUrl}" style="display:inline-block;background:#16a34a;color:#fff;font-weight:bold;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;">
+          Xem chi tiết đơn hàng
+        </a>
+      </div>
+    </div>
+  </div>`;
+
+  try {
+    await getTransporter().sendMail({
+      from: `"${fromName}" <${fromEmail}>`,
+      to: data.customerEmail,
+      subject: `[TechMart] Hoàn tiền thành công — ${data.requestCode}`,
+      html,
+    });
+  } catch (error) {
+    console.error("[Email] Lỗi gửi email hoàn tiền trả hàng:", error);
+  }
+}
+
 // ──────────────────────────────────────────────────────────────
 // Gửi email thông báo nạp ví thành công
 // ──────────────────────────────────────────────────────────────
@@ -470,6 +614,7 @@ interface WalletWithdrawalStatusData {
   accountNumberMasked: string;
   status: 'approved' | 'paid' | 'rejected';
   adminNote?: string;
+  receiptImageUrl?: string;
   currentBalance?: number;
 }
 
@@ -571,6 +716,15 @@ export async function sendWalletWithdrawalStatusEmail(
         </tr>`
     : '';
 
+  const receiptUrl = toAbsoluteAssetUrl(data.receiptImageUrl);
+  const receiptRow =
+    data.status === 'paid' && receiptUrl
+      ? `<tr style="background:#f9fafb;">
+           <td style="padding:8px 12px;"><strong>Biên lai chuyển khoản</strong></td>
+           <td style="padding:8px 12px;"><a href="${receiptUrl}" style="color:#2563eb;font-weight:700;text-decoration:none;">Xem ảnh biên lai</a></td>
+         </tr>`
+      : '';
+
   const html = `
   <div style="max-width:600px;margin:0 auto;font-family:'Segoe UI',Arial,sans-serif;color:#333;">
     <div style="background:${colorMap[data.status]};padding:24px;text-align:center;border-radius:8px 8px 0 0;">
@@ -593,6 +747,7 @@ export async function sendWalletWithdrawalStatusEmail(
           <td style="padding:8px 12px;"><strong>Ngân hàng nhận</strong></td>
           <td style="padding:8px 12px;">${data.bankName} - ${data.accountNumberMasked}</td>
         </tr>
+        ${receiptRow}
         ${noteRow}
         ${balanceRow}
       </table>

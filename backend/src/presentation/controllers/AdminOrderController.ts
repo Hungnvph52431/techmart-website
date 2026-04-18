@@ -262,7 +262,8 @@ export class AdminOrderController {
         Number(req.params.returnId),
         req.user.userId,
         req.user.role,
-        req.body.adminNote
+        req.body.adminNote,
+        req.file ? `/images/receipts/${req.file.filename}` : undefined
       );
 
       if (!orderReturn) {

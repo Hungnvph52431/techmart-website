@@ -34,6 +34,11 @@ const STATUS_STYLE: Record<ReturnStatus, string> = {
   closed:    'bg-gray-100 text-gray-600',
 };
 
+const REFUND_DESTINATION_LABELS: Record<string, string> = {
+  wallet: 'Ví TechMart',
+  bank_account: 'Tài khoản ngân hàng',
+};
+
 const FILTER_OPTIONS: { value: string; label: string }[] = [
   { value: 'all',      label: 'Tất cả' },
   { value: 'requested', label: 'Chờ duyệt' },
@@ -50,6 +55,9 @@ const ActionModal = ({
   description,
   confirmLabel,
   confirmClass,
+  receiptLabel,
+  receiptHint,
+  requireReceiptUpload = false,
   onConfirm,
   onClose,
 }: {
@@ -57,16 +65,38 @@ const ActionModal = ({
   description: string;
   confirmLabel: string;
   confirmClass: string;
-  onConfirm: (note: string) => Promise<void>;
+  receiptLabel?: string;
+  receiptHint?: string;
+  requireReceiptUpload?: boolean;
+  onConfirm: (note: string, receiptFile?: File | null) => Promise<void>;
   onClose: () => void;
 }) => {
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [receiptPreviewUrl, setReceiptPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!receiptFile) {
+      setReceiptPreviewUrl(null);
+      return;
+    }
+
+    const nextUrl = URL.createObjectURL(receiptFile);
+    setReceiptPreviewUrl(nextUrl);
+
+    return () => URL.revokeObjectURL(nextUrl);
+  }, [receiptFile]);
 
   const handleConfirm = async () => {
+    if (requireReceiptUpload && !receiptFile) {
+      toast.error('Vui lòng tải lên ảnh biên lai chuyển khoản');
+      return;
+    }
+
     try {
       setLoading(true);
-      await onConfirm(note.trim());
+      await onConfirm(note.trim(), receiptFile);
     } finally {
       setLoading(false);
     }
@@ -91,6 +121,37 @@ const ActionModal = ({
           rows={3}
           className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none resize-none"
         />
+        {requireReceiptUpload && (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-bold text-gray-800 mb-2">
+                {receiptLabel || 'Ảnh biên lai chuyển khoản'}
+              </label>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)}
+                className="block w-full rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50/40 px-3 py-3 text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-600 file:px-3 file:py-2 file:text-sm file:font-bold file:text-white"
+              />
+              <p className="mt-2 text-xs font-medium text-gray-500">
+                {receiptHint || 'Tải lên ảnh biên lai để khách hàng dễ đối soát khoản tiền đã nhận.'}
+              </p>
+            </div>
+
+            {receiptPreviewUrl && (
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-3">
+                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-emerald-700">
+                  Xem trước biên lai
+                </p>
+                <img
+                  src={receiptPreviewUrl}
+                  alt="Biên lai chuyển khoản"
+                  className="max-h-44 rounded-xl border border-emerald-200 object-contain bg-white"
+                />
+              </div>
+            )}
+          </div>
+        )}
         <div className="flex gap-3">
           <button onClick={onClose}
             className="flex-1 py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50">
@@ -133,7 +194,7 @@ export const AdminReturns = () => {
 
   useEffect(() => { void load(filter); }, [filter]);
 
-  const handleAction = async (note: string) => {
+  const handleAction = async (note: string, receiptFile?: File | null) => {
     if (!modal) return;
     const { type, item } = modal;
     try {
@@ -144,7 +205,12 @@ export const AdminReturns = () => {
       else if (type === 'receive')
         await orderService.adminReceiveReturn(item.orderId, item.orderReturnId, note || undefined);
       else if (type === 'refund')
-        await orderService.adminRefundReturn(item.orderId, item.orderReturnId, note || undefined);
+        await orderService.adminRefundReturn(
+          item.orderId,
+          item.orderReturnId,
+          note || undefined,
+          receiptFile || undefined,
+        );
 
       toast.success('Cập nhật thành công');
       setModal(null);
@@ -160,6 +226,8 @@ export const AdminReturns = () => {
     approved:  returns.filter(r => r.status === 'approved').length,
     received:  returns.filter(r => r.status === 'received').length,
   };
+  const requireReceiptUpload =
+    modal?.type === 'refund' && modal?.item.refundDestination === 'bank_account';
 
   return (
     <div className="space-y-6">
@@ -286,6 +354,9 @@ export const AdminReturns = () => {
                       {ext.paymentStatus === 'paid' ? 'Đã TT' : ext.paymentStatus === 'refunded' ? 'Đã hoàn' : ext.paymentStatus || '—'}
                     </span>
                     <p className="text-[10px] text-gray-400 mt-0.5">{ext.paymentMethod?.toUpperCase() || ''}</p>
+                    <p className="text-[10px] text-blue-600 font-bold mt-1">
+                      Hoàn về: {REFUND_DESTINATION_LABELS[item.refundDestination] || 'Ví TechMart'}
+                    </p>
                   </td>
                   <td className="px-4 py-4 text-gray-500 whitespace-nowrap text-xs">{formatDate(item.requestedAt)}</td>
                   <td className="px-4 py-4">
@@ -416,6 +487,60 @@ export const AdminReturns = () => {
                             </div>
                           )}
                         </div>
+
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                          <p className="text-xs font-black text-gray-600 uppercase tracking-wider mb-2">
+                            Phương thức hoàn tiền
+                          </p>
+                          <p className="text-sm font-bold text-gray-800">
+                            {REFUND_DESTINATION_LABELS[item.refundDestination] || 'Ví TechMart'}
+                          </p>
+                          {item.refundDestination === 'bank_account' && (
+                            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                              <div>
+                                <p className="text-[11px] font-bold text-gray-500 uppercase mb-1">Ngân hàng</p>
+                                <p className="text-sm text-gray-800">{item.refundBankName || '—'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[11px] font-bold text-gray-500 uppercase mb-1">Số tài khoản</p>
+                                <p className="text-sm font-mono text-gray-800">{item.refundAccountNumber || item.refundAccountNumberMasked || '—'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[11px] font-bold text-gray-500 uppercase mb-1">Chủ tài khoản</p>
+                                <p className="text-sm text-gray-800">{item.refundAccountHolderName || '—'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[11px] font-bold text-gray-500 uppercase mb-1">Chi nhánh</p>
+                                <p className="text-sm text-gray-800">{item.refundBranchName || '—'}</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {item.refundReceiptImageUrl && (
+                          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4">
+                            <p className="text-xs font-black text-emerald-700 uppercase tracking-wider mb-2">
+                              Biên lai hoàn tiền
+                            </p>
+                            <a
+                              href={getImageUrl(item.refundReceiptImageUrl)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block w-fit rounded-xl border border-emerald-200 bg-white p-2 shadow-sm"
+                            >
+                              <img
+                                src={getImageUrl(item.refundReceiptImageUrl)}
+                                alt="Biên lai hoàn tiền"
+                                className="max-h-44 rounded-lg object-contain"
+                              />
+                            </a>
+                            {item.refundReceiptUploadedAt && (
+                              <p className="mt-2 text-xs font-medium text-emerald-700">
+                                Cập nhật lúc: {formatDate(item.refundReceiptUploadedAt)}
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -441,19 +566,30 @@ export const AdminReturns = () => {
             modal.type === 'approve' ? `Duyệt yêu cầu ${modal.item.requestCode}. Khách sẽ được thông báo gửi hàng về.` :
             modal.type === 'reject'  ? `Từ chối yêu cầu ${modal.item.requestCode}. Vui lòng ghi rõ lý do.` :
             modal.type === 'receive' ? `Xác nhận đã nhận lại hàng từ khách hàng cho ${modal.item.requestCode}.` :
-                                       `Xác nhận đã hoàn tiền cho yêu cầu ${modal.item.requestCode}.`
+                                       modal.item.refundDestination === 'bank_account'
+                                         ? `Xác nhận đã chuyển khoản hoàn tiền cho ${modal.item.requestCode}.`
+                                         : `Xác nhận đã hoàn tiền vào ví TechMart cho ${modal.item.requestCode}.`
           }
           confirmLabel={
             modal.type === 'approve' ? 'Duyệt' :
             modal.type === 'reject'  ? 'Từ chối' :
             modal.type === 'receive' ? 'Đã nhận hàng' :
-                                       'Đã hoàn tiền'
+                                       modal.item.refundDestination === 'bank_account'
+                                         ? 'Đã chuyển khoản'
+                                         : 'Đã hoàn tiền'
           }
           confirmClass={
             modal.type === 'approve' ? 'bg-blue-600 hover:bg-blue-700' :
             modal.type === 'reject'  ? 'bg-rose-600 hover:bg-rose-700' :
             modal.type === 'receive' ? 'bg-purple-600 hover:bg-purple-700' :
                                        'bg-emerald-600 hover:bg-emerald-700'
+          }
+          requireReceiptUpload={Boolean(requireReceiptUpload)}
+          receiptLabel="Ảnh biên lai hoàn tiền"
+          receiptHint={
+            requireReceiptUpload
+              ? 'Ảnh này sẽ được lưu lại và gửi cho khách hàng để đối soát khoản hoàn tiền.'
+              : undefined
           }
           onConfirm={handleAction}
           onClose={() => setModal(null)}

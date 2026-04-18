@@ -71,6 +71,9 @@ export interface WalletWithdrawalRequest {
   branchName: string;
   customerNote?: string;
   adminNote?: string;
+  transferReceiptImageUrl?: string;
+  transferReceiptUploadedAt?: Date;
+  transferReceiptUploadedBy?: number;
   requestedAt: Date;
   approvedAt?: Date;
   paidAt?: Date;
@@ -100,6 +103,7 @@ interface CreateWithdrawalInput {
 interface UpdateWithdrawalStatusInput {
   status: 'approved' | 'paid' | 'rejected';
   adminNote?: string;
+  receiptImageUrl?: string;
 }
 
 export interface AdminWithdrawalNotification {
@@ -193,6 +197,9 @@ function mapWithdrawal(row: any): WalletWithdrawalRequest {
     branchName: row.branch_name,
     customerNote: row.customer_note ?? undefined,
     adminNote: row.admin_note ?? undefined,
+    transferReceiptImageUrl: row.transfer_receipt_image_url ?? undefined,
+    transferReceiptUploadedAt: row.transfer_receipt_uploaded_at ?? undefined,
+    transferReceiptUploadedBy: row.transfer_receipt_uploaded_by ?? undefined,
     requestedAt: row.requested_at,
     approvedAt: row.approved_at ?? undefined,
     paidAt: row.paid_at ?? undefined,
@@ -709,17 +716,35 @@ export class WalletUseCase {
           throw new Error('Chỉ có thể đánh dấu đã chuyển khoản sau khi yêu cầu đã được duyệt');
         }
 
+        if (!input.receiptImageUrl?.trim()) {
+          throw new Error('Vui lòng tải lên ảnh biên lai chuyển khoản');
+        }
+
         await connection.execute(
           `UPDATE wallet_withdrawal_requests
-           SET status = 'paid', paid_at = ?, admin_note = ?, processed_by = ?
+           SET status = 'paid',
+               paid_at = ?,
+               admin_note = ?,
+               processed_by = ?,
+               transfer_receipt_image_url = ?,
+               transfer_receipt_uploaded_at = ?,
+               transfer_receipt_uploaded_by = ?
            WHERE withdrawal_request_id = ?`,
-          [now, input.adminNote?.trim() || null, actorId, requestId]
+          [
+            now,
+            input.adminNote?.trim() || null,
+            actorId,
+            input.receiptImageUrl.trim(),
+            now,
+            actorId,
+            requestId,
+          ]
         );
 
         await this.createNotificationWithConnection(connection, {
           userId: request.userId,
           title: 'Rút tiền đã hoàn tất',
-          message: `TechMart đã chuyển khoản thành công cho yêu cầu ${request.referenceCode}.`,
+          message: `TechMart đã chuyển khoản thành công cho yêu cầu ${request.referenceCode}. Biên lai chuyển khoản đã được cập nhật trong lịch sử rút tiền của bạn.`,
           referenceId: requestId,
         });
       } else if (input.status === 'rejected') {
@@ -786,6 +811,8 @@ export class WalletUseCase {
           accountNumberMasked: request.accountNumberMasked,
           status: input.status,
           adminNote: input.adminNote?.trim() || undefined,
+          receiptImageUrl:
+            input.status === 'paid' ? input.receiptImageUrl?.trim() || undefined : undefined,
           currentBalance: Number(userMeta.wallet_balance ?? 0),
         }).catch((error) => console.error('[WalletUseCase] Lỗi gửi email trạng thái rút tiền:', error));
       }

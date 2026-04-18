@@ -15,7 +15,12 @@ import {
   getAllowedNextPaymentStatuses,
   RETURN_DEADLINE_DAYS,
 } from '../policies/OrderLifecycle';
-import { sendOrderCancelledEmail, sendPaymentSuccessEmail, sendOrderCreatedEmail } from '../services/EmailService';
+import {
+  sendOrderCancelledEmail,
+  sendOrderCreatedEmail,
+  sendOrderReturnRefundedEmail,
+  sendPaymentSuccessEmail,
+} from '../services/EmailService';
 import { VietnamAdministrativeService } from '../services/VietnamAdministrativeService';
 
 export class OrderUseCase {
@@ -586,6 +591,7 @@ export class OrderUseCase {
     return this.orderRepository.createReturn({
       orderId,
       requestedBy: userId,
+      refundDestination: payload.refundDestination ?? 'wallet',
       reason: payload.reason.trim(),
       customerNote: payload.customerNote?.trim(),
       items: payload.items,
@@ -629,9 +635,14 @@ export class OrderUseCase {
       throw new Error('Đơn hàng này đã có yêu cầu hoàn trả đang xử lý');
     }
 
+    if (payload.refundDestination === 'bank_account') {
+      throw new Error('Khách vãng lai chưa hỗ trợ hoàn tiền về tài khoản ngân hàng');
+    }
+
     return this.orderRepository.createReturn({
       orderId: aggregate.order.orderId,
       requestedBy: null,
+      refundDestination: 'wallet',
       reason: payload.reason.trim(),
       customerNote: payload.customerNote?.trim(),
       items: payload.items,
@@ -650,13 +661,33 @@ export class OrderUseCase {
   }
 
   // Fix #3: Validate status trước khi refund
-  async refundReturn(orderId: number, orderReturnId: number, actorUserId: number, actorRole: OrderActorRole, adminNote?: string) {
+  async refundReturn(
+    orderId: number,
+    orderReturnId: number,
+    actorUserId: number,
+    actorRole: OrderActorRole,
+    adminNote?: string,
+    receiptImageUrl?: string
+  ) {
     const orderReturn = await this.orderRepository.getReturnById(orderId, orderReturnId);
     if (!orderReturn) return null;
     if (orderReturn.status !== 'received') {
       throw new Error('Chỉ có thể hoàn tiền khi đã nhận lại hàng (received)');
     }
-    return this.orderRepository.refundReturn({ orderId, orderReturnId, actorUserId, actorRole, adminNote });
+    const result = await this.orderRepository.refundReturn({
+      orderId,
+      orderReturnId,
+      actorUserId,
+      actorRole,
+      adminNote,
+      receiptImageUrl,
+    });
+
+    if (result) {
+      this.sendReturnRefundedEmailNotification(orderId, orderReturnId).catch(() => {});
+    }
+
+    return result;
   }
 
   // --- EMAIL THÔNG BÁO ĐẶT HÀNG THÀNH CÔNG ---
@@ -723,6 +754,51 @@ export class OrderUseCase {
       });
     } catch (error) {
       console.error('[OrderUseCase] sendOrderCancelledEmail failed:', error);
+    }
+  }
+
+  private async sendReturnRefundedEmailNotification(
+    orderId: number,
+    orderReturnId: number,
+  ): Promise<void> {
+    try {
+      const aggregate = await this.orderRepository.findAdminDetail(orderId);
+      if (!aggregate) return;
+
+      const orderReturn = aggregate.returns.find(
+        (item) => item.orderReturnId === orderReturnId,
+      );
+      if (!orderReturn || !aggregate.order.customerEmail) return;
+
+      const refundAmount = (orderReturn.items || []).reduce((sum, returnItem) => {
+        const matchedOrderItem = aggregate.items.find(
+          (item) => item.orderDetailId === returnItem.orderDetailId,
+        );
+        return sum + Number(matchedOrderItem?.price ?? 0) * Number(returnItem.quantity ?? 0);
+      }, 0);
+
+      const isGuestOrder = !aggregate.order.userId;
+      const orderUrl = isGuestOrder
+        ? `${process.env.FRONTEND_URL || 'http://localhost:5173'}/orders/lookup/${encodeURIComponent(aggregate.order.orderCode)}`
+        : undefined;
+
+      await sendOrderReturnRefundedEmail({
+        customerName: aggregate.order.customerName || aggregate.order.shippingName,
+        customerEmail: aggregate.order.customerEmail,
+        orderCode: aggregate.order.orderCode,
+        orderId: aggregate.order.orderId,
+        orderUrl,
+        requestCode: orderReturn.requestCode,
+        refundAmount,
+        refundDestination: orderReturn.refundDestination,
+        paymentStatus: aggregate.order.paymentStatus,
+        refundBankName: orderReturn.refundBankName,
+        refundAccountNumberMasked: orderReturn.refundAccountNumberMasked,
+        receiptImageUrl: orderReturn.refundReceiptImageUrl,
+        adminNote: orderReturn.adminNote,
+      });
+    } catch (error) {
+      console.error('[OrderUseCase] sendReturnRefundedEmail failed:', error);
     }
   }
 

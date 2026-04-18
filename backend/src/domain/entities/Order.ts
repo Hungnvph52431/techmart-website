@@ -35,6 +35,7 @@ export type ReturnStatus =
   | 'closed';
 
 export type ReturnRestockAction = 'restock' | 'inspect' | 'discard';
+export type ReturnRefundDestination = 'wallet' | 'bank_account';
 
 // --- 2. CÁC THỰC THỂ CHÍNH (ENTITIES) ---
 export interface Order {
@@ -142,11 +143,22 @@ export interface OrderReturn {
   orderId: number;
   requestCode: string;
   requestedBy: number | null;
+  refundDestination: ReturnRefundDestination;
+  refundBankAccountId?: number | null;
+  refundBankCode?: string;
+  refundBankName?: string;
+  refundAccountNumber?: string;
+  refundAccountNumberMasked?: string;
+  refundAccountHolderName?: string;
+  refundBranchName?: string;
   status: ReturnStatus;
   reason: string;
   customerNote?: string;
   adminNote?: string;
   evidenceImages?: string[];
+  refundReceiptImageUrl?: string;
+  refundReceiptUploadedAt?: Date;
+  refundReceiptUploadedBy?: number | null;
   requestedAt: Date;
   approvedAt?: Date;
   rejectedAt?: Date;
@@ -249,6 +261,7 @@ export interface CancelOrderDTO {
 export interface CreateOrderReturnDTO {
   orderId: number;
   requestedBy: number | null;
+  refundDestination?: ReturnRefundDestination;
   reason: string;
   customerNote?: string;
   evidenceImages?: string[];
@@ -283,6 +296,7 @@ export interface RefundOrderReturnDTO {
   actorUserId: number;
   actorRole: OrderActorRole;
   adminNote?: string;
+  receiptImageUrl?: string;
 }
 
 export interface CloseOrderReturnDTO {

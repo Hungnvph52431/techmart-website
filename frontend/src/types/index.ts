@@ -33,6 +33,8 @@ export interface ProductVariant {
   sku: string;
   attributes: Record<string, any>;
   priceAdjustment: number;
+  price?: number;
+  originalPrice?: number;
   stockQuantity: number;
   availableStockQuantity?: number;
   imageUrl?: string;
@@ -51,6 +53,7 @@ export interface Product {
   brandName?: string;
   brandSlug?: string;
   price: number;
+  originalPrice?: number;
   salePrice?: number;
   costPrice?: number;
   description?: string;
@@ -138,7 +141,7 @@ export interface OrderItem {
 
 export interface Order {
   orderId: number;
-  userId: number;
+  userId: number | null;
   orderCode: string; // Mã đơn hàng (TM-XXXX)
   items: OrderItem[];
   totalAmount: number;

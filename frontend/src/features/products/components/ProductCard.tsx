@@ -134,7 +134,7 @@ export const ProductCard = ({ product }: ProductCardProps) => {
     Number(product.reviewCount ?? 0) > 0
       ? Number(product.ratingAvg ?? 0).toFixed(1)
       : '0';
-  const soldQuantityText = Number(product.soldQuantity ?? 0).toLocaleString('vi-VN');
+  const hasReview = Number(product.reviewCount ?? 0) > 0;
 
   const handleWishlistClick = async (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -248,19 +248,16 @@ export const ProductCard = ({ product }: ProductCardProps) => {
           </Link>
 
           <div className="space-y-2.5 px-4 pb-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2">
-                <div className="flex items-center rounded-md bg-yellow-50 px-1.5 py-0.5 border border-yellow-100">
+            <div className="flex items-center gap-3">
+              {hasReview && (
+                <div className="flex items-center rounded-md border border-yellow-100 bg-yellow-50 px-1.5 py-0.5">
                   <Star className="h-3 w-3 fill-current text-yellow-500" />
                   <span className="ml-1 text-xs font-bold text-yellow-700">{ratingValue}</span>
                   {Number(product.reviewCount ?? 0) > 0 && (
                     <span className="ml-0.5 text-[10px] text-yellow-600/70">({product.reviewCount})</span>
                   )}
                 </div>
-                <span className="truncate text-xs font-semibold text-gray-500">
-                  Đã bán <span className="text-gray-700">{soldQuantityText}</span>
-                </span>
-              </div>
+              )}
 
               <button
                 type="button"
@@ -271,13 +268,14 @@ export const ProductCard = ({ product }: ProductCardProps) => {
                     ? 'Xoá sản phẩm khỏi danh sách yêu thích'
                     : 'Thêm sản phẩm vào danh sách yêu thích'
                 }
-                className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border transition-all ${
+                className={`ml-auto inline-flex flex-shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1.5 text-xs font-bold transition-all ${
                   isFavorite
                     ? 'border-rose-500 bg-rose-500 text-white shadow-sm'
-                    : 'border-rose-100 bg-rose-50/80 text-rose-300 hover:border-rose-200 hover:text-rose-500'
+                    : 'border-rose-100 bg-rose-50/80 text-rose-400 hover:border-rose-200 hover:text-rose-500'
                 } ${isWishlistPending ? 'cursor-wait opacity-70' : ''}`}
               >
                 <Heart className={`h-3.5 w-3.5 ${isFavorite ? 'fill-current' : ''}`} />
+                <span>Yêu thích</span>
               </button>
             </div>
 

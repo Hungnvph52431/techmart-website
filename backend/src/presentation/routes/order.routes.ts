@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { OrderController } from '../controllers/OrderController';
 import { authMiddleware, adminMiddleware, staffMiddleware } from '../middlewares/auth.middleware';
 import { guestOrderAccessMiddleware } from '../middlewares/guest-order.middleware';
-import { uploadReturnEvidence } from '../middlewares/upload.middleware';
+import { uploadReceiptImage, uploadReturnEvidence } from '../middlewares/upload.middleware';
 
 export const createOrderRoutes = (orderController: OrderController) => {
   const router = Router();
@@ -37,7 +37,13 @@ export const createOrderRoutes = (orderController: OrderController) => {
   router.get('/admin/returns', authMiddleware, staffMiddleware, orderController.adminListAllReturns);
   router.patch('/:id/returns/:returnId/review', authMiddleware, staffMiddleware, orderController.adminReviewReturn);
   router.patch('/:id/returns/:returnId/receive', authMiddleware, staffMiddleware, orderController.adminReceiveReturn);
-  router.patch('/:id/returns/:returnId/refund', authMiddleware, staffMiddleware, orderController.adminRefundReturn);
+  router.patch(
+    '/:id/returns/:returnId/refund',
+    authMiddleware,
+    staffMiddleware,
+    uploadReceiptImage.single('refundReceiptImage'),
+    orderController.adminRefundReturn,
+  );
 
   // --- 2. ROUTES DÀNH CHO KHÁCH HÀNG (Yêu cầu Đăng nhập) ---
   router.use(authMiddleware);

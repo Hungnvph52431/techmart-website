@@ -190,7 +190,9 @@ export const AdminOrderDetail = () => {
     type: 'review' | 'receive' | 'refund' | 'close' | null;
     returnId: number | null;
     adminNote: string;
-  }>({ type: null, returnId: null, adminNote: '' });
+    receiptImage: File | null;
+  }>({ type: null, returnId: null, adminNote: '', receiptImage: null });
+  const [returnReceiptPreviewUrl, setReturnReceiptPreviewUrl] = useState<string | null>(null);
 
   // Confirm + assign shipper modal
   const [shipperModal, setShipperModal] = useState(false);
@@ -229,6 +231,17 @@ export const AdminOrderDetail = () => {
   useEffect(() => {
     void loadDetail();
   }, [orderId]);
+
+  useEffect(() => {
+    if (!returnModal.receiptImage) {
+      setReturnReceiptPreviewUrl(null);
+      return;
+    }
+
+    const nextUrl = URL.createObjectURL(returnModal.receiptImage);
+    setReturnReceiptPreviewUrl(nextUrl);
+    return () => URL.revokeObjectURL(nextUrl);
+  }, [returnModal.receiptImage]);
 
   // ── Mở modal chọn shipper khi admin bấm "Đã xác nhận" ─────────────────────
   const openShipperModal = async () => {
@@ -348,7 +361,7 @@ export const AdminOrderDetail = () => {
 
   // ── Xử lý hoàn trả ──────────────────────────────────────────────────────────
   const handleReturnAction = async () => {
-    const { type, returnId, adminNote } = returnModal;
+    const { type, returnId, adminNote, receiptImage } = returnModal;
     if (!type || !returnId) return;
 
     try {
@@ -361,14 +374,22 @@ export const AdminOrderDetail = () => {
         await adminOrderService.receiveReturn(orderId, returnId, payload);
         toast.success('Đã xác nhận nhận hàng hoàn trả');
       } else if (type === 'refund') {
-        await adminOrderService.refundReturn(orderId, returnId, payload);
+        if (requiresReturnReceipt && !receiptImage) {
+          toast.error('Vui lòng tải lên ảnh biên lai hoàn tiền');
+          return;
+        }
+
+        await adminOrderService.refundReturn(orderId, returnId, {
+          ...payload,
+          receiptImage: receiptImage || undefined,
+        });
         toast.success('Đã hoàn tiền thành công');
       } else if (type === 'close') {
         await adminOrderService.closeReturn(orderId, returnId, payload);
         toast.success('Đã đóng yêu cầu hoàn trả');
       }
 
-      setReturnModal({ type: null, returnId: null, adminNote: '' });
+      setReturnModal({ type: null, returnId: null, adminNote: '', receiptImage: null });
       await loadDetail();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Thao tác thất bại');
@@ -441,6 +462,12 @@ const allowedPayments = (() => {
 })();
   const ordererName = order.customer?.name || order.customerName || '—';
   const ordererEmail = order.customer?.email || order.customerEmail || '—';
+  const activeReturn = returnModal.returnId
+    ? returns.find((ret: any) => ret.orderReturnId === returnModal.returnId)
+    : null;
+  const requiresReturnReceipt =
+    returnModal.type === 'refund' && activeReturn?.refundDestination === 'bank_account';
+
   return (
     <div className="space-y-6">
       {/* HEADER */}
@@ -712,6 +739,24 @@ const allowedPayments = (() => {
                       </div>
                     )}
 
+                    {ret.refundReceiptImageUrl && (
+                      <div>
+                        <p className="text-xs font-bold text-gray-500 mb-1.5">Biên lai hoàn tiền:</p>
+                        <a
+                          href={getImageUrl(ret.refundReceiptImageUrl)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block w-20 h-20 rounded-xl overflow-hidden border-2 border-emerald-200 hover:border-emerald-400 transition-colors"
+                        >
+                          <img
+                            src={getImageUrl(ret.refundReceiptImageUrl)}
+                            alt={`refund-receipt-${ret.orderReturnId}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </a>
+                      </div>
+                    )}
+
                     {/* ACTION BUTTONS theo trạng thái */}
                     <div className="flex flex-wrap gap-2 pt-1">
                       {ret.status === 'requested' && (
@@ -734,7 +779,7 @@ const allowedPayments = (() => {
                       )}
                       {ret.status === 'approved' && (
                         <button
-                          onClick={() => setReturnModal({ type: 'receive', returnId: ret.orderReturnId, adminNote: '' })}
+                          onClick={() => setReturnModal({ type: 'receive', returnId: ret.orderReturnId, adminNote: '', receiptImage: null })}
                           disabled={!!submitting}
                           className="inline-flex items-center gap-1.5 px-4 py-2 bg-violet-600 text-white rounded-xl text-xs font-black uppercase hover:bg-violet-700 disabled:opacity-60"
                         >
@@ -743,7 +788,7 @@ const allowedPayments = (() => {
                       )}
                       {ret.status === 'received' && !isCodUnpaid && (
                         <button
-                          onClick={() => setReturnModal({ type: 'refund', returnId: ret.orderReturnId, adminNote: '' })}
+                          onClick={() => setReturnModal({ type: 'refund', returnId: ret.orderReturnId, adminNote: '', receiptImage: null })}
                           disabled={!!submitting}
                           className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-black uppercase hover:bg-blue-700 disabled:opacity-60"
                         >
@@ -753,7 +798,7 @@ const allowedPayments = (() => {
                       {/* COD chưa thanh toán + đã nhận hàng → đóng luôn, không cần hoàn tiền */}
                       {ret.status === 'received' && isCodUnpaid && (
                         <button
-                          onClick={() => setReturnModal({ type: 'close', returnId: ret.orderReturnId, adminNote: '' })}
+                          onClick={() => setReturnModal({ type: 'close', returnId: ret.orderReturnId, adminNote: '', receiptImage: null })}
                           disabled={!!submitting}
                           className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-600 text-white rounded-xl text-xs font-black uppercase hover:bg-slate-700 disabled:opacity-60"
                         >
@@ -762,7 +807,7 @@ const allowedPayments = (() => {
                       )}
                       {(ret.status === 'refunded' || ret.status === 'rejected') && ret.status !== 'closed' && (
                         <button
-                          onClick={() => setReturnModal({ type: 'close', returnId: ret.orderReturnId, adminNote: '' })}
+                          onClick={() => setReturnModal({ type: 'close', returnId: ret.orderReturnId, adminNote: '', receiptImage: null })}
                           disabled={!!submitting}
                           className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-600 text-white rounded-xl text-xs font-black uppercase hover:bg-slate-700 disabled:opacity-60"
                         >
@@ -1051,9 +1096,45 @@ const allowedPayments = (() => {
               placeholder="Ghi chú admin (tùy chọn)..."
               className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-blue-400 focus:outline-none"
             />
+            {requiresReturnReceipt && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-widest text-gray-500 mb-2">
+                    Ảnh biên lai hoàn tiền
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(e) =>
+                      setReturnModal((prev) => ({
+                        ...prev,
+                        receiptImage: e.target.files?.[0] ?? null,
+                      }))
+                    }
+                    className="block w-full rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50/40 px-3 py-3 text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-600 file:px-3 file:py-2 file:text-sm file:font-bold file:text-white"
+                  />
+                  <p className="mt-2 text-xs font-medium text-gray-500">
+                    Ảnh này sẽ được lưu lại và gửi cho khách hàng để đối soát khoản hoàn tiền.
+                  </p>
+                </div>
+
+                {returnReceiptPreviewUrl && (
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-3">
+                    <p className="mb-2 text-xs font-black uppercase tracking-widest text-emerald-700">
+                      Xem trước biên lai
+                    </p>
+                    <img
+                      src={returnReceiptPreviewUrl}
+                      alt="Biên lai hoàn tiền"
+                      className="max-h-44 rounded-xl border border-emerald-200 bg-white object-contain"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex gap-3 justify-end">
               <button
-                onClick={() => setReturnModal({ type: null, returnId: null, adminNote: '' })}
+                onClick={() => setReturnModal({ type: null, returnId: null, adminNote: '', receiptImage: null })}
                 className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50"
               >
                 Hủy

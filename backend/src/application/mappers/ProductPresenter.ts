@@ -69,13 +69,17 @@ export const toStorefrontProduct = (product: Product) => {
         id: variant.variantId,
         variantId: variant.variantId,
         name: variant.variantName,
+        variantName: variant.variantName,
         sku: variant.sku,
         attributes: toValueMap(variant.attributes),
+        priceAdjustment: variant.priceAdjustment,
         price: (product.salePrice ?? product.price) + variant.priceAdjustment,
+        originalPrice: product.price + variant.priceAdjustment,
         stock: variant.availableStockQuantity ?? variant.stockQuantity,
         stockQuantity: variant.stockQuantity,
         availableStockQuantity: variant.availableStockQuantity ?? variant.stockQuantity,
         image: variant.imageUrl,
+        imageUrl: variant.imageUrl,
       })),
   };
 };

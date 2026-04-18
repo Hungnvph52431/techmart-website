@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { CheckCircle2, RefreshCw, Wallet, XCircle } from 'lucide-react';
+import { CheckCircle2, ImageIcon, RefreshCw, Wallet, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { walletService, type AdminWalletWithdrawalRequest, type WalletWithdrawalStatus } from '@/services/wallet.service';
 
 const formatCurrency = (n: number) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n);
+
+const BACKEND_URL = (import.meta.env.VITE_API_URL as string)?.replace('/api', '') || 'http://localhost:5001';
+const getImageUrl = (url?: string) => {
+  if (!url) return '';
+  if (url.startsWith('http') || url.startsWith('data:')) return url;
+  return `${BACKEND_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
 
 const formatDate = (d?: string) =>
   d ? new Date(d).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
@@ -40,6 +47,8 @@ export const AdminWalletWithdrawals = () => {
     status: 'approved' | 'paid' | 'rejected';
   } | null>(null);
   const [adminNote, setAdminNote] = useState('');
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [receiptPreviewUrl, setReceiptPreviewUrl] = useState<string | null>(null);
   const focusedRequestId = Number(searchParams.get('focus') || 0);
 
   const load = async (nextDays = days, nextStatus = status) => {
@@ -78,12 +87,26 @@ export const AdminWalletWithdrawals = () => {
   ) => {
     setActionModal({ request, status: nextStatus });
     setAdminNote('');
+    setReceiptFile(null);
   };
 
   const closeActionModal = () => {
     setActionModal(null);
     setAdminNote('');
+    setReceiptFile(null);
   };
+
+  useEffect(() => {
+    if (!receiptFile) {
+      setReceiptPreviewUrl(null);
+      return;
+    }
+
+    const nextUrl = URL.createObjectURL(receiptFile);
+    setReceiptPreviewUrl(nextUrl);
+
+    return () => URL.revokeObjectURL(nextUrl);
+  }, [receiptFile]);
 
   const handleConfirmAction = async () => {
     if (!actionModal) return;
@@ -93,11 +116,17 @@ export const AdminWalletWithdrawals = () => {
       return;
     }
 
+    if (actionModal.status === 'paid' && !receiptFile) {
+      toast.error('Vui lòng tải lên ảnh biên lai chuyển khoản');
+      return;
+    }
+
     try {
       setProcessing(true);
       await walletService.adminUpdateWithdrawalStatus(actionModal.request.requestId, {
         status: actionModal.status,
         adminNote: adminNote.trim() || undefined,
+        receiptImage: receiptFile || undefined,
       });
       toast.success('Cập nhật yêu cầu rút tiền thành công');
       closeActionModal();
@@ -241,6 +270,16 @@ export const AdminWalletWithdrawals = () => {
                       {formatDate(item.paidAt || item.rejectedAt || item.approvedAt)}
                     </p>
                     {item.adminNote && <p className="text-gray-400 mt-1 max-w-[220px]">{item.adminNote}</p>}
+                    {item.transferReceiptImageUrl && (
+                      <a
+                        href={getImageUrl(item.transferReceiptImageUrl)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-700 hover:bg-emerald-100"
+                      >
+                        <ImageIcon size={12} /> Xem biên lai
+                      </a>
+                    )}
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex flex-col gap-2 min-w-[140px]">
@@ -321,6 +360,38 @@ export const AdminWalletWithdrawals = () => {
                   className="w-full rounded-2xl border-2 border-gray-100 px-4 py-3 text-sm font-medium text-gray-700 outline-none focus:border-blue-300"
                 />
               </div>
+
+              {actionModal.status === 'paid' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-widest text-gray-500 mb-2">
+                      Ảnh biên lai chuyển khoản
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)}
+                      className="block w-full rounded-2xl border-2 border-dashed border-emerald-200 bg-emerald-50/40 px-4 py-3 text-sm text-gray-600 file:mr-3 file:rounded-xl file:border-0 file:bg-emerald-600 file:px-3 file:py-2 file:text-sm file:font-bold file:text-white"
+                    />
+                    <p className="mt-2 text-xs font-medium text-gray-500">
+                      Ảnh này sẽ được lưu lại và gửi cho khách hàng để đối soát khoản chuyển khoản.
+                    </p>
+                  </div>
+
+                  {receiptPreviewUrl && (
+                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-3">
+                      <p className="mb-2 text-xs font-black uppercase tracking-widest text-emerald-700">
+                        Xem trước biên lai
+                      </p>
+                      <img
+                        src={receiptPreviewUrl}
+                        alt="Biên lai chuyển khoản"
+                        className="max-h-44 rounded-xl border border-emerald-200 bg-white object-contain"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="px-6 py-5 border-t border-gray-100 flex items-center justify-end gap-3">

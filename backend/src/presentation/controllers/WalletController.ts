@@ -149,6 +149,7 @@ export class WalletController {
       const result = await this.walletUseCase.adminUpdateWithdrawalStatus(requestId, req.user.userId, {
         status: req.body.status,
         adminNote: req.body.adminNote,
+        receiptImageUrl: req.file ? `/images/receipts/${req.file.filename}` : undefined,
       });
 
       res.json(result);

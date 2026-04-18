@@ -64,6 +64,9 @@ export interface WalletWithdrawalRequest {
   branchName: string;
   customerNote?: string;
   adminNote?: string;
+  transferReceiptImageUrl?: string;
+  transferReceiptUploadedAt?: string;
+  transferReceiptUploadedBy?: number;
   requestedAt: string;
   approvedAt?: string;
   paidAt?: string;
@@ -169,9 +172,27 @@ export const walletService = {
 
   adminUpdateWithdrawalStatus: async (
     requestId: number | string,
-    payload: { status: 'approved' | 'paid' | 'rejected'; adminNote?: string }
+    payload: {
+      status: 'approved' | 'paid' | 'rejected';
+      adminNote?: string;
+      receiptImage?: File;
+    }
   ): Promise<AdminWalletWithdrawalRequest> => {
-    const res = await api.patch(`/wallet/admin/withdrawals/${requestId}/status`, payload);
+    if (payload.receiptImage) {
+      const formData = new FormData();
+      formData.append('status', payload.status);
+      if (payload.adminNote) formData.append('adminNote', payload.adminNote);
+      formData.append('transferReceiptImage', payload.receiptImage);
+      const res = await api.patch(`/wallet/admin/withdrawals/${requestId}/status`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return res.data;
+    }
+
+    const res = await api.patch(`/wallet/admin/withdrawals/${requestId}/status`, {
+      status: payload.status,
+      adminNote: payload.adminNote,
+    });
     return res.data;
   },
 };

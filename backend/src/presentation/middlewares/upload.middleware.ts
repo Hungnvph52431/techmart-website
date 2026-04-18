@@ -77,3 +77,19 @@ export const uploadReturnEvidence = multer({
   fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 },
 });
+
+// --- 5. Upload ảnh biên lai chuyển khoản / hoàn tiền ---
+const receiptDir = path.join(process.cwd(), 'public', 'images', 'receipts');
+ensureDir(receiptDir);
+
+export const uploadReceiptImage = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, receiptDir),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, `receipt-${Date.now()}-${Math.round(Math.random() * 1e6)}${ext}`);
+    },
+  }),
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 },
+});

@@ -42,6 +42,12 @@ const WITHDRAWAL_STATUS_CONFIG: Record<string, { label: string; className: strin
 };
 
 const formatCurrency = (n: number) => n.toLocaleString('vi-VN');
+const BACKEND_URL = (import.meta.env.VITE_API_URL as string)?.replace('/api', '') || 'http://localhost:5001';
+const getImageUrl = (url?: string) => {
+  if (!url) return '';
+  if (url.startsWith('http') || url.startsWith('data:')) return url;
+  return `${BACKEND_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
 
 const formatDate = (date?: string) =>
   date
@@ -625,6 +631,16 @@ export const WalletPage = () => {
                               </p>
                               <p className="text-xs text-gray-400 font-bold">Tạo lúc: {formatDate(item.requestedAt)}</p>
                               {item.adminNote && <p className="text-xs text-gray-500 font-bold">Ghi chú: {item.adminNote}</p>}
+                              {item.transferReceiptImageUrl && (
+                                <a
+                                  href={getImageUrl(item.transferReceiptImageUrl)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-black uppercase tracking-widest text-emerald-700 hover:bg-emerald-100"
+                                >
+                                  Xem biên lai chuyển khoản
+                                </a>
+                              )}
                             </div>
                             <div className="text-right">
                               <p className="text-lg font-black text-rose-600">-{formatCurrency(item.amount)}₫</p>
