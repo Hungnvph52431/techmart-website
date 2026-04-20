@@ -87,6 +87,8 @@ import { createBannerRoutes, createAdminBannerRoutes } from './presentation/rout
 import { createReviewRoutes, createAdminReviewRoutes } from './presentation/routes/review.routes';
 import { createLocationRoutes } from './presentation/routes/location.routes';
 import { createWishlistRoutes } from './presentation/routes/wishlist.routes';
+import { createChatRoutes } from './presentation/routes/chat.routes';
+
 import path from 'path';
 
 dotenv.config();
@@ -190,6 +192,7 @@ app.use('/api/wallet', createWalletRoutes(walletController));
 app.use('/api/wishlist', createWishlistRoutes(wishlistController));
 app.use('/api/shipper', createShipperRoutes(shipperController));
 app.use('/api', createCODRoutes(codController));
+app.use('/api/chat', createChatRoutes());
 
 // Admin Routes
 app.use('/api/admin/products', createAdminProductRoutes(adminProductController));

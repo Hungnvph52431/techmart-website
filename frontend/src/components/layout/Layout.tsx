@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { Header } from './Header';
 import { Footer } from './Footer';
 import { ChevronUp } from 'lucide-react';
+import ChatBot from '../chat/ChatBot';
 
 interface LayoutProps {
   children: ReactNode;
@@ -33,12 +34,14 @@ const ScrollToTop = () => {
 export const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
   const hideFooter = location.pathname === '/';
+  const hideChatBot = ['/admin', '/checkout'].some(p => location.pathname.startsWith(p));
 
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
       <main className="flex-1">{children}</main>
       {!hideFooter && <Footer />}
+      {!hideChatBot && <ChatBot />}
       <ScrollToTop />
     </div>
   );
