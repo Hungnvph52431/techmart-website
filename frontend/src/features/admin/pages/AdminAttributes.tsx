@@ -242,7 +242,7 @@ export const AdminAttributes = () => {
       setLoading(true);
       const [attrData, catData] = await Promise.all([adminAttributeService.getAll(), adminCategoryService.getAll()]);
       setAttributes(attrData); setCategories(catData);
-      const firstParent = catData.find(c => !c.parentId);
+      const firstParent = catData.find((c: AdminCategory) => !c.parentId);
       if (firstParent) setSelectedCategoryId(firstParent.categoryId);
     } catch { toast.error('Không thể tải dữ liệu'); }
     finally { setLoading(false); }

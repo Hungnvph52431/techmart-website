@@ -110,13 +110,30 @@ export const ProductDetailPage = () => {
     (v: any) => (v.variantId ?? v.id) === selectedVariantId,
   );
 
-  const basePrice = Number(product?.salePrice || product?.price || 0);
-  const displayPrice = selectedVariant
+  const baseOriginalPrice = Number(
+    product?.originalPrice ?? product?.price ?? 0,
+  );
+  const baseSalePrice = Number(product?.salePrice ?? product?.price ?? 0);
+  const variantPriceDelta = selectedVariant
     ? selectedVariant.priceAdjustment != null &&
       !isNaN(Number(selectedVariant.priceAdjustment))
-      ? basePrice + Number(selectedVariant.priceAdjustment)
-      : Number(selectedVariant.price || basePrice)
-    : basePrice;
+      ? Number(selectedVariant.priceAdjustment)
+      : selectedVariant.price != null && !isNaN(Number(selectedVariant.price))
+        ? Number(selectedVariant.price) - baseSalePrice
+        : 0
+    : 0;
+  const displayPrice = selectedVariant
+    ? selectedVariant.price != null && !isNaN(Number(selectedVariant.price))
+      ? Number(selectedVariant.price)
+      : baseSalePrice + variantPriceDelta
+    : baseSalePrice;
+  const displayOriginalPrice = selectedVariant
+    ? selectedVariant.originalPrice != null &&
+      !isNaN(Number(selectedVariant.originalPrice))
+      ? Number(selectedVariant.originalPrice)
+      : baseOriginalPrice + variantPriceDelta
+    : baseOriginalPrice;
+  const hasDiscount = displayOriginalPrice > displayPrice;
 
   const stockToUse = product
     ? getProductPurchaseStockLimit(product, selectedVariant)
@@ -129,10 +146,11 @@ export const ProductDetailPage = () => {
   const isMaxReached = !isOutOfStock && !isInactive && availableStock <= 0;
   const isDisabled = isOutOfStock || isInactive || isMaxReached;
 
-  const discountPercent =
-    product?.salePrice && product.price > product.salePrice
-      ? Math.round(((product.price - product.salePrice) / product.price) * 100)
-      : 0;
+  const discountPercent = hasDiscount
+    ? Math.round(
+        ((displayOriginalPrice - displayPrice) / displayOriginalPrice) * 100,
+      )
+    : 0;
 
   useEffect(() => {
     setQuantity((cur) => {
@@ -354,9 +372,6 @@ export const ProductDetailPage = () => {
   const headerRatingAverage =
     reviewSummary.total > 0 ? reviewSummary.average : 0;
   const specs = parseSpecs((product as any).specifications);
-  console.log("product keys:", Object.keys(product));
-  console.log("categorySlug:", (product as any).categorySlug);
-  console.log("full product:", product);
 
   return (
     <Layout>
@@ -498,10 +513,10 @@ export const ProductDetailPage = () => {
                 <span className="text-3xl md:text-4xl font-bold text-red-600 tracking-tight">
                   {displayPrice.toLocaleString("vi-VN")}₫
                 </span>
-                {product.salePrice && product.price > product.salePrice && (
+                {hasDiscount && (
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-base text-gray-400 line-through font-medium">
-                      {product.price.toLocaleString("vi-VN")}₫
+                      {displayOriginalPrice.toLocaleString("vi-VN")}₫
                     </span>
                   </div>
                 )}

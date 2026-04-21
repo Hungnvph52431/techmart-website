@@ -13,7 +13,7 @@ export const ProductInfo = ({ product }: Props) => {
       </h1>
 
       <p className="text-gray-500 mb-4">
-        Brand: {product.brand}
+        Brand: {product.brandName || 'Không rõ'}
       </p>
 
       <p className="text-2xl text-red-500 font-bold mb-6">

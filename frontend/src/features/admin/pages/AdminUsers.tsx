@@ -3,6 +3,8 @@ import toast from 'react-hot-toast';
 import { Users, UserPlus, Edit2, Trash2, Search, X, ChevronLeft, ChevronRight, AlertTriangle, Eye, EyeOff, Check } from 'lucide-react';
 import {
     userService,
+    type CreateUserPayload,
+    type UpdateUserPayload,
     type User,
     type UserFilters,
     type UserRole,
@@ -391,9 +393,20 @@ const passwordRules = [
     { label: 'Có ký tự đặc biệt !@#$^*()_', test: (p: string) => /[!@#$^*()_]/.test(p) },
 ];
 
+type UserFormData = {
+    email: string;
+    password: string;
+    name: string;
+    phone: string;
+    role: UserRole;
+    status: UserStatus;
+    membershipLevel: MembershipLevel;
+    points: number;
+};
+
 // ── UserModal ─────────────────────────────────────────────────────────────────
 const UserModal = ({ user, onClose, onSuccess }: { user: User | null; onClose: () => void; onSuccess: () => void }) => {
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<UserFormData>({
         email:           user?.email           ?? '',
         password:        '',
         name:            user?.name            ?? '',
@@ -421,10 +434,26 @@ const UserModal = ({ user, onClose, onSuccess }: { user: User | null; onClose: (
         setSaving(true);
         try {
             if (user) {
-                await userService.updateUser(user.userId, formData);
+                const updatePayload: UpdateUserPayload = {
+                    email: formData.email,
+                    name: formData.name,
+                    phone: formData.phone,
+                    role: formData.role,
+                    status: formData.status,
+                    membershipLevel: formData.membershipLevel,
+                    points: formData.points,
+                };
+                await userService.updateUser(user.userId, updatePayload);
                 toast.success('Đã cập nhật tài khoản');
             } else {
-                await userService.createUser(formData as any);
+                const createPayload: CreateUserPayload = {
+                    email: formData.email,
+                    password: formData.password,
+                    name: formData.name,
+                    phone: formData.phone,
+                    role: formData.role,
+                };
+                await userService.createUser(createPayload);
                 toast.success('Đã tạo tài khoản mới');
             }
             onSuccess();

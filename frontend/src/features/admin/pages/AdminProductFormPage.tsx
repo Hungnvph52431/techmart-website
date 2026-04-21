@@ -394,7 +394,7 @@ export const AdminProductFormPage = () => {
   const variantAttributes = mergedAttributes.filter((a) => a.scope === 'variant' || a.assignment.isVariantAxis);
 
   // Real-time duplicate variant detection
-  const getDuplicateWarning = (variantIndex: number, attrCode: string): string | null => {
+  const getDuplicateWarning = (variantIndex: number): string | null => {
     if (watchedVariants.length < 2) return null;
     const currentVariant = watchedVariants[variantIndex];
     if (!currentVariant?.attributes) return null;
@@ -909,7 +909,7 @@ export const AdminProductFormPage = () => {
                             render={({ field: f }) => {
                               // Lấy lỗi duplicate từ Zod hoặc real-time
                               const attrError = (errors.variants?.[index] as any)?.attributes?.[attr.code]?.message;
-                              const dupWarning = getDuplicateWarning(index, attr.code);
+                              const dupWarning = getDuplicateWarning(index);
                               const errorMsg = attrError || dupWarning;
                               const hasError = Boolean(errorMsg);
                               if (attr.inputType === 'select' || attr.inputType === 'color') return (

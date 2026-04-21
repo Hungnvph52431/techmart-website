@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CheckCircle, XCircle, Clock, ArrowRight, ShoppingBag, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, ArrowRight, ShoppingBag, Loader2 } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import api from '@/services/api';
-import { useCartStore } from '@/store/cartStore';
 
 type ResultStatus = 'loading' | 'success' | 'cancel' | 'failed' | 'error';
 

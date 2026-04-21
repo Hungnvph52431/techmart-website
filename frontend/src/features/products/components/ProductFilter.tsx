@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { SlidersHorizontal, X } from "lucide-react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
 import { brandService, type Brand } from "@/services/brand.service";
 import { categoryService, type Category } from "@/services/category.service";
 import { ProductListContent } from "./ProductListContent";
+import { hasActiveProductLayoutFilters } from "../lib/filterLayout";
 
 const FILTER_GROUPS: {
   key: string;
@@ -66,6 +67,7 @@ const toggleInCsv = (csv: string, value: string): string => {
 
 export const ProductsFilter = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [searchInput, setSearchInput] = useState(searchParams.get("search") || "");
   const [showPanel, setShowPanel] = useState(false);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [childCategories, setChildCategories] = useState<Category[]>([]);
@@ -95,6 +97,10 @@ export const ProductsFilter = () => {
     setTempFilters(current);
   }, [searchParams]);
 
+  useEffect(() => {
+    setSearchInput(searchParams.get("search") || "");
+  }, [searchParams]);
+
   const brand = searchParams.get("brand") || "";
   const category = searchParams.get("category") || "";
 
@@ -106,9 +112,14 @@ export const ProductsFilter = () => {
   const updateParams = (updates: Record<string, string>) => {
     const current: Record<string, string> = {};
     searchParams.forEach((v, k) => { current[k] = v; });
-    const next = { ...current, ...updates, page: "1" };
+    const next: Record<string, string> = { ...current, ...updates, page: "1" };
     Object.keys(next).forEach(k => { if (!next[k]) delete next[k]; });
     setSearchParams(next);
+  };
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateParams({ search: searchInput });
   };
 
   const toggleTemp = (group: typeof FILTER_GROUPS[0], value: string) => {
@@ -146,12 +157,13 @@ export const ProductsFilter = () => {
   const resetFilters = () => setTempFilters({});
 
   const clearAll = () => {
+    setSearchInput("");
     setTempFilters({});
     setSearchParams({ page: "1" });
     setShowPanel(false);
   };
 
-  const hasAnyFilter = brand || category || realActiveCount > 0 || searchParams.get("search");
+  const hasAnyFilter = hasActiveProductLayoutFilters(searchParams);
 
   return (
     // Layout 3/10 - 7/10
@@ -203,6 +215,41 @@ export const ProductsFilter = () => {
 
         {/* Danh mục + Bộ lọc */}
         <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
+
+          <form onSubmit={handleSearch} className="flex gap-2">
+            <div className="relative flex-1">
+              <Search
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
+                size={17}
+              />
+              <input
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Tìm iPhone, Samsung, Xiaomi..."
+                className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm font-medium focus:outline-none focus:border-blue-400 focus:bg-white transition-all"
+              />
+              {searchInput && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchInput("");
+                    updateParams({ search: "" });
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X size={15} />
+                </button>
+              )}
+            </div>
+            <button
+              type="submit"
+              className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors"
+            >
+              Tìm
+            </button>
+          </form>
+
+          <div className="border-t border-gray-100" />
 
           {/* Category pills */}
           {childCategories.length > 0 && (

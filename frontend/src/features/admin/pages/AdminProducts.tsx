@@ -146,8 +146,6 @@ export const AdminProducts = () => {
     }
   };
 
-  const isDeleted = filters.status === 'deleted';
-
   return (
     <div className="space-y-6">
       {/* HEADER (Style Khanh) */}

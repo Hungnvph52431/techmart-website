@@ -206,22 +206,6 @@ const passwordRules = [
   },
 ];
 
-const getNewPasswordValidationMessage = (password: string) => {
-  if (!password.trim()) {
-    return 'Vui lòng nhập mật khẩu mới';
-  }
-
-  if (password.length < 6) {
-    return 'Mật khẩu mới phải có ít nhất 6 ký tự';
-  }
-
-  if (!/[A-Z]/.test(password)) {
-    return 'Mật khẩu mới phải có ít nhất 1 chữ in hoa';
-  }
-
-  return '';
-};
-
 // ─── Address Modal ────────────────────────────────────────────────────────────
 const AddressModal = ({ editing, onSave, onClose }: {
   editing?: Address; onSave: (data: AddressFormData) => Promise<void>; onClose: () => void;
