@@ -21,6 +21,7 @@ import {
   Tag,
   Landmark,
   Bell,
+  MessageCircle,
 } from 'lucide-react';
 import { walletService, type AdminWithdrawalNotification } from '@/services/wallet.service';
 
@@ -310,6 +311,7 @@ export const AdminLayout = () => {
             {(isAdmin || isStaff) && <>
               <SidebarLink to="/admin/reviews" icon={<Star size={18} />} label="Đánh giá" active={isActive('/admin/reviews')} />
               <SidebarLink to="/admin/returns" icon={<RotateCcw size={18} />} label="Hoàn/Trả hàng" active={isActive('/admin/returns')} />
+              <SidebarLink to="/admin/support" icon={<MessageCircle size={18} />} label="Hỗ trợ khách" active={isActive('/admin/support')} />
             </>}
 
             {/* Admin only */}

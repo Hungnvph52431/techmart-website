@@ -46,6 +46,7 @@ import { AdminBrands } from '@/features/admin/pages/AdminBrands';
 import { AdminBanners } from '@/features/admin/pages/AdminBanners';
 import { AdminOrderDetail } from './features/admin/pages/AdminOrderDetail';
 import { AdminReturns } from '@/features/admin/pages/AdminReturns';
+import SupportChatAdminPage from '@/features/admin/pages/SupportChatAdminPage';
 import { WalletPage } from '@/features/wallet/pages/WalletPage';
 import { AdminWalletTopups } from '@/features/admin/pages/AdminWalletTopups';
 import { AdminWalletWithdrawals } from '@/features/admin/pages/AdminWalletWithdrawals';
@@ -125,6 +126,7 @@ function App() {
             <Route path="vouchers" element={<AdminVoucher />} />
             <Route path="reviews" element={<AdminReviews />} />
             <Route path="returns" element={<AdminReturns />} />
+            <Route path="support" element={<SupportChatAdminPage />} />
             <Route path="wallet-topups" element={<AdminWalletTopups />} />
             <Route path="wallet-withdrawals" element={<AdminWalletWithdrawals />} />
           </Route>

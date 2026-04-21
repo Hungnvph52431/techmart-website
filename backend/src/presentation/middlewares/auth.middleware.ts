@@ -10,7 +10,7 @@ export interface AuthRequest extends Request {
 export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
-    
+
     if (!token) {
       return res.status(401).json({ message: 'No token provided' });
     }
@@ -21,6 +21,19 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
   } catch (error) {
     return res.status(401).json({ message: 'Invalid token' });
   }
+};
+
+// Parse JWT nếu có, nhưng không reject nếu thiếu/invalid. Dùng cho endpoint
+// vừa cho khách đã login vừa cho guest (vd chat hỗ trợ).
+export const optionalAuthMiddleware = (req: AuthRequest, _res: Response, next: NextFunction) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return next();
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+  } catch {
+    // bỏ qua token invalid - coi như guest
+  }
+  next();
 };
 
 export const adminMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {

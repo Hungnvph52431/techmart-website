@@ -849,5 +849,49 @@ CREATE TABLE wallet_withdrawal_requests (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==================================================
+-- BẢNG SUPPORT_CHAT_CONVERSATIONS - Cuộc chat hỗ trợ (khách ↔ staff)
+-- ==================================================
+CREATE TABLE IF NOT EXISTS support_chat_conversations (
+    conversation_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NULL,
+    guest_name VARCHAR(100) NULL,
+    guest_email VARCHAR(150) NULL,
+    guest_token VARCHAR(128) NULL,
+    subject VARCHAR(255) NULL,
+    status ENUM('open', 'assigned', 'closed') NOT NULL DEFAULT 'open',
+    assigned_staff_id INT NULL,
+    last_message_at TIMESTAMP NULL,
+    last_message_preview VARCHAR(200) NULL,
+    unread_customer INT NOT NULL DEFAULT 0,
+    unread_staff INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    closed_at TIMESTAMP NULL,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL,
+    FOREIGN KEY (assigned_staff_id) REFERENCES users(user_id) ON DELETE SET NULL,
+    INDEX idx_status (status),
+    INDEX idx_assigned_status (assigned_staff_id, status),
+    INDEX idx_last_message (last_message_at DESC),
+    INDEX idx_user (user_id),
+    INDEX idx_guest_token (guest_token)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==================================================
+-- BẢNG SUPPORT_CHAT_MESSAGES - Tin nhắn trong cuộc chat hỗ trợ
+-- ==================================================
+CREATE TABLE IF NOT EXISTS support_chat_messages (
+    message_id INT AUTO_INCREMENT PRIMARY KEY,
+    conversation_id INT NOT NULL,
+    sender_type ENUM('customer', 'staff', 'system') NOT NULL,
+    sender_id INT NULL,
+    content TEXT NOT NULL,
+    read_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (conversation_id) REFERENCES support_chat_conversations(conversation_id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_id) REFERENCES users(user_id) ON DELETE SET NULL,
+    INDEX idx_conv_created (conversation_id, created_at),
+    INDEX idx_sender (sender_type, sender_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==================================================
 -- END OF SCHEMA
 -- ==================================================

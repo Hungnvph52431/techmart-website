@@ -149,6 +149,14 @@ export class PaymentController {
       }
 
       if (verify.isVerified && verify.isSuccess) {
+        // Defense-in-depth: check amount khớp với đơn (dù signature đã verify)
+        const vnpAmount = Number((req.query as any)["vnp_Amount"]) / 100;
+        if (Math.abs(order.total - vnpAmount) > 1) {
+          console.warn(`[Payment] Amount mismatch: order=${order.total}, vnp=${vnpAmount}`);
+          return res.redirect(
+            `${FRONTEND_URL}/payment/result?status=failed&orderCode=${orderCode}`,
+          );
+        }
         await this.orderUseCase.updateOrderPaymentStatus(
           order.orderId,
           "paid",
@@ -233,8 +241,9 @@ export class PaymentController {
           }
           return res.json({ RspCode: "00", Message: "Confirm Success" });
         } catch (err) {
+          // KHÔNG trả "00" khi lỗi — VNPay phải retry để không mất tiền khách
           console.error("[Payment] wallet IPN error:", err);
-          return res.json({ RspCode: "00", Message: "Confirm Success" });
+          return res.json({ RspCode: "99", Message: "Unknown error, please retry" });
         }
       }
 

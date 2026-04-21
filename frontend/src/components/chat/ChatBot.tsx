@@ -1,18 +1,31 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import SupportChatPanel from "./SupportChatPanel";
+
+type ChatTab = "ai" | "staff";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
-}
-
-interface ChatResponse {
-  reply: string;
-  timestamp: string;
+  toolStatus?: string; // hiển thị khi AI đang gọi tool (vd "Đang tìm sản phẩm...")
 }
 
 const API_URL = import.meta.env.VITE_API_URL;
-console.log("ChatBot API_URL:", API_URL); // thêm dòng này
+
+// Map tool name → mô tả thân thiện cho user
+const TOOL_LABELS: Record<string, string> = {
+  search_products: "Đang tìm sản phẩm phù hợp",
+  get_product_detail: "Đang xem chi tiết sản phẩm",
+  lookup_order: "Đang tra đơn hàng",
+  get_active_coupons: "Đang tìm mã giảm giá",
+  get_categories: "Đang kiểm tra danh mục",
+};
+
+function describeTools(names: string[]): string {
+  const labels = names.map((n) => TOOL_LABELS[n] || "Đang xử lý");
+  const unique = Array.from(new Set(labels));
+  return unique.join(" · ") + "...";
+}
 const QUICK_QUESTIONS = [
   "Kiểm tra đơn hàng",
   "Chính sách đổi trả",
@@ -23,15 +36,22 @@ const QUICK_QUESTIONS = [
 const BOT_AVATAR = (
   <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: 28, height: 28 }}>
     <rect width="36" height="36" rx="10" fill="url(#botGrad)" />
-    <circle cx="13" cy="16" r="3" fill="white" opacity="0.9" />
-    <circle cx="23" cy="16" r="3" fill="white" opacity="0.9" />
-    <path d="M12 23 Q18 27 24 23" stroke="white" strokeWidth="2" strokeLinecap="round" fill="none" />
-    <rect x="15" y="7" width="6" height="3" rx="1.5" fill="white" opacity="0.6" />
-    <line x1="18" y1="10" x2="18" y2="13" stroke="white" strokeWidth="1.5" opacity="0.6" />
+    <text
+      x="18"
+      y="24"
+      textAnchor="middle"
+      fill="white"
+      fontFamily="Inter, sans-serif"
+      fontWeight="900"
+      fontSize="18"
+      letterSpacing="-0.5"
+    >
+      T
+    </text>
     <defs>
       <linearGradient id="botGrad" x1="0" y1="0" x2="36" y2="36">
-        <stop offset="0%" stopColor="#6366f1" />
-        <stop offset="100%" stopColor="#8b5cf6" />
+        <stop offset="0%" stopColor="#2563eb" />
+        <stop offset="100%" stopColor="#4f46e5" />
       </linearGradient>
     </defs>
   </svg>
@@ -39,10 +59,11 @@ const BOT_AVATAR = (
 
 export default function ChatBot() {
   const [isOpen, setIsOpen] = useState(false);
+  const [tab, setTab] = useState<ChatTab>("ai");
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "Xin chào! 👋 Tôi là trợ lý AI của shop. Tôi có thể giúp bạn về sản phẩm, đơn hàng, hoặc bất kỳ thắc mắc nào khác!",
+      content: "Xin chào! 👋 Tôi là trợ lý AI của TechMart. Mình có thể giúp bạn chọn điện thoại, laptop, tra đơn hàng hay thắc mắc về chính sách. Bạn đang cần gì nhỉ?",
       timestamp: new Date(),
     },
   ]);
@@ -69,6 +90,30 @@ export default function ChatBot() {
     }
   }, [isOpen]);
 
+  const appendAssistantDelta = useCallback((delta: string) => {
+    setMessages((prev) => {
+      const copy = [...prev];
+      const last = copy[copy.length - 1];
+      if (!last || last.role !== "assistant") return prev;
+      copy[copy.length - 1] = {
+        ...last,
+        content: last.content + delta,
+        toolStatus: undefined,
+      };
+      return copy;
+    });
+  }, []);
+
+  const setAssistantToolStatus = useCallback((status: string | undefined) => {
+    setMessages((prev) => {
+      const copy = [...prev];
+      const last = copy[copy.length - 1];
+      if (!last || last.role !== "assistant") return prev;
+      copy[copy.length - 1] = { ...last, toolStatus: status };
+      return copy;
+    });
+  }, []);
+
   const sendMessage = useCallback(
     async (text: string) => {
       const trimmed = text.trim();
@@ -84,12 +129,18 @@ export default function ChatBot() {
         .filter((m) => m.role !== "assistant" || messages.indexOf(m) > 0)
         .map((m) => ({ role: m.role, content: m.content }));
 
-      setMessages((prev) => [...prev, userMessage]);
+      // Thêm user message + bubble assistant rỗng (sẽ fill dần)
+      const placeholderAssistant: Message = {
+        role: "assistant",
+        content: "",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, userMessage, placeholderAssistant]);
       setInput("");
       setIsLoading(true);
 
       try {
-        const res = await fetch(`${API_URL}/chat`, {
+        const res = await fetch(`${API_URL}/chat/stream`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -98,35 +149,66 @@ export default function ChatBot() {
           }),
         });
 
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || "Lỗi không xác định");
+        if (!res.ok || !res.body) {
+          let errMsg = "Lỗi không xác định";
+          try {
+            const err = await res.json();
+            errMsg = err.error || errMsg;
+          } catch { /* not JSON */ }
+          throw new Error(errMsg);
         }
 
-        const data: ChatResponse = await res.json();
-        const botMessage: Message = {
-          role: "assistant",
-          content: data.reply,
-          timestamp: new Date(data.timestamp),
-        };
-        setMessages((prev) => [...prev, botMessage]);
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let gotAnyContent = false;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const frames = buffer.split("\n\n");
+          buffer = frames.pop() || "";
+
+          for (const frame of frames) {
+            if (!frame.startsWith("data: ")) continue;
+            const payload = frame.slice(6).trim();
+            if (!payload) continue;
+
+            try {
+              const event = JSON.parse(payload);
+              if (event.type === "content") {
+                gotAnyContent = true;
+                appendAssistantDelta(event.delta);
+              } else if (event.type === "tool_start") {
+                setAssistantToolStatus(describeTools(event.names || []));
+              } else if (event.type === "error") {
+                appendAssistantDelta(`⚠️ ${event.message}`);
+              }
+              // "done" không cần handle đặc biệt
+            } catch {
+              // ignore bad JSON
+            }
+          }
+        }
+
+        if (!gotAnyContent) {
+          appendAssistantDelta("Mình chưa nhận được phản hồi. Bạn thử lại nhé 😊");
+        }
 
         if (!isOpen) setHasNewMessage(true);
       } catch (error) {
-        const errMessage: Message = {
-          role: "assistant",
-          content:
-            error instanceof Error
-              ? `⚠️ ${error.message}`
-              : "⚠️ Có lỗi xảy ra. Vui lòng thử lại sau.",
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, errMessage]);
+        const msg =
+          error instanceof Error
+            ? `⚠️ ${error.message}`
+            : "⚠️ Có lỗi xảy ra. Vui lòng thử lại sau.";
+        appendAssistantDelta(msg);
       } finally {
         setIsLoading(false);
       }
     },
-    [messages, isLoading, isOpen]
+    [messages, isLoading, isOpen, appendAssistantDelta, setAssistantToolStatus]
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -143,11 +225,9 @@ export default function ChatBot() {
     <>
       {/* ===== STYLES ===== */}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap');
-
         .chatbot-root * {
           box-sizing: border-box;
-          font-family: 'Be Vietnam Pro', sans-serif;
+          font-family: 'Inter', sans-serif;
         }
 
         /* Toggle Button */
@@ -158,19 +238,19 @@ export default function ChatBot() {
           width: 56px;
           height: 56px;
           border-radius: 50%;
-          background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+          background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
           border: none;
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
-          box-shadow: 0 4px 20px rgba(99, 102, 241, 0.5);
+          box-shadow: 0 4px 20px rgba(37, 99, 235, 0.5);
           transition: transform 0.2s ease, box-shadow 0.2s ease;
           z-index: 9999;
         }
         .chatbot-toggle:hover {
           transform: scale(1.08);
-          box-shadow: 0 6px 28px rgba(99, 102, 241, 0.65);
+          box-shadow: 0 6px 28px rgba(37, 99, 235, 0.65);
         }
         .chatbot-toggle:active { transform: scale(0.96); }
 
@@ -199,7 +279,7 @@ export default function ChatBot() {
           height: 560px;
           border-radius: 20px;
           background: #ffffff;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.15), 0 0 0 1px rgba(99,102,241,0.1);
+          box-shadow: 0 20px 60px rgba(0,0,0,0.15), 0 0 0 1px rgba(37,99,235,0.1);
           display: flex;
           flex-direction: column;
           overflow: hidden;
@@ -224,7 +304,7 @@ export default function ChatBot() {
 
         /* Header */
         .chatbot-header {
-          background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+          background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
           padding: 16px 18px;
           display: flex;
           align-items: center;
@@ -281,12 +361,12 @@ export default function ChatBot() {
           display: flex;
           flex-direction: column;
           gap: 12px;
-          background: #f8f9ff;
+          background: #f8fafc;
           scroll-behavior: smooth;
         }
         .chatbot-messages::-webkit-scrollbar { width: 4px; }
         .chatbot-messages::-webkit-scrollbar-track { background: transparent; }
-        .chatbot-messages::-webkit-scrollbar-thumb { background: #d1d5f0; border-radius: 2px; }
+        .chatbot-messages::-webkit-scrollbar-thumb { background: #bfdbfe; border-radius: 2px; }
 
         /* Message Bubbles */
         .chatbot-msg-row {
@@ -301,7 +381,7 @@ export default function ChatBot() {
           border-radius: 10px;
           overflow: hidden;
           flex-shrink: 0;
-          background: linear-gradient(135deg, #6366f1, #8b5cf6);
+          background: linear-gradient(135deg, #2563eb, #4f46e5);
           display: flex; align-items: center; justify-content: center;
         }
 
@@ -327,7 +407,7 @@ export default function ChatBot() {
           box-shadow: 0 1px 4px rgba(0,0,0,0.07);
         }
         .chatbot-bubble.user {
-          background: linear-gradient(135deg, #6366f1, #818cf8);
+          background: linear-gradient(135deg, #2563eb, #3b82f6);
           color: white;
           border-radius: 16px 4px 16px 16px;
         }
@@ -349,7 +429,7 @@ export default function ChatBot() {
         }
         .chatbot-typing span {
           width: 7px; height: 7px;
-          background: #6366f1;
+          background: #2563eb;
           border-radius: 50%;
           animation: typing 1.2s infinite;
           opacity: 0.5;
@@ -360,6 +440,32 @@ export default function ChatBot() {
           0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
           30% { transform: translateY(-5px); opacity: 1; }
         }
+        .chatbot-tool-status {
+          margin-left: 6px;
+          font-size: 12px;
+          color: #2563eb;
+          font-weight: 500;
+          animation: toolStatusIn 0.2s ease;
+        }
+        @keyframes toolStatusIn {
+          from { opacity: 0; transform: translateX(-4px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+
+        /* Streaming caret */
+        .chatbot-caret {
+          display: inline-block;
+          width: 2px;
+          height: 13px;
+          background: #2563eb;
+          margin-left: 2px;
+          vertical-align: text-bottom;
+          animation: caretBlink 1s infinite;
+        }
+        @keyframes caretBlink {
+          0%, 50% { opacity: 1; }
+          51%, 100% { opacity: 0; }
+        }
 
         /* Quick Questions */
         .chatbot-quick {
@@ -367,26 +473,26 @@ export default function ChatBot() {
           display: flex;
           gap: 6px;
           flex-wrap: wrap;
-          background: #f8f9ff;
-          border-top: 1px solid #ede9fe;
+          background: #f8fafc;
+          border-top: 1px solid #dbeafe;
           flex-shrink: 0;
         }
         .chatbot-quick-btn {
           background: white;
-          border: 1.5px solid #ede9fe;
+          border: 1.5px solid #dbeafe;
           border-radius: 20px;
           padding: 5px 12px;
           font-size: 11.5px;
           font-weight: 600;
-          color: #6366f1;
+          color: #2563eb;
           cursor: pointer;
           transition: all 0.15s;
-          font-family: 'Be Vietnam Pro', sans-serif;
+          font-family: 'Inter', sans-serif;
           white-space: nowrap;
         }
         .chatbot-quick-btn:hover {
-          background: #ede9fe;
-          border-color: #6366f1;
+          background: #dbeafe;
+          border-color: #2563eb;
         }
 
         /* Input Area */
@@ -405,7 +511,7 @@ export default function ChatBot() {
           border-radius: 12px;
           padding: 10px 14px;
           font-size: 13.5px;
-          font-family: 'Be Vietnam Pro', sans-serif;
+          font-family: 'Inter', sans-serif;
           resize: none;
           outline: none;
           min-height: 42px;
@@ -417,7 +523,7 @@ export default function ChatBot() {
           overflow-y: auto;
         }
         .chatbot-textarea:focus {
-          border-color: #6366f1;
+          border-color: #2563eb;
           background: white;
         }
         .chatbot-textarea::placeholder { color: #b0b0c0; }
@@ -425,17 +531,234 @@ export default function ChatBot() {
         .chatbot-send {
           width: 42px; height: 42px;
           border-radius: 12px;
-          background: linear-gradient(135deg, #6366f1, #8b5cf6);
+          background: linear-gradient(135deg, #2563eb, #4f46e5);
           border: none;
           cursor: pointer;
           display: flex; align-items: center; justify-content: center;
           flex-shrink: 0;
           transition: transform 0.15s, opacity 0.15s;
-          box-shadow: 0 2px 8px rgba(99,102,241,0.35);
+          box-shadow: 0 2px 8px rgba(37,99,235,0.35);
         }
         .chatbot-send:hover:not(:disabled) { transform: scale(1.05); }
         .chatbot-send:active:not(:disabled) { transform: scale(0.95); }
         .chatbot-send:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* ===== Tabs ===== */
+        .chatbot-tabs {
+          display: flex;
+          background: white;
+          border-bottom: 1px solid #e5e7eb;
+          flex-shrink: 0;
+        }
+        .chatbot-tab {
+          flex: 1;
+          background: transparent;
+          border: none;
+          padding: 10px 12px;
+          font-size: 13px;
+          font-weight: 600;
+          color: #6b7280;
+          cursor: pointer;
+          font-family: 'Inter', sans-serif;
+          border-bottom: 2.5px solid transparent;
+          transition: all 0.15s;
+          display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        .chatbot-tab:hover { background: #f9fafb; color: #374151; }
+        .chatbot-tab.active {
+          color: #2563eb;
+          border-bottom-color: #2563eb;
+          background: #f8fafc;
+        }
+        .chatbot-tab span { font-size: 14px; }
+
+        /* ===== Support Panel ===== */
+        .support-panel {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          background: #f8fafc;
+          overflow: hidden;
+        }
+        .support-empty {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 14px;
+          padding: 20px;
+          text-align: center;
+          color: #6b7280;
+          font-size: 13px;
+        }
+        .support-spinner {
+          width: 28px; height: 28px;
+          border: 3px solid #dbeafe;
+          border-top-color: #2563eb;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .support-form {
+          padding: 16px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          overflow-y: auto;
+        }
+        .support-form-intro {
+          background: #dbeafe;
+          border-radius: 10px;
+          padding: 10px 12px;
+          font-size: 13px;
+          color: #1e40af;
+          line-height: 1.5;
+        }
+        .support-form-intro p { margin: 0; }
+        .support-field {
+          width: 100%;
+          border: 1.5px solid #e5e7eb;
+          border-radius: 10px;
+          padding: 9px 12px;
+          font-size: 13.5px;
+          font-family: 'Inter', sans-serif;
+          outline: none;
+          transition: border-color 0.15s;
+          background: white;
+        }
+        .support-field:focus { border-color: #2563eb; }
+        .support-field-area { resize: none; line-height: 1.5; }
+        .support-primary-btn {
+          background: linear-gradient(135deg, #2563eb, #4f46e5);
+          color: white;
+          border: none;
+          border-radius: 10px;
+          padding: 10px 16px;
+          font-size: 13.5px;
+          font-weight: 600;
+          cursor: pointer;
+          font-family: 'Inter', sans-serif;
+          box-shadow: 0 2px 8px rgba(37,99,235,0.25);
+          transition: transform 0.15s, opacity 0.15s;
+        }
+        .support-primary-btn:hover:not(:disabled) { transform: translateY(-1px); }
+        .support-primary-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .support-error {
+          background: #fef2f2;
+          border: 1px solid #fecaca;
+          border-radius: 8px;
+          padding: 8px 10px;
+          font-size: 12.5px;
+          color: #b91c1c;
+        }
+        .support-error-inline {
+          margin: 6px 12px 10px;
+        }
+        .support-form-hint { margin: 0; font-size: 12px; color: #6b7280; text-align: center; }
+
+        .support-status-banner {
+          background: #dbeafe;
+          padding: 8px 14px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 12.5px;
+          color: #1e40af;
+          font-weight: 500;
+          flex-shrink: 0;
+        }
+        .support-status-dot {
+          width: 7px; height: 7px;
+          background: #10b981;
+          border-radius: 50%;
+          animation: blink 2s infinite;
+        }
+
+        .support-messages {
+          flex: 1;
+          overflow-y: auto;
+          padding: 14px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .support-messages::-webkit-scrollbar { width: 4px; }
+        .support-messages::-webkit-scrollbar-thumb { background: #bfdbfe; border-radius: 2px; }
+        .support-msg-row {
+          display: flex;
+        }
+        .support-msg-row.mine { justify-content: flex-end; }
+        .support-msg-row.other { justify-content: flex-start; }
+        .support-bubble {
+          max-width: 78%;
+          padding: 9px 13px;
+          border-radius: 14px;
+          font-size: 13.5px;
+          line-height: 1.5;
+          word-break: break-word;
+          animation: bubbleIn 0.2s ease;
+        }
+        .support-bubble.mine {
+          background: linear-gradient(135deg, #2563eb, #3b82f6);
+          color: white;
+          border-radius: 14px 4px 14px 14px;
+        }
+        .support-bubble.other {
+          background: white;
+          color: #1e1e2e;
+          border-radius: 4px 14px 14px 14px;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+        }
+        .support-system-msg {
+          align-self: center;
+          background: #f3f4f6;
+          color: #6b7280;
+          font-size: 11.5px;
+          padding: 5px 12px;
+          border-radius: 12px;
+          font-style: italic;
+        }
+
+        .support-input-area {
+          padding: 10px 12px;
+          background: white;
+          border-top: 1px solid #f0f0f5;
+          display: flex;
+          gap: 8px;
+          align-items: flex-end;
+          flex-shrink: 0;
+        }
+        .support-textarea {
+          flex: 1;
+          border: 1.5px solid #e5e7eb;
+          border-radius: 12px;
+          padding: 9px 14px;
+          font-size: 13.5px;
+          font-family: 'Inter', sans-serif;
+          resize: none;
+          outline: none;
+          min-height: 40px;
+          max-height: 100px;
+          line-height: 1.5;
+          background: #fafafa;
+          transition: border-color 0.15s;
+        }
+        .support-textarea:focus { border-color: #2563eb; background: white; }
+        .support-send-btn {
+          width: 40px; height: 40px;
+          border-radius: 12px;
+          background: linear-gradient(135deg, #2563eb, #4f46e5);
+          border: none;
+          cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          flex-shrink: 0;
+          box-shadow: 0 2px 8px rgba(37,99,235,0.3);
+          transition: transform 0.15s;
+        }
+        .support-send-btn:hover:not(:disabled) { transform: scale(1.05); }
+        .support-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
       `}</style>
 
       {/* ===== TOGGLE BUTTON ===== */}
@@ -464,10 +787,14 @@ export default function ChatBot() {
             <div className="chatbot-header">
               <div className="chatbot-avatar">{BOT_AVATAR}</div>
               <div className="chatbot-header-info">
-                <p className="chatbot-header-name">Trợ lý AI Shop</p>
+                <p className="chatbot-header-name">
+                  {tab === "ai" ? "TechMart AI" : "Hỗ trợ viên TechMart"}
+                </p>
                 <div className="chatbot-header-status">
                   <span className="chatbot-status-dot" />
-                  <span className="chatbot-status-text">Đang hoạt động</span>
+                  <span className="chatbot-status-text">
+                    {tab === "ai" ? "Trả lời tức thì" : "Chat trực tiếp với nhân viên"}
+                  </span>
                 </div>
               </div>
               <button
@@ -481,30 +808,60 @@ export default function ChatBot() {
               </button>
             </div>
 
+            {/* Tab Bar */}
+            <div className="chatbot-tabs">
+              <button
+                className={`chatbot-tab ${tab === "ai" ? "active" : ""}`}
+                onClick={() => setTab("ai")}
+              >
+                <span>🤖</span> Trợ lý AI
+              </button>
+              <button
+                className={`chatbot-tab ${tab === "staff" ? "active" : ""}`}
+                onClick={() => setTab("staff")}
+              >
+                <span>💬</span> Nhân viên
+              </button>
+            </div>
+
+            {tab === "staff" ? (
+              <SupportChatPanel active={isOpen && tab === "staff"} />
+            ) : (
+              <>
             {/* Messages */}
             <div className="chatbot-messages">
-              {messages.map((msg, i) => (
-                <div key={i} className={`chatbot-msg-row ${msg.role}`}>
-                  {msg.role === "assistant" && (
-                    <div className="chatbot-avatar">{BOT_AVATAR}</div>
-                  )}
-                  <div className="chatbot-bubble-wrap">
-                    <div className={`chatbot-bubble ${msg.role}`}>
-                      {msg.content}
+              {messages.map((msg, i) => {
+                const isEmptyAssistant =
+                  msg.role === "assistant" && msg.content.length === 0;
+                return (
+                  <div key={i} className={`chatbot-msg-row ${msg.role}`}>
+                    {msg.role === "assistant" && (
+                      <div className="chatbot-avatar">{BOT_AVATAR}</div>
+                    )}
+                    <div className="chatbot-bubble-wrap">
+                      {isEmptyAssistant ? (
+                        <div className="chatbot-typing">
+                          <span /><span /><span />
+                          {msg.toolStatus && (
+                            <span className="chatbot-tool-status">{msg.toolStatus}</span>
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          <div className={`chatbot-bubble ${msg.role}`}>
+                            {msg.content}
+                            {msg.role === "assistant" && isLoading && i === messages.length - 1 && (
+                              <span className="chatbot-caret" />
+                            )}
+                          </div>
+                          <span className="chatbot-time">{formatTime(msg.timestamp)}</span>
+                        </>
+                      )}
                     </div>
-                    <span className="chatbot-time">{formatTime(msg.timestamp)}</span>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
-              {isLoading && (
-                <div className="chatbot-msg-row assistant">
-                  <div className="chatbot-avatar">{BOT_AVATAR}</div>
-                  <div className="chatbot-typing">
-                    <span /><span /><span />
-                  </div>
-                </div>
-              )}
               <div ref={messagesEndRef} />
             </div>
 
@@ -545,6 +902,8 @@ export default function ChatBot() {
                 </svg>
               </button>
             </div>
+              </>
+            )}
           </div>
         )}
       </div>

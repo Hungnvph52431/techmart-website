@@ -88,6 +88,15 @@ import { createReviewRoutes, createAdminReviewRoutes } from './presentation/rout
 import { createLocationRoutes } from './presentation/routes/location.routes';
 import { createWishlistRoutes } from './presentation/routes/wishlist.routes';
 import { createChatRoutes } from './presentation/routes/chat.routes';
+import {
+  createSupportChatCustomerRoutes,
+  createSupportChatStaffRoutes,
+} from './presentation/routes/supportChat.routes';
+import { SupportChatRepository } from './infrastructure/repositories/SupportChatRepository';
+import { SupportChatUseCase } from './application/use-cases/SupportChatUseCase';
+import { SupportChatController } from './presentation/controllers/SupportChatController';
+import { SupportChatSocketServer } from './infrastructure/socket/SupportChatSocket';
+import http from 'http';
 
 import path from 'path';
 
@@ -173,6 +182,12 @@ const shipperController = new ShipperController(shipperUseCase);
 const wishlistController = new WishlistController(wishlistUseCase);
 const codPaymentRepository = new PaymentRepository();
 const codController = new CODController(codPaymentRepository);
+
+// Support Chat (Live Chat nhân viên)
+const supportChatRepository = new SupportChatRepository();
+const supportChatUseCase = new SupportChatUseCase(supportChatRepository);
+const supportChatController = new SupportChatController(supportChatUseCase);
+
 // --- ROUTES MOUNTING ---
 // Public & Customer Routes
 app.use('/api/auth', createAuthRoutes(authController));
@@ -193,6 +208,8 @@ app.use('/api/wishlist', createWishlistRoutes(wishlistController));
 app.use('/api/shipper', createShipperRoutes(shipperController));
 app.use('/api', createCODRoutes(codController));
 app.use('/api/chat', createChatRoutes());
+app.use('/api/support', createSupportChatCustomerRoutes(supportChatController));
+app.use('/api/staff/support', createSupportChatStaffRoutes(supportChatController));
 
 // Admin Routes
 app.use('/api/admin/products', createAdminProductRoutes(adminProductController));
@@ -208,19 +225,35 @@ app.get('/health', (_req, res) => {
 });
 
 // --- START SERVER ---
+const httpServer = http.createServer(app);
+
+const corsOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',')
+  : ['http://localhost:5173', 'http://localhost:5174'];
+
+// Socket.io cho live chat hỗ trợ
+const supportSocketServer = new SupportChatSocketServer(
+  httpServer,
+  supportChatUseCase,
+  corsOrigins
+);
+// Cho phép controller emit socket events (vd khi staff assign/close qua REST)
+supportChatController.setSocketServer(supportSocketServer);
+
 const startServer = async () => {
   try {
     await testConnection();
-    app.listen(PORT, () => {
+    httpServer.listen(PORT, () => {
       console.log(`🚀 Server is running on port ${PORT}`);
       console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`🔌 Socket.io /support namespace ready`);
       console.log(
         `🗺️ Vietnam administrative dataset: ${vietnamAdministrativeService.getSummary().provinceCount} provinces, ${vietnamAdministrativeService.getSummary().wardCount} wards`
       );
 
       const scheduler = new OrderScheduler(orderUseCase);
       scheduler.start();
-      paymentScheduler(); 
+      paymentScheduler();
     });
   } catch (error) {
     console.error('Failed to start server:', error);
