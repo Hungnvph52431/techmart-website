@@ -11,47 +11,66 @@ import {
 } from '@/services/supportChat.service';
 
 const API_URL = import.meta.env.VITE_API_URL as string;
-const SOCKET_URL = API_URL.replace(/\/api\/?$/, ''); // strip /api suffix
+const SOCKET_URL = API_URL.replace(/\/api\/?$/, '');
 
 const LS_CONV_ID = 'techmart_support_conversation_id';
 const LS_GUEST_TOKEN = 'techmart_support_guest_token';
+const LS_GUEST_NAME = 'techmart_support_guest_name';
+const LS_GUEST_EMAIL = 'techmart_support_guest_email';
 
 interface Props {
-  active: boolean; // tab đang được hiện - dùng để auto mark-read
+  active: boolean;
 }
 
-type Phase = 'loading' | 'form' | 'chat' | 'closed' | 'error';
+type Phase = 'loading' | 'active' | 'closed';
+
+const WELCOME_QUICK_REPLIES = [
+  'Kiểm tra đơn hàng',
+  'Đổi/trả hàng',
+  'Bảo hành sản phẩm',
+];
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
 export default function SupportChatPanel({ active }: Props) {
   const { user, token } = useAuthStore();
   const isLoggedIn = !!token;
 
   const [phase, setPhase] = useState<Phase>('loading');
-  const [errorMsg, setErrorMsg] = useState<string>('');
   const [conversation, setConversation] = useState<SupportConversation | null>(null);
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
-  const [staffName, setStaffName] = useState<string>('');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [staffName, setStaffName] = useState('');
 
-  // Form state (cho khách vãng lai)
-  const [formName, setFormName] = useState('');
-  const [formEmail, setFormEmail] = useState('');
-  const [formSubject, setFormSubject] = useState('');
-  const [formMessage, setFormMessage] = useState('');
+  // Guest identity — chỉ hỏi 1 lần, lưu localStorage
+  const [guestName, setGuestName] = useState(
+    () => localStorage.getItem(LS_GUEST_NAME) || ''
+  );
+  const [guestEmail, setGuestEmail] = useState(
+    () => localStorage.getItem(LS_GUEST_EMAIL) || ''
+  );
 
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  const needsGuestInfo = !isLoggedIn && (!guestName.trim() || !guestEmail.trim());
+
   // ==================================================
-  // Khởi tạo: check localStorage, load conversation nếu có
+  // Load conversation từ localStorage
   // ==================================================
   useEffect(() => {
     const savedId = localStorage.getItem(LS_CONV_ID);
     const savedGuestToken = localStorage.getItem(LS_GUEST_TOKEN);
     if (!savedId) {
-      setPhase('form');
+      setPhase('active');
       return;
     }
     const conversationId = Number(savedId);
@@ -64,7 +83,7 @@ export default function SupportChatPanel({ active }: Props) {
         });
         if (conv.status === 'closed') {
           clearLocalConversation();
-          setPhase('closed');
+          setPhase('active');
           return;
         }
         const msgs = await getMessages(conversationId, {
@@ -73,40 +92,40 @@ export default function SupportChatPanel({ active }: Props) {
         });
         setConversation(conv);
         setMessages(msgs);
-        setPhase('chat');
-      } catch (err) {
-        // Có thể conversation không còn truy cập được → xóa và quay về form
+        setPhase('active');
+      } catch {
         clearLocalConversation();
-        setPhase('form');
+        setPhase('active');
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ==================================================
-  // Kết nối Socket khi vào phase chat
+  // Kết nối Socket khi có conversation
   // ==================================================
   useEffect(() => {
-    if (phase !== 'chat' || !conversation) return;
+    if (!conversation) return;
 
-    const guestToken = localStorage.getItem(LS_GUEST_TOKEN) || undefined;
+    const guestTok = localStorage.getItem(LS_GUEST_TOKEN) || undefined;
     const socket = io(`${SOCKET_URL}/support`, {
-      auth: token ? { token } : { guestToken },
+      auth: token ? { token } : { guestToken: guestTok },
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 5,
     });
     socketRef.current = socket;
 
     socket.on('connect', () => {
-      socket.emit('join-conversation', { conversationId: conversation.conversationId }, () => {
-        // no-op
-      });
+      socket.emit(
+        'join-conversation',
+        { conversationId: conversation.conversationId },
+        () => {}
+      );
     });
 
     socket.on('new-message', (msg: SupportMessage & { senderName?: string }) => {
       if (msg.conversationId !== conversation.conversationId) return;
       setMessages((prev) => {
-        // Dedupe nếu message đã tồn tại (mình gửi REST fallback rồi socket echo)
         if (prev.some((m) => m.messageId === msg.messageId)) return prev;
         return [...prev, msg];
       });
@@ -115,8 +134,7 @@ export default function SupportChatPanel({ active }: Props) {
     socket.on('conversation-assigned', (evt: { conversationId: number; staffName: string }) => {
       if (evt.conversationId !== conversation.conversationId) return;
       setStaffName(evt.staffName);
-      setConversation((prev) => prev ? { ...prev, status: 'assigned' } : prev);
-      // Thêm system message vào UI (không lưu DB)
+      setConversation((prev) => (prev ? { ...prev, status: 'assigned' } : prev));
       setMessages((prev) => [
         ...prev,
         {
@@ -124,7 +142,7 @@ export default function SupportChatPanel({ active }: Props) {
           conversationId: evt.conversationId,
           senderType: 'system',
           senderId: null,
-          content: `${evt.staffName} đã tham gia cuộc hội thoại`,
+          content: `${evt.staffName} đã tham gia cuộc trò chuyện`,
           readAt: null,
           createdAt: new Date().toISOString(),
         },
@@ -144,21 +162,28 @@ export default function SupportChatPanel({ active }: Props) {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [phase, conversation?.conversationId, token, conversation]);
+  }, [conversation?.conversationId, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ==================================================
-  // Auto scroll + mark-read khi tab active
+  // Auto scroll + mark-read
   // ==================================================
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, phase]);
 
   useEffect(() => {
-    if (!active || phase !== 'chat' || !conversation) return;
-    const guestToken = localStorage.getItem(LS_GUEST_TOKEN) || undefined;
-    markReadAsCustomer(conversation.conversationId, { token, guestToken }).catch(() => {});
+    if (!active || !conversation) return;
+    const guestTok = localStorage.getItem(LS_GUEST_TOKEN) || undefined;
+    markReadAsCustomer(conversation.conversationId, { token, guestToken: guestTok }).catch(() => {});
     socketRef.current?.emit('mark-read', { conversationId: conversation.conversationId });
-  }, [active, phase, conversation, messages.length, token]);
+  }, [active, conversation, messages.length, token]);
+
+  // Auto focus input khi mở tab
+  useEffect(() => {
+    if (active && phase === 'active') {
+      setTimeout(() => inputRef.current?.focus(), 150);
+    }
+  }, [active, phase]);
 
   // ==================================================
   // Handlers
@@ -168,82 +193,100 @@ export default function SupportChatPanel({ active }: Props) {
     localStorage.removeItem(LS_GUEST_TOKEN);
   };
 
-  const handleSubmitForm = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg('');
+  const validateGuest = (): string | null => {
+    if (!guestName.trim()) return 'Vui lòng nhập tên';
+    if (!/^\S+@\S+\.\S+$/.test(guestEmail)) return 'Email không hợp lệ';
+    return null;
+  };
 
-    const msg = formMessage.trim();
-    if (!msg) {
-      setErrorMsg('Vui lòng nhập nội dung cần hỗ trợ.');
-      return;
-    }
-    if (!isLoggedIn) {
-      if (!formName.trim() || !formEmail.trim()) {
-        setErrorMsg('Vui lòng nhập tên và email.');
-        return;
-      }
-      if (!/^\S+@\S+\.\S+$/.test(formEmail)) {
-        setErrorMsg('Email không hợp lệ.');
-        return;
-      }
-    }
-
-    try {
-      setSending(true);
-      const result = await createConversation(
-        {
-          guestName: isLoggedIn ? undefined : formName.trim(),
-          guestEmail: isLoggedIn ? undefined : formEmail.trim(),
-          subject: formSubject.trim() || undefined,
-          initialMessage: msg,
-        },
-        token
-      );
-      localStorage.setItem(LS_CONV_ID, String(result.conversation.conversationId));
-      if (result.guestToken) {
-        localStorage.setItem(LS_GUEST_TOKEN, result.guestToken);
-      }
-      setConversation(result.conversation);
-      setMessages([result.firstMessage]);
-      setPhase('chat');
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Lỗi không xác định');
-    } finally {
-      setSending(false);
-    }
-  }, [formMessage, formName, formEmail, formSubject, isLoggedIn, token]);
-
-  const handleSendMessage = useCallback(() => {
-    const content = input.trim();
-    if (!content || !conversation || sending) return;
-    const socket = socketRef.current;
-    if (!socket?.connected) {
-      setErrorMsg('Mất kết nối. Đang thử lại...');
-      return;
-    }
-    setSending(true);
-    socket.emit(
-      'send-message',
-      { conversationId: conversation.conversationId, content },
-      (ack: { ok: boolean; error?: string; data?: SupportMessage }) => {
-        setSending(false);
-        if (!ack?.ok) {
-          setErrorMsg(ack?.error || 'Gửi tin thất bại.');
+  const sendFirstMessage = useCallback(
+    async (content: string) => {
+      setErrorMsg('');
+      if (!isLoggedIn) {
+        const err = validateGuest();
+        if (err) {
+          setErrorMsg(err);
           return;
         }
-        setInput('');
-        // Server sẽ emit new-message → component tự nhận; nhưng thêm ngay để mượt
-        if (ack.data && !messages.some((m) => m.messageId === ack.data!.messageId)) {
-          setMessages((prev) => [...prev, ack.data!]);
-        }
       }
-    );
-  }, [input, conversation, sending, messages]);
+
+      try {
+        setSending(true);
+        const result = await createConversation(
+          {
+            guestName: isLoggedIn ? undefined : guestName.trim(),
+            guestEmail: isLoggedIn ? undefined : guestEmail.trim(),
+            initialMessage: content,
+          },
+          token
+        );
+        localStorage.setItem(LS_CONV_ID, String(result.conversation.conversationId));
+        if (result.guestToken) {
+          localStorage.setItem(LS_GUEST_TOKEN, result.guestToken);
+          localStorage.setItem(LS_GUEST_NAME, guestName.trim());
+          localStorage.setItem(LS_GUEST_EMAIL, guestEmail.trim());
+        }
+        setConversation(result.conversation);
+        setMessages([result.firstMessage]);
+        setInput('');
+      } catch (err) {
+        setErrorMsg(err instanceof Error ? err.message : 'Lỗi không xác định');
+      } finally {
+        setSending(false);
+      }
+    },
+    [isLoggedIn, guestName, guestEmail, token]
+  );
+
+  const sendViaSocket = useCallback(
+    (content: string) => {
+      if (!conversation) return;
+      const socket = socketRef.current;
+      if (!socket?.connected) {
+        setErrorMsg('Mất kết nối, đang thử lại...');
+        return;
+      }
+      setSending(true);
+      socket.emit(
+        'send-message',
+        { conversationId: conversation.conversationId, content },
+        (ack: { ok: boolean; error?: string; data?: SupportMessage }) => {
+          setSending(false);
+          if (!ack?.ok) {
+            setErrorMsg(ack?.error || 'Gửi tin thất bại');
+            return;
+          }
+          setInput('');
+          if (ack.data) {
+            setMessages((prev) => {
+              if (prev.some((m) => m.messageId === ack.data!.messageId)) return prev;
+              return [...prev, ack.data!];
+            });
+          }
+        }
+      );
+    },
+    [conversation]
+  );
+
+  const handleSend = useCallback(
+    (text?: string) => {
+      const content = (text ?? input).trim();
+      if (!content || sending) return;
+      setErrorMsg('');
+      if (!conversation) {
+        sendFirstMessage(content);
+      } else {
+        sendViaSocket(content);
+      }
+    },
+    [input, sending, conversation, sendFirstMessage, sendViaSocket]
+  );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSendMessage();
+      handleSend();
     }
   };
 
@@ -252,9 +295,8 @@ export default function SupportChatPanel({ active }: Props) {
     setConversation(null);
     setMessages([]);
     setStaffName('');
-    setFormMessage('');
-    setFormSubject('');
-    setPhase('form');
+    setInput('');
+    setPhase('active');
   };
 
   // ==================================================
@@ -266,7 +308,7 @@ export default function SupportChatPanel({ active }: Props) {
       <div className="support-panel">
         <div className="support-empty">
           <div className="support-spinner" />
-          <p>Đang tải cuộc hội thoại...</p>
+          <p>Đang tải cuộc trò chuyện...</p>
         </div>
       </div>
     );
@@ -276,7 +318,9 @@ export default function SupportChatPanel({ active }: Props) {
     return (
       <div className="support-panel">
         <div className="support-empty">
-          <p>Cuộc hội thoại đã kết thúc.</p>
+          <div className="support-empty-icon">✓</div>
+          <p className="support-empty-title">Cuộc trò chuyện đã kết thúc</p>
+          <p className="support-empty-sub">Cảm ơn bạn đã liên hệ TechMart</p>
           <button className="support-primary-btn" onClick={startNewChat}>
             Bắt đầu chat mới
           </button>
@@ -285,75 +329,63 @@ export default function SupportChatPanel({ active }: Props) {
     );
   }
 
-  if (phase === 'form') {
-    return (
-      <div className="support-panel">
-        <form className="support-form" onSubmit={handleSubmitForm}>
-          <div className="support-form-intro">
-            <p>Đội ngũ TechMart sẽ trả lời bạn trong vài phút. Vui lòng mô tả vấn đề:</p>
-          </div>
-          {!isLoggedIn && (
-            <>
-              <input
-                className="support-field"
-                placeholder="Tên của bạn"
-                value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-                required
-              />
-              <input
-                className="support-field"
-                type="email"
-                placeholder="Email"
-                value={formEmail}
-                onChange={(e) => setFormEmail(e.target.value)}
-                required
-              />
-            </>
-          )}
-          <input
-            className="support-field"
-            placeholder="Chủ đề (vd: Đơn ORD-... chưa về)"
-            value={formSubject}
-            onChange={(e) => setFormSubject(e.target.value)}
-          />
-          <textarea
-            className="support-field support-field-area"
-            placeholder="Mô tả chi tiết..."
-            rows={3}
-            value={formMessage}
-            onChange={(e) => setFormMessage(e.target.value)}
-            required
-          />
-          {errorMsg && <div className="support-error">{errorMsg}</div>}
-          <button type="submit" className="support-primary-btn" disabled={sending}>
-            {sending ? 'Đang gửi...' : 'Bắt đầu chat'}
-          </button>
-          {isLoggedIn && user && (
-            <p className="support-form-hint">
-              Bạn đang đăng nhập với <b>{user.fullName}</b>
-            </p>
-          )}
-        </form>
-      </div>
-    );
-  }
-
-  // phase === 'chat'
-  const statusLine =
-    conversation?.status === 'assigned' && staffName
-      ? `${staffName} đang hỗ trợ bạn`
-      : conversation?.status === 'assigned'
-        ? 'Nhân viên đang hỗ trợ bạn'
-        : 'Đang chờ nhân viên tham gia...';
+  // phase === 'active'
+  const isClosed = conversation?.status === 'closed';
+  const showGuestFields = !conversation && needsGuestInfo;
+  const statusBanner = conversation
+    ? conversation.status === 'assigned'
+      ? staffName
+        ? `${staffName} đang hỗ trợ bạn`
+        : 'Nhân viên đang hỗ trợ bạn'
+      : 'Đang kết nối với nhân viên...'
+    : null;
 
   return (
     <div className="support-panel">
-      <div className="support-status-banner">
-        <span className="support-status-dot" />
-        <span>{statusLine}</span>
-      </div>
+      {statusBanner && (
+        <div className="support-status-banner">
+          <span className="support-status-dot" />
+          <span>{statusBanner}</span>
+        </div>
+      )}
+
       <div className="support-messages">
+        {/* Welcome bubble hiển thị khi chưa có conversation */}
+        {!conversation && (
+          <>
+            <div className="support-msg-row other">
+              <div className="support-staff-avatar">T</div>
+              <div className="support-bubble other">
+                {isLoggedIn ? (
+                  <>Xin chào <b>{user?.fullName}</b>! 👋<br />Tụi mình hỗ trợ 24/7, bạn cần giúp gì ạ?</>
+                ) : (
+                  <>Xin chào! 👋<br />Tụi mình là nhân viên TechMart. Bạn cần tư vấn gì nhỉ?</>
+                )}
+              </div>
+            </div>
+            <div className="support-quick-replies">
+              {WELCOME_QUICK_REPLIES.map((q) => (
+                <button
+                  key={q}
+                  className="support-quick-chip"
+                  onClick={() => {
+                    if (needsGuestInfo) {
+                      setInput(q);
+                      inputRef.current?.focus();
+                    } else {
+                      handleSend(q);
+                    }
+                  }}
+                  disabled={sending}
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Tin nhắn cuộc trò chuyện */}
         {messages.map((msg) => {
           if (msg.senderType === 'system') {
             return (
@@ -368,8 +400,12 @@ export default function SupportChatPanel({ active }: Props) {
               key={msg.messageId}
               className={`support-msg-row ${isMine ? 'mine' : 'other'}`}
             >
-              <div className={`support-bubble ${isMine ? 'mine' : 'other'}`}>
-                {msg.content}
+              {!isMine && <div className="support-staff-avatar">T</div>}
+              <div className="support-bubble-wrap">
+                <div className={`support-bubble ${isMine ? 'mine' : 'other'}`}>
+                  {msg.content}
+                </div>
+                <span className="support-msg-time">{formatTime(msg.createdAt)}</span>
               </div>
             </div>
           );
@@ -377,29 +413,64 @@ export default function SupportChatPanel({ active }: Props) {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Guest fields (compact, chỉ hỏi lần đầu) */}
+      {showGuestFields && (
+        <div className="support-guest-fields">
+          <input
+            className="support-guest-field"
+            placeholder="Tên của bạn"
+            value={guestName}
+            onChange={(e) => setGuestName(e.target.value)}
+            disabled={sending}
+          />
+          <input
+            className="support-guest-field"
+            type="email"
+            placeholder="Email để liên hệ lại"
+            value={guestEmail}
+            onChange={(e) => setGuestEmail(e.target.value)}
+            disabled={sending}
+          />
+        </div>
+      )}
+
+      {errorMsg && <div className="support-error-inline">{errorMsg}</div>}
+
+      {/* Input area */}
       <div className="support-input-area">
         <textarea
           ref={inputRef}
           className="support-textarea"
-          placeholder="Nhập tin nhắn..."
+          placeholder={
+            isClosed
+              ? 'Hội thoại đã đóng'
+              : conversation
+                ? 'Nhập tin nhắn...'
+                : 'Nhập tin nhắn đầu tiên...'
+          }
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           rows={1}
-          disabled={sending || conversation?.status === 'closed'}
+          disabled={sending || isClosed}
         />
         <button
           className="support-send-btn"
-          onClick={handleSendMessage}
-          disabled={sending || !input.trim()}
+          onClick={() => handleSend()}
+          disabled={sending || !input.trim() || isClosed}
           aria-label="Gửi"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path
+              d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"
+              stroke="white"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </button>
       </div>
-      {errorMsg && <div className="support-error support-error-inline">{errorMsg}</div>}
     </div>
   );
 }
