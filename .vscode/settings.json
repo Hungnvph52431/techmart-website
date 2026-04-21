@@ -1,5 +1,6 @@
 {
     "chat.tools.terminal.autoApprove": {
         "npm install": true
-    }
+    },
+    "typescript.tsdk": "backend/node_modules/typescript/lib"
 }
