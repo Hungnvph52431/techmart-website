@@ -5,6 +5,7 @@ import { IOrderRepository, OrderStats } from '../../domain/repositories/IOrderRe
 import {
   AdminOrderListFilters,
   CancelOrderDTO,
+  CancelOrderReturnDTO,
   CloseOrderReturnDTO,
   CreateOrderDTO,
   CreateOrderReturnDTO,
@@ -1228,6 +1229,43 @@ export class OrderRepository implements IOrderRepository {
       connection.release();
     }
   }
+
+  async cancelReturn(input: CancelOrderReturnDTO): Promise<OrderReturn | null> {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const now = new Date();
+
+      const [result] = await connection.execute<ResultSetHeader>(
+        `UPDATE order_returns SET status = 'cancelled', cancelled_at = ?, updated_at = ?
+         WHERE order_return_id = ? AND order_id = ? AND status = 'requested'`,
+        [now, now, input.orderReturnId, input.orderId]
+      );
+
+      if (result.affectedRows === 0) {
+        await connection.rollback();
+        return null;
+      }
+
+      await this.appendEventWithConnection(connection, {
+        orderId: input.orderId,
+        eventType: 'return_cancelled',
+        toStatus: 'cancelled',
+        actorUserId: input.actorUserId,
+        actorRole: input.actorRole,
+        note: input.customerNote,
+      });
+
+      await connection.commit();
+      return this.getReturnById(input.orderId, input.orderReturnId);
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
   async updatePaymentStatus(input: UpdatePaymentStatusDTO): Promise<Order | null> {
     const connection = await pool.getConnection();
     try {

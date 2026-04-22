@@ -199,6 +199,14 @@ export const orderService = {
     return response.data;
   },
 
+  cancelReturn: async (orderId: number, returnId: number, customerNote?: string): Promise<OrderReturnView> => {
+    const response = await api.post(
+      `/orders/my-orders/${orderId}/returns/${returnId}/cancel`,
+      customerNote ? { customerNote } : {},
+    );
+    return response.data;
+  },
+
   // 4. ADMIN — QUẢN LÝ HOÀN TRẢ
   adminGetAllReturns: async (filters?: { status?: string }): Promise<OrderReturnView[]> => {
     const params = new URLSearchParams();

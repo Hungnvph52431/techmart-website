@@ -17,7 +17,8 @@ export type ReturnStatus =
   | 'rejected'
   | 'received'
   | 'refunded'
-  | 'closed';
+  | 'closed'
+  | 'cancelled';
 
 export type ReturnRestockAction = 'restock' | 'inspect' | 'discard';
 
@@ -127,6 +128,7 @@ export interface OrderReturnView {
   receivedAt?: string;
   refundedAt?: string;
   closedAt?: string;
+  cancelledAt?: string;
   updatedAt: string;
   items: OrderReturnItemView[];
 }

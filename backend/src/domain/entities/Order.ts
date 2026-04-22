@@ -24,7 +24,8 @@ export type OrderEventType =
   | 'return_rejected'
   | 'return_received'
   | 'return_refunded'
-  | 'return_closed';
+  | 'return_closed'
+  | 'return_cancelled';
 
 export type ReturnStatus =
   | 'requested'
@@ -32,7 +33,8 @@ export type ReturnStatus =
   | 'rejected'
   | 'received'
   | 'refunded'
-  | 'closed';
+  | 'closed'
+  | 'cancelled';
 
 export type ReturnRestockAction = 'restock' | 'inspect' | 'discard';
 
@@ -291,4 +293,12 @@ export interface CloseOrderReturnDTO {
   actorUserId: number;
   actorRole: OrderActorRole;
   adminNote?: string;
+}
+
+export interface CancelOrderReturnDTO {
+  orderId: number;
+  orderReturnId: number;
+  actorUserId: number;
+  actorRole: OrderActorRole;
+  customerNote?: string;
 }

@@ -23,6 +23,7 @@ const STATUS_LABEL: Record<ReturnStatus, string> = {
   received:  'Đã nhận hàng',
   refunded:  'Đã hoàn tiền',
   closed:    'Đã đóng',
+  cancelled: 'Khách hủy',
 };
 
 const STATUS_STYLE: Record<ReturnStatus, string> = {
@@ -32,6 +33,7 @@ const STATUS_STYLE: Record<ReturnStatus, string> = {
   received:  'bg-purple-100 text-purple-800',
   refunded:  'bg-emerald-100 text-emerald-800',
   closed:    'bg-gray-100 text-gray-600',
+  cancelled: 'bg-gray-200 text-gray-700',
 };
 
 const FILTER_OPTIONS: { value: string; label: string }[] = [

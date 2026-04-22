@@ -292,6 +292,27 @@ export class OrderController {
     }
   };
 
+  /** Khách tự hủy yêu cầu trả hàng (chỉ khi đang chờ duyệt) */
+  cancelMyReturn = async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await this.orderUseCase.cancelReturn(
+        Number(req.params.id),
+        Number(req.params.returnId),
+        req.user.userId,
+        req.user.role,
+        req.body?.customerNote,
+      );
+      if (!result) {
+        return res
+          .status(404)
+          .json({ message: "Không tìm thấy yêu cầu trả hàng" });
+      }
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  };
+
   createGuestReturn = async (req: GuestOrderRequest, res: Response) => {
     try {
       const { orderCode, email } = this.ensureGuestOrderAccess(

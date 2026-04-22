@@ -424,7 +424,8 @@ CREATE TABLE order_events (
         'return_rejected',
         'return_received',
         'return_refunded',
-        'return_closed'
+        'return_closed',
+        'return_cancelled'
     ) NOT NULL,
     from_status VARCHAR(50),
     to_status VARCHAR(50),
@@ -449,7 +450,7 @@ CREATE TABLE order_returns (
     order_id INT NOT NULL,
     request_code VARCHAR(50) NOT NULL UNIQUE,
     requested_by INT NULL,
-    status ENUM('requested', 'approved', 'rejected', 'received', 'refunded', 'closed') DEFAULT 'requested',
+    status ENUM('requested', 'approved', 'rejected', 'received', 'refunded', 'closed', 'cancelled') DEFAULT 'requested',
     reason TEXT NOT NULL,
     customer_note TEXT,
     evidence_images JSON NULL,
@@ -460,6 +461,7 @@ CREATE TABLE order_returns (
     received_at TIMESTAMP NULL,
     refunded_at TIMESTAMP NULL,
     closed_at TIMESTAMP NULL,
+    cancelled_at TIMESTAMP NULL,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE,
     FOREIGN KEY (requested_by) REFERENCES users(user_id) ON DELETE SET NULL,

@@ -509,7 +509,7 @@ export class ReviewController {
       );
 
       if ((orderRows as any[]).length === 0) {
-        return res.status(403).json({ message: 'Bạn cần mua và xác nhận nhận hàng thành công mới có thể đánh giá sản phẩm này' });
+        return res.status(403).json({ message: 'Bạn cần mua sản phẩm này để đánh giá' });
       }
 
       const orderId = orderRows[0].order_id;

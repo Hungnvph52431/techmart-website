@@ -47,6 +47,7 @@ const RETURN_STATUS_LABELS: Record<ReturnStatus, string> = {
   received: 'Đã nhận hàng',
   refunded: 'Đã hoàn tiền',
   closed: 'Đã đóng',
+  cancelled: 'Đã hủy',
 };
 
 const EVENT_LABELS: Record<OrderEvent['eventType'], string> = {
@@ -60,6 +61,7 @@ const EVENT_LABELS: Record<OrderEvent['eventType'], string> = {
   return_received: 'Đã nhận hàng hoàn trả',
   return_refunded: 'Đã hoàn tiền hoàn trả',
   return_closed: 'Yêu cầu hoàn trả đã đóng',
+  return_cancelled: 'Khách hủy yêu cầu hoàn trả',
 };
 
 const ACTOR_ROLE_LABELS: Record<OrderActorRole, string> = {

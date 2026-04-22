@@ -87,6 +87,7 @@ const ORDER_EVENT_LABELS: Record<string, string> = {
   return_received: "Đã nhận hàng hoàn trả",
   return_refunded: "Đã hoàn tiền",
   return_closed: "Đơn hoàn/trả đã đóng",
+  return_cancelled: "Khách hủy yêu cầu hoàn/trả",
 };
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
@@ -139,6 +140,7 @@ const RETURN_STATUS_LABELS: Record<string, string> = {
   received: "Đã nhận hàng",
   refunded: "Đã hoàn tiền",
   closed: "Đã đóng",
+  cancelled: "Đã hủy",
 };
 
 const RETURN_STATUS_STYLES: Record<string, string> = {
@@ -148,6 +150,7 @@ const RETURN_STATUS_STYLES: Record<string, string> = {
   received: "bg-violet-100 text-violet-800",
   refunded: "bg-emerald-100 text-emerald-800",
   closed: "bg-slate-100 text-slate-600",
+  cancelled: "bg-gray-200 text-gray-700",
 };
 
 const PAYMENT_BADGE_STYLES: Record<string, string> = {
@@ -878,6 +881,7 @@ export const OrderDetailPage = () => {
   const [cancelReason, setCancelReason] = useState("");
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState(false);
+  const [cancellingReturnId, setCancellingReturnId] = useState<number | null>(null);
   const [reviewSummary, setReviewSummary] = useState<OrderReviewSummary | null>(
     null,
   );
@@ -924,6 +928,24 @@ export const OrderDetailPage = () => {
       setShowCancelForm(false);
       setCancelReason("");
       await loadData();
+    } finally {
+      setSubmitting(null);
+    }
+  };
+
+  const handleCancelReturn = async (returnId: number) => {
+    if (!detail) return;
+    try {
+      setSubmitting(`cancel-return-${returnId}`);
+      const oid = detail?.orderId ?? detail?.order?.orderId;
+      await orderService.cancelReturn(oid, returnId);
+      toast.success("Đã hủy yêu cầu trả hàng");
+      setCancellingReturnId(null);
+      await loadData();
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message || "Không thể hủy yêu cầu trả hàng",
+      );
     } finally {
       setSubmitting(null);
     }
@@ -989,7 +1011,7 @@ export const OrderDetailPage = () => {
   const returns: OrderReturnView[] = detail.returns ?? [];
   const returnedOrderDetailIds = new Set(
     returns
-      .filter((r) => r.status !== "rejected")
+      .filter((r) => r.status !== "rejected" && r.status !== "cancelled")
       .flatMap((r) => r.items.map((i) => i.orderDetailId)),
   );
   const refundedOrderDetailIds = new Set(
@@ -1064,6 +1086,40 @@ export const OrderDetailPage = () => {
             void loadData();
           }}
         />
+      )}
+
+      {cancellingReturnId !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-base font-black text-gray-900 mb-2">
+              Hủy yêu cầu trả hàng?
+            </h3>
+            <p className="text-sm text-gray-600 mb-5">
+              Yêu cầu sẽ bị hủy và không thể khôi phục. Bạn có thể tạo yêu cầu
+              mới sau nếu cần.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setCancellingReturnId(null)}
+                disabled={submitting?.startsWith("cancel-return-")}
+                className="px-4 py-2 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+              >
+                Không
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCancelReturn(cancellingReturnId)}
+                disabled={submitting?.startsWith("cancel-return-")}
+                className="px-4 py-2 rounded-lg text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50"
+              >
+                {submitting?.startsWith("cancel-return-")
+                  ? "Đang hủy..."
+                  : "Hủy yêu cầu"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showReturnModal && (
@@ -1464,6 +1520,10 @@ export const OrderDetailPage = () => {
                         label: "Đã đóng",
                         style: "bg-gray-100 text-gray-600",
                       },
+                      cancelled: {
+                        label: "Đã hủy",
+                        style: "bg-gray-200 text-gray-700",
+                      },
                     };
                     const cfg = RSTATUS[ret.status] ?? RSTATUS.requested;
                     return (
@@ -1576,7 +1636,28 @@ export const OrderDetailPage = () => {
                           {ret.closedAt && (
                             <span>Đóng: {formatDateTime(ret.closedAt)}</span>
                           )}
+                          {ret.cancelledAt && (
+                            <span className="text-gray-500">
+                              Hủy: {formatDateTime(ret.cancelledAt)}
+                            </span>
+                          )}
                         </div>
+                        {ret.status === "requested" && (
+                          <div className="pt-2 border-t border-gray-100">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setCancellingReturnId(ret.orderReturnId)
+                              }
+                              disabled={
+                                submitting === `cancel-return-${ret.orderReturnId}`
+                              }
+                              className="text-xs font-bold text-rose-600 hover:text-rose-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Hủy yêu cầu
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

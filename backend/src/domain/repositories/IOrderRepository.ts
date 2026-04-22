@@ -1,6 +1,7 @@
 import {
   AdminOrderListFilters,
   CancelOrderDTO,
+  CancelOrderReturnDTO,
   CloseOrderReturnDTO,
   CreateOrderDTO,
   CreateOrderReturnDTO,
@@ -95,4 +96,5 @@ export interface IOrderRepository {
   receiveReturn(input: ReceiveOrderReturnDTO): Promise<OrderReturn | null>;
   refundReturn(input: RefundOrderReturnDTO): Promise<OrderReturn | null>;
   closeReturn(input: CloseOrderReturnDTO): Promise<OrderReturn | null>;
+  cancelReturn(input: CancelOrderReturnDTO): Promise<OrderReturn | null>;
 }

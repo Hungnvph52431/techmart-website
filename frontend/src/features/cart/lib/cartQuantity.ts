@@ -57,7 +57,7 @@ export const getProductPurchaseStockLimit = (
     : 0;
   const productStock = Number(product.availableStockQuantity ?? product.stockQuantity ?? 0);
 
-  return selectedVariant ? (variantStock > 0 ? variantStock : productStock) : productStock;
+  return selectedVariant ? variantStock : productStock;
 };
 
 export const getCartSelectionQuantity = (

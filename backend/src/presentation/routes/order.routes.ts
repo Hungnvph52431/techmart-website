@@ -56,6 +56,7 @@ export const createOrderRoutes = (orderController: OrderController) => {
   router.post('/my-orders/:id/returns', uploadReturnEvidence.array('evidenceImages', 5), orderController.createReturn);
   router.get('/my-orders/:id/returns', orderController.getReturns);
   router.get('/my-orders/:id/returns/:returnId', orderController.getReturnById);
+  router.post('/my-orders/:id/returns/:returnId/cancel', orderController.cancelMyReturn);
 
   return router;
 };

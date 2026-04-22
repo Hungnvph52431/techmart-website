@@ -735,3 +735,99 @@ export async function sendForgotPasswordOtpEmail(
     );
   }
 }
+
+// ──────────────────────────────────────────────────────────────
+// Email thông báo admin đã DUYỆT / TỪ CHỐI yêu cầu trả hàng
+// ──────────────────────────────────────────────────────────────
+interface ReturnReviewEmailData {
+  customerName: string;
+  customerEmail: string;
+  orderCode: string;
+  orderId: number;
+  requestCode: string;
+  reason: string;
+  adminNote?: string;
+  decision: 'approved' | 'rejected';
+}
+
+export async function sendReturnReviewEmail(
+  data: ReturnReviewEmailData,
+): Promise<void> {
+  if (!process.env.SMTP_USER) {
+    console.warn("[Email] SMTP_USER chưa cấu hình — bỏ qua gửi email");
+    return;
+  }
+
+  const fromName = process.env.SMTP_FROM_NAME || "TechMart";
+  const fromEmail = process.env.SMTP_USER;
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+  const orderUrl = `${frontendUrl}/orders/${data.orderId}`;
+
+  const isApproved = data.decision === 'approved';
+  const headerColor = isApproved ? '#10b981' : '#ef4444';
+  const headerTitle = isApproved
+    ? 'Yêu cầu trả hàng đã được duyệt'
+    : 'Yêu cầu trả hàng bị từ chối';
+  const intro = isApproved
+    ? `TechMart đã <strong>duyệt</strong> yêu cầu trả hàng <strong>${data.requestCode}</strong> của bạn. Vui lòng làm theo hướng dẫn để hoàn tất thủ tục.`
+    : `Rất tiếc, yêu cầu trả hàng <strong>${data.requestCode}</strong> của bạn đã bị <strong>từ chối</strong>.`;
+  const subject = isApproved
+    ? `[TechMart] Yêu cầu trả hàng ${data.requestCode} đã được duyệt`
+    : `[TechMart] Yêu cầu trả hàng ${data.requestCode} bị từ chối`;
+
+  const adminNoteHtml = data.adminNote
+    ? `<tr><td style="padding:8px 12px;vertical-align:top;"><strong>Ghi chú từ TechMart</strong></td><td style="padding:8px 12px;">${data.adminNote}</td></tr>`
+    : '';
+
+  const html = `
+  <div style="max-width:600px;margin:0 auto;font-family:'Segoe UI',Arial,sans-serif;color:#333;">
+    <div style="background:${headerColor};padding:24px;text-align:center;border-radius:8px 8px 0 0;">
+      <h1 style="color:#fff;margin:0;font-size:22px;">${headerTitle}</h1>
+    </div>
+    <div style="padding:24px;background:#fff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
+      <p>Xin chào <strong>${data.customerName}</strong>,</p>
+      <p>${intro}</p>
+
+      <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+        <tr style="background:#f9fafb;">
+          <td style="padding:8px 12px;"><strong>Mã đơn hàng</strong></td>
+          <td style="padding:8px 12px;">${data.orderCode}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 12px;"><strong>Mã yêu cầu trả hàng</strong></td>
+          <td style="padding:8px 12px;">${data.requestCode}</td>
+        </tr>
+        <tr style="background:#f9fafb;">
+          <td style="padding:8px 12px;vertical-align:top;"><strong>Lý do của bạn</strong></td>
+          <td style="padding:8px 12px;">${data.reason}</td>
+        </tr>
+        ${adminNoteHtml}
+      </table>
+
+      <div style="text-align:center;margin:28px 0;">
+        <a href="${orderUrl}" style="display:inline-block;background:${headerColor};color:#fff;font-weight:bold;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;">
+          Xem chi tiết đơn hàng
+        </a>
+      </div>
+
+      <hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb;">
+      <p style="font-size:13px;color:#6b7280;">
+        Nếu cần hỗ trợ, vui lòng liên hệ hotline <strong>1900 1234</strong>.
+      </p>
+    </div>
+  </div>`;
+
+  try {
+    await getTransporter().sendMail({
+      from: `"${fromName}" <${fromEmail}>`,
+      to: data.customerEmail,
+      subject,
+      html,
+    });
+    console.log(
+      `[Email] Đã gửi email ${data.decision} return ${data.requestCode} cho ${data.customerEmail}`,
+    );
+  } catch (error) {
+    console.error("[Email] Lỗi gửi email review return:", error);
+  }
+}

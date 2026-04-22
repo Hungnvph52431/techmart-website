@@ -3,6 +3,7 @@ import {
   CreateOrderDTO,
   CreateOrderReturnDTO,
   OrderActorRole,
+  OrderReturn,
   OrderStatus,
   PaymentStatus,
 } from '../../domain/entities/Order';
@@ -15,7 +16,7 @@ import {
   getAllowedNextPaymentStatuses,
   RETURN_DEADLINE_DAYS,
 } from '../policies/OrderLifecycle';
-import { sendOrderCancelledEmail, sendPaymentSuccessEmail, sendOrderCreatedEmail } from '../services/EmailService';
+import { sendOrderCancelledEmail, sendPaymentSuccessEmail, sendOrderCreatedEmail, sendReturnReviewEmail } from '../services/EmailService';
 import { VietnamAdministrativeService } from '../services/VietnamAdministrativeService';
 
 export class OrderUseCase {
@@ -561,7 +562,7 @@ export class OrderUseCase {
     if (!aggregate) return null;
 
     if (!canRequestReturn(aggregate.order.status)) {
-      throw new Error('Chỉ có thể yêu cầu trả hàng cho đơn đã giao thành công');
+      throw new Error('Chỉ có thể yêu cầu trả hàng với đơn đã nhận');
     }
 
     // Fix #8: Kiểm tra thời hạn hoàn trả (N ngày kể từ ngày giao)
@@ -577,7 +578,7 @@ export class OrderUseCase {
     // Fix #2: Không cho tạo yêu cầu hoàn trả nếu đã có yêu cầu đang xử lý
     const existingReturns = await this.orderRepository.listReturns(orderId);
     const hasActiveReturn = existingReturns.some(
-      (r) => !['closed', 'rejected'].includes(r.status)
+      (r) => !['closed', 'rejected', 'cancelled'].includes(r.status)
     );
     if (hasActiveReturn) {
       throw new Error('Đơn hàng này đã có yêu cầu hoàn trả đang xử lý');
@@ -605,7 +606,7 @@ export class OrderUseCase {
     if (!aggregate) return null;
 
     if (!canRequestReturn(aggregate.order.status)) {
-      throw new Error('Chỉ có thể yêu cầu trả hàng cho đơn đã giao thành công');
+      throw new Error('Chỉ có thể yêu cầu trả hàng với đơn đã nhận');
     }
 
     const deliveredAt = aggregate.order.deliveredAt;
@@ -623,7 +624,7 @@ export class OrderUseCase {
       aggregate.order.orderId,
     );
     const hasActiveReturn = existingReturns.some(
-      (item) => !['closed', 'rejected'].includes(item.status),
+      (item) => !['closed', 'rejected', 'cancelled'].includes(item.status),
     );
     if (hasActiveReturn) {
       throw new Error('Đơn hàng này đã có yêu cầu hoàn trả đang xử lý');
@@ -639,6 +640,27 @@ export class OrderUseCase {
     });
   }
 
+  // Khách hủy yêu cầu trả hàng của chính mình (chỉ khi đang ở trạng thái 'requested')
+  async cancelReturn(orderId: number, orderReturnId: number, userId: number, actorRole: OrderActorRole, customerNote?: string) {
+    const owned = await this.orderRepository.findOwnedById(orderId, userId);
+    if (!owned) return null;
+
+    const orderReturn = await this.orderRepository.getReturnById(orderId, orderReturnId);
+    if (!orderReturn) return null;
+
+    if (orderReturn.status !== 'requested') {
+      throw new Error('Chỉ có thể hủy yêu cầu đang chờ duyệt');
+    }
+
+    return this.orderRepository.cancelReturn({
+      orderId,
+      orderReturnId,
+      actorUserId: userId,
+      actorRole,
+      customerNote,
+    });
+  }
+
   // Các hàm duyệt và xử lý hoàn trả dành cho Admin
   async reviewReturn(orderId: number, orderReturnId: number, actorUserId: number, actorRole: OrderActorRole, decision: 'approved' | 'rejected', adminNote?: string) {
     const orderReturn = await this.orderRepository.getReturnById(orderId, orderReturnId);
@@ -646,7 +668,38 @@ export class OrderUseCase {
     if (orderReturn.status !== 'requested') {
       throw new Error('Chỉ có thể duyệt/từ chối yêu cầu đang ở trạng thái "Chờ duyệt"');
     }
-    return this.orderRepository.reviewReturn({ orderId, orderReturnId, actorUserId, actorRole, decision, adminNote });
+    const result = await this.orderRepository.reviewReturn({ orderId, orderReturnId, actorUserId, actorRole, decision, adminNote });
+    if (result) {
+      this.sendReturnReviewEmailNotification(orderId, result, decision, adminNote).catch(() => {});
+    }
+    return result;
+  }
+
+  private async sendReturnReviewEmailNotification(
+    orderId: number,
+    orderReturn: OrderReturn,
+    decision: 'approved' | 'rejected',
+    adminNote?: string,
+  ): Promise<void> {
+    try {
+      const aggregate = await this.orderRepository.findAdminDetail(orderId);
+      if (!aggregate) return;
+      const order = aggregate.order;
+      if (!order.customerEmail) return;
+
+      await sendReturnReviewEmail({
+        customerName: order.customerName || order.shippingName,
+        customerEmail: order.customerEmail,
+        orderCode: order.orderCode,
+        orderId: order.orderId,
+        requestCode: orderReturn.requestCode,
+        reason: orderReturn.reason,
+        adminNote,
+        decision,
+      });
+    } catch (error) {
+      console.error('[OrderUseCase] sendReturnReviewEmail failed:', error);
+    }
   }
 
   // Fix #3: Validate status trước khi refund
