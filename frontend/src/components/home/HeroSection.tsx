@@ -175,7 +175,21 @@ export function HeroSection() {
                     {s.title}
                   </h1>
                   <p className="mt-6 text-white/60 whitespace-pre-line leading-relaxed text-base md:text-lg max-w-md">
-                    {s.subtitle}
+                    {isLast ? (
+                      <>
+                        Giá chỉ từ 34.990.000₫{'\n'}
+                        <Link
+                          to="/checkout"
+                          onClick={() => window.scrollTo(0, 0)}
+                          className="underline decoration-dotted hover:text-white transition"
+                        >
+                          Trả góp 0%
+                        </Link>
+                        {' — Freeship toàn quốc'}
+                      </>
+                    ) : (
+                      s.subtitle
+                    )}
                   </p>
                   {s.detail && (
                     <p
@@ -201,7 +215,7 @@ export function HeroSection() {
                         Mua ngay
                       </Link>
                       <Link
-                        to="/"
+                        to="/home"
                         onClick={() => window.scrollTo(0, 0)}
                         className="px-8 py-3.5 rounded-full font-semibold text-white text-center border border-white/20 hover:bg-white/5 transition"
                       >

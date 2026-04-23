@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 type Props = {
   rotateX: number;
   rotateY: number;
@@ -93,8 +95,10 @@ export function PhoneMockup({ rotateX, rotateY, scale }: Props) {
             </span>
           </div>
 
-          <div
-            className="rounded-2xl px-3 py-2.5 text-white text-[10px] font-semibold flex items-center justify-between"
+          <Link
+            to="/products?onSale=true"
+            onClick={() => window.scrollTo(0, 0)}
+            className="rounded-2xl px-3 py-2.5 text-white text-[10px] font-semibold flex items-center justify-between hover:brightness-110 transition"
             style={{
               background: 'linear-gradient(90deg, #3b82f6, #8b5cf6)',
               boxShadow: '0 4px 14px rgba(59,130,246,0.4)',
@@ -102,7 +106,7 @@ export function PhoneMockup({ rotateX, rotateY, scale }: Props) {
           >
             <span>⚡ Flash Sale</span>
             <span>Giảm 50%</span>
-          </div>
+          </Link>
 
           {PRODUCTS.map((p) => (
             <div
