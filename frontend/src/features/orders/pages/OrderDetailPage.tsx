@@ -7,10 +7,6 @@ import {
   ArrowLeft,
   RefreshCcw,
   Package,
-  MapPin,
-  CreditCard,
-  FileText,
-  Clock,
   CheckCircle2,
   Star,
   AlertCircle,
@@ -25,22 +21,17 @@ import type { OrderReturnView } from "@/types/order";
 import { RepayButton } from "../components/RepayButton";
 import { ReviewModal } from "../components/ReviewModal";
 import { ReturnModal } from "../components/ReturnModal";
+import { OrderItemsList } from "../components/OrderItemsList";
+import { OrderTimeline } from "../components/OrderTimeline";
+import { OrderReturnsSection } from "../components/OrderReturnsSection";
+import { OrderSummaryAside } from "../components/OrderSummaryAside";
+import { formatDateTime } from "../lib/orderFormatters";
 import {
-  formatCurrency,
-  formatDateTime,
-  formatOrderItemVariantSummary,
-  getImageUrl,
-} from "../lib/orderFormatters";
-import {
-  ORDER_EVENT_LABELS,
   ORDER_STATUS_LABELS,
   ORDER_STATUS_STYLES,
-  PAYMENT_BADGE_STYLES,
   PAYMENT_METHOD_LABELS,
   PAYMENT_STATUS_LABELS,
   PAYMENT_STATUS_STYLES,
-  RETURN_STATUS_LABELS,
-  RETURN_STATUS_STYLES,
 } from "../lib/orderLabels";
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -473,98 +464,13 @@ export const OrderDetailPage = () => {
 
         <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
           <div className="space-y-6">
-            {/* ── Sản phẩm ── */}
-            <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between mb-5">
-                <h3 className="text-base font-black text-gray-900 uppercase italic flex items-center gap-2">
-                  <Package size={18} className="text-blue-600" /> Sản phẩm trong
-                  đơn
-                </h3>
-                <p className="text-sm font-black text-gray-900">
-                  {formatCurrency(total)}
-                </p>
-              </div>
-              <div className="space-y-3">
-                {items.length === 0 ? (
-                  <p className="text-sm text-gray-400 italic">
-                    Không có sản phẩm
-                  </p>
-                ) : (
-                  items.map((item: any, idx: number) => {
-                    const name =
-                      item.productName ??
-                      item.product_name ??
-                      `Sản phẩm #${idx + 1}`;
-                    const variant = formatOrderItemVariantSummary(item);
-                    const qty = item.quantity ?? 1;
-                    const price = Number(item.price ?? 0);
-                    const sub = Number(item.subtotal ?? price * qty);
-                    const img =
-                      getImageUrl(
-                        item.productImage ?? item.product_image ?? item.image,
-                      ) || "/placeholder.jpg";
-                    const isItemReturned = returnedOrderDetailIds.has(item.orderDetailId);
-                    const isItemRefunded = refundedOrderDetailIds.has(item.orderDetailId);
-                    const isItemRejected = rejectedOrderDetailIds.has(item.orderDetailId);
-                    return (
-                      <div
-                        key={item.orderDetailId ?? idx}
-                        className={`flex gap-4 rounded-2xl border p-4 ${isItemReturned ? "border-gray-100 bg-gray-50 opacity-50" : "border-gray-100"}`}
-                      >
-                        <img
-                          src={img}
-                          alt={name}
-                          className="h-16 w-16 rounded-xl object-cover flex-shrink-0 bg-gray-50"
-                          onError={(e) => {
-                            const el = e.target as HTMLImageElement;
-                            el.onerror = null;
-                            el.src = "/placeholder.jpg";
-                          }}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-bold text-gray-900 truncate">
-                              {name}
-                            </p>
-                            {isItemReturned && !isItemRefunded && (
-                              <span className="inline-flex rounded-full bg-gray-300 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-600 flex-shrink-0">
-                                Đang hoàn hàng
-                              </span>
-                            )}
-                            {isItemRefunded && (
-                              <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-green-700 flex-shrink-0">
-                                Đã hoàn hàng
-                              </span>
-                            )}
-                            {isItemRejected && !isItemReturned && (
-                              <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-600 flex-shrink-0">
-                                Từ chối hoàn hàng
-                              </span>
-                            )}
-                          </div>
-                          {variant && (
-                            <p className="text-xs text-gray-500 mt-0.5">
-                              {variant}
-                            </p>
-                          )}
-                          <p className="text-xs text-gray-400 mt-1">
-                            Số lượng: {qty}
-                          </p>
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="font-black text-gray-900">
-                            {formatCurrency(sub)}
-                          </p>
-                          <p className="text-xs text-gray-400 mt-1">
-                            {formatCurrency(price)}/sp
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </section>
+            <OrderItemsList
+              items={items}
+              total={total}
+              returnedOrderDetailIds={returnedOrderDetailIds}
+              refundedOrderDetailIds={refundedOrderDetailIds}
+              rejectedOrderDetailIds={rejectedOrderDetailIds}
+            />
 
             {/* ── Đánh giá sản phẩm ── */}
             {canReview && (
@@ -606,314 +512,24 @@ export const OrderDetailPage = () => {
               </section>
             )}
 
-            {/* ── Timeline ── */}
-            {timeline.length > 0 && (
-              <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h3 className="text-base font-black text-gray-900 uppercase italic flex items-center gap-2 mb-5">
-                  <Clock size={18} className="text-blue-600" /> Lịch sử xử lý
-                </h3>
-                <div className="space-y-4">
-                  {timeline.map((event: any, idx: number) => (
-                    <div key={event.orderEventId ?? idx} className="flex gap-3">
-                      <div className="mt-1.5 h-2.5 w-2.5 rounded-full bg-blue-600 flex-shrink-0" />
-                      <div>
-                        <p className="text-sm font-bold text-gray-900">
-                          {ORDER_EVENT_LABELS[event.eventType ?? event.type] ??
-                            event.eventType ??
-                            event.type ??
-                            "Cập nhật trạng thái"}
-                        </p>
-                        {(event.fromStatus || event.toStatus) && (
-                          <p className="mt-1 flex items-center gap-1 flex-wrap">
-                            {event.fromStatus && (
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${ORDER_STATUS_STYLES[event.fromStatus] ?? RETURN_STATUS_STYLES[event.fromStatus] ?? PAYMENT_BADGE_STYLES[event.fromStatus] ?? "bg-gray-100 text-gray-700"}`}>
-                                {ORDER_STATUS_LABELS[event.fromStatus] ?? RETURN_STATUS_LABELS[event.fromStatus] ?? PAYMENT_STATUS_LABELS[event.fromStatus] ?? event.fromStatus}
-                              </span>
-                            )}
-                            {event.fromStatus && event.toStatus && (
-                              <svg className="w-2.5 h-2.5 text-gray-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
-                            )}
-                            {event.toStatus && (
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${ORDER_STATUS_STYLES[event.toStatus] ?? RETURN_STATUS_STYLES[event.toStatus] ?? PAYMENT_BADGE_STYLES[event.toStatus] ?? "bg-gray-100 text-gray-700"}`}>
-                                {ORDER_STATUS_LABELS[event.toStatus] ?? RETURN_STATUS_LABELS[event.toStatus] ?? PAYMENT_STATUS_LABELS[event.toStatus] ?? event.toStatus}
-                              </span>
-                            )}
-                          </p>
-                        )}
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {event.createdAt
-                            ? formatDateTime(event.createdAt)
-                            : ""}
-                        </p>
-                        {event.note && (
-                          <p className="text-xs text-gray-600 mt-1">
-                            {event.note}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
+            <OrderTimeline timeline={timeline} />
 
-            {/* ── Trạng thái hoàn trả (cho khách hàng) ── */}
-            {returns.length > 0 && (
-              <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h3 className="text-base font-black text-gray-900 uppercase italic flex items-center gap-2 mb-5">
-                  <RotateCcw size={18} className="text-orange-500" /> Yêu cầu
-                  hoàn/trả hàng
-                </h3>
-                <div className="space-y-4">
-                  {returns.map((ret) => {
-                    const RSTATUS: Record<
-                      string,
-                      { label: string; style: string }
-                    > = {
-                      requested: {
-                        label: "Chờ duyệt",
-                        style: "bg-amber-100 text-amber-800",
-                      },
-                      approved: {
-                        label: "Đã duyệt",
-                        style: "bg-sky-100 text-sky-800",
-                      },
-                      rejected: {
-                        label: "Từ chối",
-                        style: "bg-rose-100 text-rose-800",
-                      },
-                      received: {
-                        label: "Đã nhận hàng",
-                        style: "bg-violet-100 text-violet-800",
-                      },
-                      refunded: {
-                        label: "Đã hoàn tiền",
-                        style: "bg-emerald-100 text-emerald-800",
-                      },
-                      closed: {
-                        label: "Đã đóng",
-                        style: "bg-gray-100 text-gray-600",
-                      },
-                      cancelled: {
-                        label: "Đã hủy",
-                        style: "bg-gray-200 text-gray-700",
-                      },
-                    };
-                    const cfg = RSTATUS[ret.status] ?? RSTATUS.requested;
-                    return (
-                      <div
-                        key={ret.orderReturnId}
-                        className="rounded-xl border border-gray-100 p-4 space-y-3"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div>
-                            <p className="font-bold text-gray-800 text-sm">
-                              {ret.requestCode}
-                            </p>
-                            <p className="text-xs text-gray-400 mt-0.5">
-                              Yêu cầu lúc{" "}
-                              {ret.requestedAt
-                                ? formatDateTime(ret.requestedAt)
-                                : "—"}
-                            </p>
-                          </div>
-                          <span
-                            className={`px-3 py-1 rounded-full text-xs font-black uppercase ${cfg.style}`}
-                          >
-                            {cfg.label}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-600">
-                          <span className="font-bold text-gray-800">
-                            Lý do:
-                          </span>{" "}
-                          {ret.reason}
-                        </p>
-                        {ret.customerNote && (
-                          <p className="text-xs text-gray-500 italic">
-                            "{ret.customerNote}"
-                          </p>
-                        )}
-                        {/* Ảnh bằng chứng */}
-                        {ret.evidenceImages &&
-                          ret.evidenceImages.length > 0 && (
-                            <div>
-                              <p className="text-xs font-bold text-gray-500 mb-1.5">
-                                Ảnh bằng chứng:
-                              </p>
-                              <div className="flex flex-wrap gap-2">
-                                {ret.evidenceImages.map((img, idx) => (
-                                  <a
-                                    key={idx}
-                                    href={getImageUrl(img)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="block w-16 h-16 rounded-lg overflow-hidden border border-gray-200 hover:border-orange-400 transition-colors"
-                                  >
-                                    <img
-                                      src={getImageUrl(img)}
-                                      alt={`evidence-${idx}`}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  </a>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        {/* Sản phẩm trong phiếu trả */}
-                        {ret.items?.length > 0 && (
-                          <div className="space-y-1.5">
-                            {ret.items.map((item) => {
-                              const variantSummary =
-                                formatOrderItemVariantSummary(item);
-                              return (
-                                <div
-                                  key={item.orderReturnItemId}
-                                  className="text-xs text-gray-600 bg-gray-50 rounded-xl px-3 py-2"
-                                >
-                                  <span className="font-bold">
-                                    {item.productName ||
-                                      `SP #${item.productId}`}
-                                  </span>
-                                  {variantSummary && (
-                                    <span className="text-gray-500">
-                                      {" "}
-                                      • {variantSummary}
-                                    </span>
-                                  )}{" "}
-                                  — SL: {item.quantity}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                        {/* Timeline nhỏ */}
-                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-gray-400 font-bold pt-1 border-t border-gray-50">
-                          {ret.approvedAt && (
-                            <span>Duyệt: {formatDateTime(ret.approvedAt)}</span>
-                          )}
-                          {ret.rejectedAt && (
-                            <span className="text-rose-400">
-                              Từ chối: {formatDateTime(ret.rejectedAt)}
-                            </span>
-                          )}
-                          {ret.receivedAt && (
-                            <span>
-                              Nhận hàng: {formatDateTime(ret.receivedAt)}
-                            </span>
-                          )}
-                          {ret.refundedAt && (
-                            <span className="text-emerald-500">
-                              Hoàn tiền: {formatDateTime(ret.refundedAt)}
-                            </span>
-                          )}
-                          {ret.closedAt && (
-                            <span>Đóng: {formatDateTime(ret.closedAt)}</span>
-                          )}
-                          {ret.cancelledAt && (
-                            <span className="text-gray-500">
-                              Hủy: {formatDateTime(ret.cancelledAt)}
-                            </span>
-                          )}
-                        </div>
-                        {ret.status === "requested" && (
-                          <div className="pt-2 border-t border-gray-100">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setCancellingReturnId(ret.orderReturnId)
-                              }
-                              disabled={
-                                submitting === `cancel-return-${ret.orderReturnId}`
-                              }
-                              className="text-xs font-bold text-rose-600 hover:text-rose-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              Hủy yêu cầu
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
+            <OrderReturnsSection
+              returns={returns}
+              submitting={submitting}
+              onRequestCancel={setCancellingReturnId}
+            />
           </div>
 
-          {/* ── Aside ── */}
-          <aside className="space-y-6">
-            <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-              <h3 className="text-sm font-black text-gray-900 uppercase italic flex items-center gap-2 mb-4">
-                <MapPin size={16} className="text-blue-600" /> Thông tin giao
-                hàng
-              </h3>
-              <div className="space-y-2 text-sm text-gray-600">
-                <p>
-                  <span className="font-bold text-gray-900">Người nhận:</span>{" "}
-                  {shipping.name ?? shipping.receiverName ?? "—"}
-                </p>
-                <p>
-                  <span className="font-bold text-gray-900">SĐT:</span>{" "}
-                  {shipping.phone ?? shipping.receiverPhone ?? "—"}
-                </p>
-                <p>
-                  <span className="font-bold text-gray-900">Địa chỉ:</span>{" "}
-                  {shipping.fullAddress ?? shipping.address ?? "—"}
-                </p>
-              </div>
-            </section>
-
-            <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-              <h3 className="text-sm font-black text-gray-900 uppercase italic flex items-center gap-2 mb-4">
-                <CreditCard size={16} className="text-blue-600" /> Tổng kết
-                thanh toán
-              </h3>
-              <div className="space-y-2 text-sm text-gray-600">
-                <div className="flex justify-between">
-                  <span>Tạm tính</span>
-                  <span>{formatCurrency(subtotal)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Phí vận chuyển</span>
-                  <span>{formatCurrency(shippingFee)}</span>
-                </div>
-                {discount > 0 && (
-                  <div className="flex justify-between text-emerald-600">
-                    <span>Giảm giá</span>
-                    <span>-{formatCurrency(discount)}</span>
-                  </div>
-                )}
-                <div className="border-t border-gray-100 pt-2 flex justify-between font-black text-gray-900 text-base">
-                  <span>Tổng cộng</span>
-                  <span className="text-blue-600">{formatCurrency(total)}</span>
-                </div>
-              </div>
-            </section>
-
-            {(customerNote || cancelReason_) && (
-              <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                <h3 className="text-sm font-black text-gray-900 uppercase italic flex items-center gap-2 mb-4">
-                  <FileText size={16} className="text-blue-600" /> Ghi chú
-                </h3>
-                <div className="space-y-2 text-sm text-gray-600">
-                  {customerNote && (
-                    <p>
-                      <span className="font-bold text-gray-900">Ghi chú:</span>{" "}
-                      {customerNote}
-                    </p>
-                  )}
-                  {cancelReason_ && (
-                    <p>
-                      <span className="font-bold text-rose-700">
-                        Lý do hủy:
-                      </span>{" "}
-                      {cancelReason_}
-                    </p>
-                  )}
-                </div>
-              </section>
-            )}
-          </aside>
+          <OrderSummaryAside
+            shipping={shipping}
+            subtotal={subtotal}
+            shippingFee={shippingFee}
+            discount={discount}
+            total={total}
+            customerNote={customerNote}
+            cancelReason={cancelReason_}
+          />
         </div>
       </div>
     </>
