@@ -910,8 +910,11 @@ export class OrderRepository implements IOrderRepository {
     const placeholders = returnIds.map(() => '?').join(', ');
     const [itemRows] = await pool.execute<RowDataPacket[]>(
       `SELECT ori.order_return_id, ori.order_return_item_id, ori.order_detail_id,
-              ori.quantity, ori.reason, ori.restock_action, ori.created_at,
-              od.product_id, od.variant_id, od.product_name,
+              ori.quantity, ori.reason, ori.restock_action,
+              ori.inspection_result, ori.inspection_note, ori.refund_amount,
+              ori.created_at,
+              od.product_id, od.variant_id, od.product_name, od.price,
+              p.main_image AS product_image,
               COALESCE(od.variant_name, pv.variant_name) AS resolved_variant_name,
               COALESCE(od.sku, pv.sku, p.sku) AS resolved_sku
        FROM order_return_items ori
@@ -953,6 +956,7 @@ export class OrderRepository implements IOrderRepository {
           od.variant_id,
           od.product_name,
           od.price,
+          p.main_image AS product_image,
           COALESCE(od.variant_name, pv.variant_name) AS resolved_variant_name,
           COALESCE(od.sku, pv.sku, p.sku) AS resolved_sku
        FROM order_return_items ori
@@ -1147,14 +1151,23 @@ export class OrderRepository implements IOrderRepository {
         ? JSON.stringify(input.inspectionEvidenceImages)
         : null;
 
+      // Nếu tất cả items đều khách làm hỏng (totalRefund = 0):
+      //   → tự động chuyển sang 'rejected', skip bước refund
+      //   → admin sẽ liên hệ khách trả hàng offline
+      // Ngược lại: chuyển sang 'inspected', chờ admin bấm hoàn tiền
+      const nextStatus: 'rejected' | 'inspected' = totalRefund === 0 ? 'rejected' : 'inspected';
+      const timestampField = nextStatus === 'rejected' ? 'rejected_at' : 'inspected_at';
+
       const [updateResult] = await connection.execute<ResultSetHeader>(
         `UPDATE order_returns
-         SET status = 'inspected', inspected_at = ?, inspected_by = ?,
+         SET status = ?, inspected_at = ?, inspected_by = ?, ${timestampField} = ?,
              inspection_note = ?, inspection_evidence_images = ?, refund_amount = ?, updated_at = ?
          WHERE order_return_id = ? AND order_id = ? AND status = 'received'`,
         [
+          nextStatus,
           now,
           input.actorUserId,
+          now,
           input.inspectionNote || null,
           evidenceJson,
           totalRefund,
@@ -1169,6 +1182,7 @@ export class OrderRepository implements IOrderRepository {
         return null;
       }
 
+      // Luôn ghi event inspect (admin đã làm việc kiểm tra)
       await this.appendEventWithConnection(connection, {
         orderId: input.orderId,
         eventType: 'return_inspected',
@@ -1177,6 +1191,18 @@ export class OrderRepository implements IOrderRepository {
         actorRole: input.actorRole,
         note: input.inspectionNote,
       });
+
+      // Nếu auto-reject thì ghi thêm event reject
+      if (nextStatus === 'rejected') {
+        await this.appendEventWithConnection(connection, {
+          orderId: input.orderId,
+          eventType: 'return_rejected',
+          toStatus: 'rejected',
+          actorUserId: input.actorUserId,
+          actorRole: input.actorRole,
+          note: 'Sau kiểm tra: tất cả sản phẩm do khách làm hỏng — không hoàn tiền',
+        });
+      }
 
       await connection.commit();
       return this.getReturnById(input.orderId, input.orderReturnId);
@@ -1772,6 +1798,8 @@ export class OrderRepository implements IOrderRepository {
       productName:       row.product_name ?? undefined,
       variantName:       row.resolved_variant_name || row.variant_name || undefined,
       sku:               row.resolved_sku || row.sku || undefined,
+      productImage:      row.product_image ?? undefined,
+      price:             row.price != null ? Number(row.price) : undefined,
       quantity:          Number(row.quantity),
       reason:            row.reason ?? undefined,
       restockAction:     row.restock_action ?? 'inspect',

@@ -50,6 +50,36 @@ export const adminOrderService = {
     return response.data;
   },
 
+  inspectReturn: async (
+    orderId: number | string,
+    returnId: number | string,
+    payload: {
+      inspectionNote?: string;
+      inspectionEvidenceImages?: File[];
+      items: Array<{
+        orderReturnItemId: number;
+        inspectionResult: 'good' | 'defective' | 'damaged_by_customer';
+        inspectionNote?: string;
+        refundAmount?: number;
+      }>;
+    },
+  ) => {
+    const formData = new FormData();
+    if (payload.inspectionNote) formData.append('inspectionNote', payload.inspectionNote);
+    formData.append('items', JSON.stringify(payload.items));
+    if (payload.inspectionEvidenceImages) {
+      for (const file of payload.inspectionEvidenceImages) {
+        formData.append('inspectionEvidenceImages', file);
+      }
+    }
+    const response = await api.post(
+      `/admin/orders/${orderId}/returns/${returnId}/inspect`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data;
+  },
+
   refundReturn: async (orderId: number | string, returnId: number | string, payload?: { adminNote?: string }) => {
     const response = await api.post(`/admin/orders/${orderId}/returns/${returnId}/refund`, payload || {});
     return response.data;

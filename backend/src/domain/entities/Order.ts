@@ -137,6 +137,8 @@ export interface OrderReturnItem {
   productName?: string;
   variantName?: string;
   sku?: string;
+  productImage?: string;
+  price?: number;
   quantity: number;
   reason?: string;
   restockAction: ReturnRestockAction;

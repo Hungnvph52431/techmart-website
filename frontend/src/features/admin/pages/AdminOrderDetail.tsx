@@ -13,8 +13,10 @@ import {
   XCircle,
   Truck,
   AlertCircle,
+  Search,
 } from 'lucide-react';
 import { adminOrderService } from '@/services/admin/order.service';
+import { InspectReturnModal } from '../components/InspectReturnModal';
 
 const BACKEND_URL = (import.meta.env.VITE_API_URL as string)?.replace('/api', '') || 'http://localhost:5001';
 const getImageUrl = (url?: string | null) => {
@@ -191,6 +193,9 @@ export const AdminOrderDetail = () => {
     returnId: number | null;
     adminNote: string;
   }>({ type: null, returnId: null, adminNote: '' });
+
+  // Inspect return modal — chứa returnId của phiếu hoàn đang được kiểm tra
+  const [inspectingReturnId, setInspectingReturnId] = useState<number | null>(null);
 
   // Confirm + assign shipper modal
   const [shipperModal, setShipperModal] = useState(false);
@@ -741,17 +746,28 @@ const allowedPayments = (() => {
                           <Truck size={13} /> Xác nhận nhận hàng
                         </button>
                       )}
-                      {ret.status === 'received' && !isCodUnpaid && (
+                      {/* Sau khi nhận hàng, BẮT BUỘC kiểm tra trước khi quyết định hoàn tiền */}
+                      {ret.status === 'received' && (
+                        <button
+                          onClick={() => setInspectingReturnId(ret.orderReturnId)}
+                          disabled={!!submitting}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase hover:bg-indigo-700 disabled:opacity-60"
+                        >
+                          <Search size={13} /> Kiểm tra hàng
+                        </button>
+                      )}
+                      {/* Đã kiểm tra: cho phép hoàn tiền (refund_amount đã chốt ở bước inspect) */}
+                      {ret.status === 'inspected' && !isCodUnpaid && (
                         <button
                           onClick={() => setReturnModal({ type: 'refund', returnId: ret.orderReturnId, adminNote: '' })}
                           disabled={!!submitting}
                           className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-black uppercase hover:bg-blue-700 disabled:opacity-60"
                         >
-                          <CreditCard size={13} /> Hoàn tiền
+                          <CreditCard size={13} /> Hoàn tiền {ret.refundAmount != null ? `(${Number(ret.refundAmount).toLocaleString('vi-VN')}đ)` : ''}
                         </button>
                       )}
-                      {/* COD chưa thanh toán + đã nhận hàng → đóng luôn, không cần hoàn tiền */}
-                      {ret.status === 'received' && isCodUnpaid && (
+                      {/* COD chưa thanh toán + đã kiểm tra → đóng luôn, không cần hoàn tiền */}
+                      {ret.status === 'inspected' && isCodUnpaid && (
                         <button
                           onClick={() => setReturnModal({ type: 'close', returnId: ret.orderReturnId, adminNote: '' })}
                           disabled={!!submitting}
@@ -1139,6 +1155,33 @@ const allowedPayments = (() => {
           </div>
         </div>
       )}
+
+      {/* INSPECT RETURN MODAL */}
+      {inspectingReturnId != null && (() => {
+        const ret = (returns ?? []).find((r: any) => r.orderReturnId === inspectingReturnId);
+        if (!ret) return null;
+        return (
+          <InspectReturnModal
+            orderId={orderId}
+            returnId={inspectingReturnId}
+            items={(ret.items ?? []).map((it: any) => ({
+              orderReturnItemId: it.orderReturnItemId,
+              productId: it.productId,
+              productName: it.productName,
+              variantName: it.variantName,
+              sku: it.sku,
+              productImage: it.productImage,
+              price: it.price,
+              quantity: it.quantity,
+            }))}
+            onClose={() => setInspectingReturnId(null)}
+            onDone={async () => {
+              setInspectingReturnId(null);
+              await loadDetail();
+            }}
+          />
+        );
+      })()}
     </div>
   );
 };
