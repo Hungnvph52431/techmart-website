@@ -69,20 +69,21 @@ export const OrderReturnsSection = ({
         <RotateCcw size={18} className="text-orange-500" /> Yêu cầu hoàn/trả
         hàng
       </h3>
-      <div className="space-y-4">
+      <div className="space-y-5">
         {returns.map((ret) => {
           const cfg = RSTATUS[ret.status] ?? RSTATUS.requested;
           return (
             <div
               key={ret.orderReturnId}
-              className="rounded-xl border border-gray-100 p-4 space-y-3"
+              className="rounded-2xl border-2 border-gray-200 bg-white shadow-sm overflow-hidden"
             >
-              <div className="flex flex-wrap items-center justify-between gap-2">
+              {/* Header strip với background */}
+              <div className="flex flex-wrap items-center justify-between gap-2 bg-gradient-to-r from-slate-50 to-white px-4 py-3 border-b border-gray-100">
                 <div>
-                  <p className="font-bold text-gray-800 text-sm">
-                    {ret.requestCode}
+                  <p className="font-black text-gray-900 text-sm tracking-tight">
+                    #{ret.requestCode}
                   </p>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="text-[11px] text-gray-400 mt-0.5">
                     Yêu cầu lúc{" "}
                     {ret.requestedAt ? formatDateTime(ret.requestedAt) : "—"}
                   </p>
@@ -93,6 +94,9 @@ export const OrderReturnsSection = ({
                   {cfg.label}
                 </span>
               </div>
+
+              {/* Body */}
+              <div className="px-4 py-4 space-y-3">
               <p className="text-sm text-gray-600">
                 <span className="font-bold text-gray-800">Lý do:</span>{" "}
                 {ret.reason}
@@ -280,6 +284,7 @@ export const OrderReturnsSection = ({
                   </button>
                 </div>
               )}
+              </div>
             </div>
           );
         })}
