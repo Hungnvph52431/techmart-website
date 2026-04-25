@@ -91,6 +91,7 @@ const RETURN_STATUS_LABELS: Record<string, string> = {
   approved: "Đã duyệt",
   rejected: "Từ chối",
   received: "Đã nhận hàng",
+  inspected: "Đã kiểm tra",
   refunded: "Đã hoàn tiền",
   closed: "Đã đóng",
 };
@@ -555,6 +556,45 @@ export const GuestOrderDetailPage = () => {
                             <p className="mt-2 text-sm text-gray-500">
                               {returnItem.customerNote}
                             </p>
+                          )}
+
+                          {/* Kết quả kiểm tra của shop */}
+                          {returnItem.inspectedAt && (
+                            <div className="mt-3 rounded-xl border-2 border-indigo-100 bg-indigo-50/40 p-3 space-y-2">
+                              <p className="text-xs font-black uppercase tracking-wide text-indigo-700">
+                                🔍 Shop đã kiểm tra hàng
+                              </p>
+                              {returnItem.inspectionNote && (
+                                <p className="text-xs italic text-gray-700">
+                                  "{returnItem.inspectionNote}"
+                                </p>
+                              )}
+                              {returnItem.refundAmount != null && (
+                                <p className="text-xs text-gray-600">
+                                  <span className="font-bold">
+                                    Tổng tiền hoàn:
+                                  </span>{" "}
+                                  <span
+                                    className={
+                                      Number(returnItem.refundAmount) > 0
+                                        ? "font-black text-blue-600"
+                                        : "font-black text-rose-600"
+                                    }
+                                  >
+                                    {Number(
+                                      returnItem.refundAmount,
+                                    ).toLocaleString("vi-VN")}
+                                    đ
+                                  </span>
+                                  {Number(returnItem.refundAmount) === 0 && (
+                                    <span className="ml-2 text-[10px] font-bold uppercase text-rose-500">
+                                      (Yêu cầu bị từ chối — shop sẽ liên hệ
+                                      trả hàng)
+                                    </span>
+                                  )}
+                                </p>
+                              )}
+                            </div>
                           )}
                         </div>
                       ))}

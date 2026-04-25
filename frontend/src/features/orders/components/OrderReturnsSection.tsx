@@ -23,6 +23,10 @@ const RSTATUS: Record<string, { label: string; style: string }> = {
     label: "Đã nhận hàng",
     style: "bg-violet-100 text-violet-800",
   },
+  inspected: {
+    label: "Đã kiểm tra",
+    style: "bg-indigo-100 text-indigo-800",
+  },
   refunded: {
     label: "Đã hoàn tiền",
     style: "bg-emerald-100 text-emerald-800",
@@ -34,6 +38,15 @@ const RSTATUS: Record<string, { label: string; style: string }> = {
   cancelled: {
     label: "Đã hủy",
     style: "bg-gray-200 text-gray-700",
+  },
+};
+
+const INSPECTION_BADGE: Record<string, { label: string; cls: string }> = {
+  good: { label: "🟢 Sản phẩm tốt", cls: "bg-emerald-100 text-emerald-700" },
+  defective: { label: "🟡 Lỗi do shop/NSX", cls: "bg-amber-100 text-amber-700" },
+  damaged_by_customer: {
+    label: "🔴 Hỏng do khách",
+    cls: "bg-rose-100 text-rose-700",
   },
 };
 
@@ -117,26 +130,111 @@ export const OrderReturnsSection = ({
                 <div className="space-y-1.5">
                   {ret.items.map((item) => {
                     const variantSummary = formatOrderItemVariantSummary(item);
+                    const insBadge = item.inspectionResult
+                      ? INSPECTION_BADGE[item.inspectionResult]
+                      : null;
                     return (
                       <div
                         key={item.orderReturnItemId}
-                        className="text-xs text-gray-600 bg-gray-50 rounded-xl px-3 py-2"
+                        className="bg-gray-50 rounded-xl px-3 py-2 space-y-1"
                       >
-                        <span className="font-bold">
-                          {item.productName || `SP #${item.productId}`}
-                        </span>
-                        {variantSummary && (
-                          <span className="text-gray-500">
-                            {" "}
-                            • {variantSummary}
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-600">
+                          <span className="font-bold text-gray-800">
+                            {item.productName || `SP #${item.productId}`}
                           </span>
-                        )}{" "}
-                        — SL: {item.quantity}
+                          {variantSummary && (
+                            <span className="text-gray-500">
+                              • {variantSummary}
+                            </span>
+                          )}
+                          <span>— SL: {item.quantity}</span>
+                          {insBadge && (
+                            <span
+                              className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${insBadge.cls}`}
+                            >
+                              {insBadge.label}
+                            </span>
+                          )}
+                          {item.refundAmount != null && item.inspectionResult && (
+                            <span
+                              className={`ml-auto text-xs font-black ${
+                                Number(item.refundAmount) > 0
+                                  ? "text-blue-600"
+                                  : "text-gray-400"
+                              }`}
+                            >
+                              Hoàn:{" "}
+                              {Number(item.refundAmount).toLocaleString(
+                                "vi-VN",
+                              )}
+                              đ
+                            </span>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
                 </div>
               )}
+
+              {/* Block kết quả kiểm tra của shop (chỉ hiện khi đã inspect) */}
+              {ret.inspectedAt && (
+                <div className="rounded-xl border-2 border-indigo-100 bg-indigo-50/40 p-3 space-y-2">
+                  <p className="text-xs font-black text-indigo-700 uppercase tracking-wide">
+                    🔍 Shop đã kiểm tra hàng
+                  </p>
+                  {ret.inspectionNote && (
+                    <p className="text-xs text-gray-700 italic">
+                      "{ret.inspectionNote}"
+                    </p>
+                  )}
+                  {ret.inspectionEvidenceImages &&
+                    ret.inspectionEvidenceImages.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-bold text-indigo-600 mb-1">
+                          Ảnh shop chụp lúc kiểm tra:
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {ret.inspectionEvidenceImages.map((img, idx) => (
+                            <a
+                              key={idx}
+                              href={getImageUrl(img)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block w-16 h-16 rounded-lg overflow-hidden border-2 border-indigo-200 hover:border-indigo-400 transition-colors"
+                            >
+                              <img
+                                src={getImageUrl(img)}
+                                alt={`inspect-${idx}`}
+                                className="w-full h-full object-cover"
+                              />
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  {ret.refundAmount != null && (
+                    <p className="text-xs text-gray-600">
+                      <span className="font-bold">Tổng tiền hoàn:</span>{" "}
+                      <span
+                        className={
+                          Number(ret.refundAmount) > 0
+                            ? "text-blue-600 font-black"
+                            : "text-rose-600 font-black"
+                        }
+                      >
+                        {Number(ret.refundAmount).toLocaleString("vi-VN")}đ
+                      </span>
+                      {Number(ret.refundAmount) === 0 && (
+                        <span className="ml-2 text-[10px] uppercase font-bold text-rose-500">
+                          (Yêu cầu bị từ chối — shop sẽ liên hệ trả hàng)
+                        </span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-gray-400 font-bold pt-1 border-t border-gray-50">
                 {ret.approvedAt && (
                   <span>Duyệt: {formatDateTime(ret.approvedAt)}</span>
@@ -148,6 +246,11 @@ export const OrderReturnsSection = ({
                 )}
                 {ret.receivedAt && (
                   <span>Nhận hàng: {formatDateTime(ret.receivedAt)}</span>
+                )}
+                {ret.inspectedAt && (
+                  <span className="text-indigo-500">
+                    Kiểm tra: {formatDateTime(ret.inspectedAt)}
+                  </span>
                 )}
                 {ret.refundedAt && (
                   <span className="text-emerald-500">
