@@ -85,9 +85,6 @@ export interface IOrderRepository {
   reassignShipper(orderId: number, newShipperId: number): Promise<Order | null>;
   confirmAndAssignShipper(orderId: number, shipperId: number, actorUserId: number): Promise<Order | null>;
   logEvent(orderId: number, actorUserId: number, actorRole: string, eventType: string, fromStatus: string, toStatus: string, note: string): Promise<void>;
-  updateWarehouseReceivedAt(orderId: number, condition: 'good' | 'defective'): Promise<void>;
-  restockForWarehouseReceipt(orderId: number, adminId: number): Promise<void>;
-
   // 6. Quản lý Đổi/Trả (Returns)
   listAllReturns(filters?: { status?: string }): Promise<OrderReturn[]>;
   listReturns(orderId: number): Promise<OrderReturn[]>;

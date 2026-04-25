@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { ProductController } from '../controllers/ProductController';
-import { authMiddleware, adminMiddleware, staffMiddleware, warehouseMiddleware } from '../middlewares/auth.middleware';
+import { authMiddleware, adminMiddleware, staffMiddleware } from '../middlewares/auth.middleware';
 
 export const createProductRoutes = (productController: ProductController) => {
   const router = Router();

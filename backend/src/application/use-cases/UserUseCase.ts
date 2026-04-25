@@ -18,7 +18,7 @@ export const validatePasswordPolicy = (password: string) => {
 };
 
 export interface UserFilters {
-    role?: 'customer' | 'admin' | 'staff' | 'warehouse' | 'shipper';
+    role?: 'customer' | 'admin' | 'staff' | 'shipper';
     status?: 'active' | 'inactive' | 'banned';
     search?: string;
     membershipLevel?: 'bronze' | 'silver' | 'gold' | 'platinum';
@@ -71,7 +71,7 @@ export class UserUseCase {
         const normalizedName = userData.name.trim();
         const normalizedPassword = userData.password.trim();
         const normalizedPhone = userData.phone?.trim() || undefined;
-        const allowedRoles: Array<'customer' | 'admin' | 'staff' | 'warehouse' | 'shipper'> = ['customer', 'admin', 'staff', 'warehouse', 'shipper'];
+        const allowedRoles: Array<'customer' | 'admin' | 'staff' | 'shipper'> = ['customer', 'admin', 'staff', 'shipper'];
         const normalizedRole = userData.role && allowedRoles.includes(userData.role)
             ? userData.role
             : 'customer';
@@ -227,7 +227,6 @@ export class UserUseCase {
                 customer: users.filter(u => u.role === 'customer').length,
                 admin: users.filter(u => u.role === 'admin').length,
                 staff: users.filter(u => u.role === 'staff').length,
-                warehouse: users.filter(u => u.role === 'warehouse').length,
                 shipper: users.filter(u => u.role === 'shipper').length,
             },
             usersByMembership: {

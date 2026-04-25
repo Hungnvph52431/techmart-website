@@ -124,7 +124,6 @@ const ACTOR_ROLE_LABELS: Record<string, string> = {
   admin: 'Quản trị viên',
   customer: 'Khách hàng',
   staff: 'Nhân viên',
-  warehouse: 'Kho vận',
   system: 'Hệ thống',
 };
 
@@ -275,19 +274,6 @@ export const AdminOrderDetail = () => {
       await loadDetail();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Cập nhật thất bại');
-    } finally {
-      setSubmitting(null);
-    }
-  };
-
-  const handleConfirmWarehouseReceipt = async (condition: 'good' | 'defective') => {
-    try {
-      setSubmitting(condition === 'good' ? 'warehouse-good' : 'warehouse-defective');
-      await adminOrderService.confirmWarehouseReceipt(orderId, condition);
-      toast.success(condition === 'good' ? 'Đã nhập kho hàng tốt' : 'Đã ghi nhận hàng lỗi');
-      await loadDetail();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Xác nhận nhập kho thất bại');
     } finally {
       setSubmitting(null);
     }
@@ -958,44 +944,6 @@ const allowedPayments = (() => {
               </div>
             )}
           </section>
-
-          {/* XÁC NHẬN NHẬP KHO */}
-          {(order as any).deliveryStatus === 'RETURNED' && (
-            <section className="bg-orange-50 rounded-2xl border border-orange-200 shadow-sm p-6 space-y-3">
-              <h2 className="font-black text-orange-700 uppercase text-sm tracking-wider flex items-center gap-2">
-                <Package size={15} /> Hàng hoàn về kho
-              </h2>
-              {(order as any).warehouseCondition ? (
-                <p className="text-sm font-semibold">
-                  {(order as any).warehouseCondition === 'good'
-                    ? '✓ Đã nhập kho - Hàng tốt, đã cộng lại tồn kho'
-                    : '✗ Đã ghi nhận - Hàng lỗi, không nhập lại kho'}
-                </p>
-              ) : (
-                <>
-                  <p className="text-sm text-orange-600">
-                    Shipper đã xác nhận trả hàng về kho. Vui lòng kiểm tra tình trạng hàng và xác nhận.
-                  </p>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => handleConfirmWarehouseReceipt('good')}
-                      disabled={submitting === 'warehouse-good' || submitting === 'warehouse-defective'}
-                      className="flex-1 px-4 py-2.5 rounded-xl bg-green-600 text-white text-sm font-black disabled:opacity-50 hover:bg-green-700 transition-colors"
-                    >
-                      {submitting === 'warehouse-good' ? 'Đang xử lý...' : '✓ Hàng tốt - Nhập lại kho'}
-                    </button>
-                    <button
-                      onClick={() => handleConfirmWarehouseReceipt('defective')}
-                      disabled={submitting === 'warehouse-good' || submitting === 'warehouse-defective'}
-                      className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-black disabled:opacity-50 hover:bg-red-700 transition-colors"
-                    >
-                      {submitting === 'warehouse-defective' ? 'Đang xử lý...' : '✗ Hàng lỗi - Không bán lại'}
-                    </button>
-                  </div>
-                </>
-              )}
-            </section>
-          )}
 
           {/* THÔNG TIN GIAO HÀNG */}
           <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-3">

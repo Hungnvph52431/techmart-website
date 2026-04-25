@@ -318,28 +318,6 @@ export class OrderUseCase {
     return result;
   }
 
-  // --- XÁC NHẬN NHẬP KHO (Admin) ---
-  async confirmWarehouseReceipt(orderId: number, adminId: number, condition: 'good' | 'defective') {
-    const order = await this.orderRepository.findById(orderId);
-    if (!order) throw new Error('Không tìm thấy đơn hàng');
-    const deliveryStatus = (order as any).deliveryStatus as string | undefined;
-    if (deliveryStatus !== 'RETURNED') {
-      throw new Error('Đơn hàng chưa được shipper xác nhận trả về kho');
-    }
-    if (order.warehouseReceivedAt) {
-      throw new Error(`Đơn hàng đã được xác nhận nhập kho lúc ${order.warehouseReceivedAt.toLocaleString('vi-VN')}`);
-    }
-    await this.orderRepository.updateWarehouseReceivedAt(orderId, condition);
-    if (condition === 'good') {
-      await this.orderRepository.restockForWarehouseReceipt(orderId, adminId);
-    }
-    const note = condition === 'good'
-      ? 'Admin xác nhận nhập kho - Hàng tốt, đã nhập lại kho'
-      : 'Admin xác nhận nhập kho - Hàng lỗi, không nhập lại kho';
-    await this.orderRepository.logEvent(orderId, adminId, 'admin', 'status_changed', 'returned', 'returned', note);
-    return { success: true, orderId, condition, message: condition === 'good' ? 'Đã nhập kho hàng tốt' : 'Đã ghi nhận hàng lỗi' };
-  }
-
   // --- QUẢN LÝ TRẠNG THÁI & HỦY ĐƠN ---
   async assignShipper(orderId: number, shipperId: number | null) {
     const order = await this.orderRepository.findById(orderId);

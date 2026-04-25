@@ -118,19 +118,6 @@ export class AdminOrderController {
     }
   };
 
-  confirmWarehouseReceipt = async (req: any, res: Response) => {
-    try {
-      const { condition } = req.body;
-      if (!condition || !['good', 'defective'].includes(condition)) {
-        return res.status(400).json({ message: 'Vui lòng chọn tình trạng hàng (good hoặc defective)' });
-      }
-      const result = await this.orderUseCase.confirmWarehouseReceipt(Number(req.params.id), req.user.userId, condition);
-      res.json(result);
-    } catch (err: any) {
-      res.status(400).json({ message: err.message });
-    }
-  };
-
   confirmAndAssignShipper = async (req: any, res: Response) => {
     try {
       const orderId = Number(req.params.id);

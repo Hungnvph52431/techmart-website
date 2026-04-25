@@ -100,11 +100,6 @@ export const adminOrderService = {
     return response.data;
   },
 
-  confirmWarehouseReceipt: async (orderId: number | string, condition: 'good' | 'defective') => {
-    const response = await api.patch(`/admin/orders/${orderId}/confirm-warehouse-receipt`, { condition });
-    return response.data;
-  },
-
   getStats: async (startDate?: string, endDate?: string) => {
     const params: Record<string, string> = {};
     if (startDate) params.startDate = startDate;

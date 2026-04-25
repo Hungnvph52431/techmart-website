@@ -59,14 +59,6 @@ export const internalMiddleware = (req: AuthRequest, res: Response, next: NextFu
   next();
 };
 
-// Admin + Shipper
-export const warehouseMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
-  if (!['admin', 'shipper'].includes(req.user?.role)) {
-    return res.status(403).json({ message: 'Yêu cầu quyền kho' });
-  }
-  next();
-};
-
 // Shipper only
 export const shipperMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
   if (req.user?.role !== 'shipper') {

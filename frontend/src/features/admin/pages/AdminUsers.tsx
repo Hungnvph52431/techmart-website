@@ -19,7 +19,6 @@ const roleLabels: Record<UserRole, string> = {
     admin: 'Quản trị viên',
     customer: 'Khách hàng',
     staff: 'Nhân viên',
-    warehouse: 'Kho (cũ)',
     shipper: 'Shipper',
 };
 
@@ -231,7 +230,6 @@ export const AdminUsers = () => {
                     <option value="customer">Khách hàng</option>
                     <option value="staff">Nhân viên</option>
                     <option value="shipper">Shipper</option>
-                    <option value="warehouse">Kho (cũ)</option>
                     <option value="admin">Quản trị viên</option>
                 </select>
 

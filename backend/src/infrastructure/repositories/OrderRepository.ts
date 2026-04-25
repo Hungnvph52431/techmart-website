@@ -604,39 +604,6 @@ export class OrderRepository implements IOrderRepository {
     );
   }
 
-  async updateWarehouseReceivedAt(orderId: number, condition: 'good' | 'defective'): Promise<void> {
-    await pool.query(
-      `UPDATE orders SET warehouse_received_at = NOW(), warehouse_condition = ? WHERE order_id = ? AND warehouse_received_at IS NULL`,
-      [condition, orderId]
-    );
-  }
-
-  async restockForWarehouseReceipt(orderId: number, adminId: number): Promise<void> {
-    const details = await this.getOrderDetails(orderId);
-    for (const detail of details) {
-      if (detail.variantId) {
-        await pool.execute(
-          'UPDATE product_variants SET stock_quantity = stock_quantity + ? WHERE variant_id = ?',
-          [detail.quantity, detail.variantId]
-        );
-      }
-      await pool.execute(
-        'UPDATE products SET stock_quantity = stock_quantity + ? WHERE product_id = ?',
-        [detail.quantity, detail.productId]
-      );
-      await this.appendInventoryTransaction(pool, {
-        productId: detail.productId,
-        variantId: detail.variantId,
-        transactionType: 'return',
-        quantity: detail.quantity,
-        referenceType: 'order',
-        referenceId: orderId,
-        notes: 'Nhập kho hàng hoàn - tình trạng tốt',
-        createdBy: adminId,
-      });
-    }
-  }
-
   async cancel(input: CancelOrderDTO): Promise<Order | null> {
     const connection = await pool.getConnection();
     try {
@@ -1696,8 +1663,6 @@ export class OrderRepository implements IOrderRepository {
       shippedAt: row.shipped_at ?? undefined,
       deliveredAt: row.delivered_at ?? undefined,
       cancelledAt: row.cancelled_at ?? undefined,
-      warehouseReceivedAt: row.warehouse_received_at ?? undefined,
-      warehouseCondition: row.warehouse_condition ?? undefined,
       updatedAt: row.updated_at,
     };
   }

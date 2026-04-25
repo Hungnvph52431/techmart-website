@@ -8,7 +8,7 @@ export class UserController {
     getAll = async (req: Request, res: Response) => {
         try {
             const filters = {
-                role: req.query.role as 'customer' | 'admin' | 'staff' | 'warehouse' | undefined,
+                role: req.query.role as 'customer' | 'admin' | 'staff' | 'shipper' | undefined,
                 status: req.query.status as 'active' | 'inactive' | 'banned' | undefined,
                 search: req.query.search as string | undefined,
                 membershipLevel: req.query.membershipLevel as 'bronze' | 'silver' | 'gold' | 'platinum' | undefined,

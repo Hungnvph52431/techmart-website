@@ -48,9 +48,6 @@ export const createAdminOrderRoutes = (adminOrderController: AdminOrderControlle
   // Xác nhận + gán shipper cùng lúc (1 bước)
   router.patch('/:id/confirm', staffMiddleware, adminOrderController.confirmAndAssignShipper);
 
-  // Admin xác nhận nhập kho sau khi shipper trả hàng về
-  router.patch('/:id/confirm-warehouse-receipt', staffMiddleware, adminOrderController.confirmWarehouseReceipt);
-
   // Staff + Admin: gán shipper / đổi shipper
   router.patch('/:id/assign-shipper', staffMiddleware, adminOrderController.assignShipper);
   router.patch('/:id/reassign-shipper', staffMiddleware, adminOrderController.reassignShipper);

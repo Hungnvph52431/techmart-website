@@ -30,7 +30,7 @@ const MEMBERSHIP = {
   platinum: { label: 'Platinum', color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-200', icon: <Crown size={13} /> },
 };
 const ROLE_LABELS: Record<string, string> = {
-  admin: 'Quản trị viên', staff: 'Nhân viên', warehouse: 'Kho hàng', shipper: 'Shipper', customer: 'Khách hàng',
+  admin: 'Quản trị viên', staff: 'Nhân viên', shipper: 'Shipper', customer: 'Khách hàng',
 };
 
 // ─── VN Admin API types ───────────────────────────────────────────────────────

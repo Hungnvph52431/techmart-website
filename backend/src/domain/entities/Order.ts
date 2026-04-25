@@ -12,7 +12,7 @@ export type PaymentMethod = 'cod' | 'bank_transfer' | 'momo' | 'vnpay' | 'zalopa
 
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 
-export type OrderActorRole = 'customer' | 'admin' | 'staff' | 'warehouse' | 'shipper' | 'system';
+export type OrderActorRole = 'customer' | 'admin' | 'staff' | 'shipper' | 'system';
 
 export type OrderEventType =
   | 'order_created'
@@ -83,8 +83,6 @@ export interface Order {
   shippedAt?: Date;
   deliveredAt?: Date;
   cancelledAt?: Date;
-  warehouseReceivedAt?: Date;
-  warehouseCondition?: 'good' | 'defective';
   updatedAt: Date;
 }
 

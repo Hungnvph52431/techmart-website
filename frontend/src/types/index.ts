@@ -108,7 +108,7 @@ export interface User {
   fullName: string; // Dùng fullName thay vì name
   phone?: string;
   address?: string;
-  role: 'admin' | 'customer' | 'staff' | 'warehouse' | 'shipper';
+  role: 'admin' | 'customer' | 'staff' | 'shipper';
   avatar?: string;
   status: 'active' | 'inactive' | 'banned';
   points: number;

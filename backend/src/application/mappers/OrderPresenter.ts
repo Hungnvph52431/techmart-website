@@ -70,7 +70,6 @@ const ACTOR_ROLE_LABELS: Record<OrderActorRole, string> = {
   customer: 'Khách hàng',
   admin: 'Quản trị viên',
   staff: 'Nhân viên',
-  warehouse: 'Kho vận',
   shipper: 'Shipper',
   system: 'Hệ thống',
 };

@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { walletService, type AdminWithdrawalNotification } from '@/services/wallet.service';
 
-const ALLOWED_ROLES = ['admin', 'staff', 'warehouse'];
+const ALLOWED_ROLES = ['admin', 'staff'];
 
 export const AdminLayout = () => {
   const navigate = useNavigate();
@@ -59,10 +59,9 @@ export const AdminLayout = () => {
 
   const isAdmin = user.role === 'admin';
   const isStaff = user.role === 'staff';
-  const isWarehouse = user.role === 'warehouse';
   const unreadNotificationCount = adminNotifications.filter((item) => !item.isRead).length;
 
-  const roleLabel = isAdmin ? 'Admin' : isStaff ? 'Nhân viên' : 'Kho';
+  const roleLabel = isAdmin ? 'Admin' : isStaff ? 'Nhân viên' : '';
   const displayName = user.fullName || user.email;
 
   const formatNotificationTime = (value: string) =>
@@ -298,8 +297,8 @@ export const AdminLayout = () => {
 
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 mt-8 mb-3">Quản lý bán hàng</p>
 
-            {/* Sản phẩm — Admin + Warehouse */}
-            {(isAdmin || isWarehouse) && <SidebarLink to="/admin/products" icon={<Package size={18} />} label="Sản phẩm" active={isActive('/admin/products')} />}
+            {/* Sản phẩm — Admin */}
+            {isAdmin && <SidebarLink to="/admin/products" icon={<Package size={18} />} label="Sản phẩm" active={isActive('/admin/products')} />}
 
             {/* Đơn hàng — tất cả */}
             <SidebarLink to="/admin/orders" icon={<ShoppingCart size={18} />} label="Đơn hàng" active={isActive('/admin/orders')} />
