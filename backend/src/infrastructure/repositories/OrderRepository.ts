@@ -9,6 +9,7 @@ import {
   CloseOrderReturnDTO,
   CreateOrderDTO,
   CreateOrderReturnDTO,
+  InspectOrderReturnDTO,
   Order,
   OrderAggregate,
   OrderCustomerSnapshot,
@@ -1060,29 +1061,8 @@ export class OrderRepository implements IOrderRepository {
         return null;
       }
 
-      const [itemRows] = await connection.execute<RowDataPacket[]>(
-        `SELECT ori.quantity, ori.restock_action, od.product_id, od.variant_id
-         FROM order_return_items ori
-         JOIN order_details od ON od.order_detail_id = ori.order_detail_id
-         WHERE ori.order_return_id = ?`,
-        [input.orderReturnId]
-      );
-
-      for (const row of itemRows) {
-        if (!['restock', 'inspect'].includes(String(row.restock_action))) {
-          continue;
-        }
-
-        await this.restockInventory(
-          connection,
-          Number(row.product_id),
-          row.variant_id != null ? Number(row.variant_id) : undefined,
-          Number(row.quantity),
-          input.orderReturnId,
-          input.actorUserId,
-          input.adminNote || 'Nhập kho khi nhận lại hàng hoàn'
-        );
-      }
+      // KHÔNG restock ở đây nữa. Restock được quyết định ở bước inspectReturn
+      // (admin/kỹ thuật phân loại từng sp: tốt/lỗi/khách làm hỏng) và thực thi ở refundReturn.
 
       await this.appendEventWithConnection(connection, {
         orderId: input.orderId,
@@ -1103,31 +1083,148 @@ export class OrderRepository implements IOrderRepository {
     }
   }
 
+  async inspectReturn(input: InspectOrderReturnDTO): Promise<OrderReturn | null> {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const now = new Date();
+
+      // Lấy giá gốc từng item để tính refund mặc định
+      const [itemRows] = await connection.execute<RowDataPacket[]>(
+        `SELECT ori.order_return_item_id, ori.quantity, od.price
+         FROM order_return_items ori
+         JOIN order_details od ON od.order_detail_id = ori.order_detail_id
+         WHERE ori.order_return_id = ?`,
+        [input.orderReturnId]
+      );
+      const itemMeta = new Map<number, { quantity: number; price: number }>();
+      for (const row of itemRows as RowDataPacket[]) {
+        itemMeta.set(Number(row.order_return_item_id), {
+          quantity: Number(row.quantity),
+          price: Number(row.price),
+        });
+      }
+
+      let totalRefund = 0;
+      for (const it of input.items) {
+        const meta = itemMeta.get(it.orderReturnItemId);
+        if (!meta) {
+          throw new Error(`Item ${it.orderReturnItemId} không thuộc phiếu hoàn này`);
+        }
+
+        // Mặc định: good/defective → refund đầy đủ; damaged_by_customer → 0 (admin có thể override)
+        let refund: number;
+        if (it.refundAmount != null) {
+          refund = Number(it.refundAmount);
+        } else if (it.inspectionResult === 'damaged_by_customer') {
+          refund = 0;
+        } else {
+          refund = meta.price * meta.quantity;
+        }
+
+        // Map kết quả → restock action
+        const restockAction =
+          it.inspectionResult === 'good' ? 'restock' : 'discard';
+
+        await connection.execute(
+          `UPDATE order_return_items
+           SET inspection_result = ?, inspection_note = ?, refund_amount = ?, restock_action = ?
+           WHERE order_return_item_id = ? AND order_return_id = ?`,
+          [
+            it.inspectionResult,
+            it.inspectionNote || null,
+            refund,
+            restockAction,
+            it.orderReturnItemId,
+            input.orderReturnId,
+          ]
+        );
+
+        totalRefund += refund;
+      }
+
+      const evidenceJson = input.inspectionEvidenceImages
+        ? JSON.stringify(input.inspectionEvidenceImages)
+        : null;
+
+      const [updateResult] = await connection.execute<ResultSetHeader>(
+        `UPDATE order_returns
+         SET status = 'inspected', inspected_at = ?, inspected_by = ?,
+             inspection_note = ?, inspection_evidence_images = ?, refund_amount = ?, updated_at = ?
+         WHERE order_return_id = ? AND order_id = ? AND status = 'received'`,
+        [
+          now,
+          input.actorUserId,
+          input.inspectionNote || null,
+          evidenceJson,
+          totalRefund,
+          now,
+          input.orderReturnId,
+          input.orderId,
+        ]
+      );
+
+      if (updateResult.affectedRows === 0) {
+        await connection.rollback();
+        return null;
+      }
+
+      await this.appendEventWithConnection(connection, {
+        orderId: input.orderId,
+        eventType: 'return_inspected',
+        toStatus: 'inspected',
+        actorUserId: input.actorUserId,
+        actorRole: input.actorRole,
+        note: input.inspectionNote,
+      });
+
+      await connection.commit();
+      return this.getReturnById(input.orderId, input.orderReturnId);
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
   async refundReturn(input: RefundOrderReturnDTO): Promise<OrderReturn | null> {
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
       const now = new Date();
 
-      // Tính tổng tiền hoàn dựa trên sản phẩm trong phiếu trả
+      // Lấy refund_amount đã chốt ở bước inspect + thông tin per-item để restock
+      const [retRows] = await connection.execute<RowDataPacket[]>(
+        `SELECT requested_by, refund_amount FROM order_returns WHERE order_return_id = ?`,
+        [input.orderReturnId]
+      );
+      const userId = retRows[0]?.requested_by;
+      const refundAmount = Number(retRows[0]?.refund_amount ?? 0);
+
       const [itemRows] = await connection.execute<RowDataPacket[]>(
-        `SELECT ori.order_detail_id, ori.quantity, ori.restock_action,
-                od.price, od.product_id, od.variant_id
+        `SELECT ori.quantity, ori.restock_action, od.product_id, od.variant_id
          FROM order_return_items ori
          JOIN order_details od ON od.order_detail_id = ori.order_detail_id
          WHERE ori.order_return_id = ?`,
         [input.orderReturnId]
       );
-      const refundAmount = (itemRows as RowDataPacket[]).reduce(
-        (sum, row) => sum + Number(row.price) * Number(row.quantity), 0
-      );
 
-      // Lấy userId và payment_status từ phiếu trả + đơn hàng
-      const [retRows] = await connection.execute<RowDataPacket[]>(
-        'SELECT requested_by FROM order_returns WHERE order_return_id = ?',
-        [input.orderReturnId]
-      );
-      const userId = retRows[0]?.requested_by;
+      // Restock per-item dựa trên kết quả inspect (chỉ những item 'restock' mới cộng kho)
+      for (const row of itemRows as RowDataPacket[]) {
+        if (String(row.restock_action) !== 'restock') {
+          continue;
+        }
+        await this.restockInventory(
+          connection,
+          Number(row.product_id),
+          row.variant_id != null ? Number(row.variant_id) : undefined,
+          Number(row.quantity),
+          input.orderReturnId,
+          input.actorUserId,
+          input.adminNote || 'Nhập kho sau kiểm hàng (sản phẩm tốt)'
+        );
+      }
 
       const [orderRows] = await connection.execute<RowDataPacket[]>(
         'SELECT payment_status, payment_method FROM orders WHERE order_id = ?',
@@ -1136,17 +1233,13 @@ export class OrderRepository implements IOrderRepository {
       const paymentStatus = orderRows[0]?.payment_status;
       const paymentMethod = orderRows[0]?.payment_method;
 
-      // Chỉ hoàn tiền vào ví khi payment_status === 'paid'
-      // COD chưa xác nhận thanh toán (pending) = khách chưa trả tiền → không hoàn
-      // Admin cần bấm "Đã thanh toán" trước khi duyệt hoàn trả nếu khách COD đã trả tiền mặt
+      // Chỉ hoàn tiền vào ví khi payment_status === 'paid' và refundAmount > 0
       let refundNote = '';
       if (userId && refundAmount > 0 && paymentStatus === 'paid') {
-        // Cộng tiền về ví khách
         await connection.execute(
           'UPDATE users SET wallet_balance = wallet_balance + ? WHERE user_id = ?',
           [refundAmount, userId]
         );
-        // Ghi lịch sử giao dịch ví
         const [walletRows] = await connection.execute<RowDataPacket[]>(
           'SELECT wallet_balance FROM users WHERE user_id = ?',
           [userId]
@@ -1160,11 +1253,13 @@ export class OrderRepository implements IOrderRepository {
         refundNote = `Hoàn ${refundAmount.toLocaleString('vi-VN')}đ vào ví`;
       } else if (paymentStatus !== 'paid') {
         refundNote = `Đơn ${paymentMethod?.toUpperCase()} chưa thanh toán — không hoàn tiền vào ví`;
+      } else if (refundAmount === 0) {
+        refundNote = 'Không hoàn tiền (kết quả kiểm tra: hàng do khách làm hỏng)';
       }
 
       const [updateResult] = await connection.execute<ResultSetHeader>(
         `UPDATE order_returns SET status = 'refunded', refunded_at = ?, admin_note = ?, updated_at = ?
-         WHERE order_return_id = ? AND order_id = ? AND status = 'received'`,
+         WHERE order_return_id = ? AND order_id = ? AND status = 'inspected'`,
         [now, input.adminNote || null, now, input.orderReturnId, input.orderId]
       );
 
@@ -1173,8 +1268,7 @@ export class OrderRepository implements IOrderRepository {
         return null;
       }
 
-      // Cập nhật trạng thái đơn hàng → returned
-      const newPaymentStatus = paymentStatus === 'paid' ? 'refunded' : paymentStatus;
+      const newPaymentStatus = paymentStatus === 'paid' && refundAmount > 0 ? 'refunded' : paymentStatus;
       await connection.execute(
         `UPDATE orders SET status = 'returned', payment_status = ?, updated_at = ? WHERE order_id = ?`,
         [newPaymentStatus, now, input.orderId]
@@ -1634,31 +1728,37 @@ export class OrderRepository implements IOrderRepository {
   }
 
   private mapRowToOrderReturn(row: any): OrderReturn {
-    let evidenceImages: string[] | undefined;
-    if (row.evidence_images) {
+    const parseJsonImages = (raw: any): string[] | undefined => {
+      if (!raw) return undefined;
       try {
-        evidenceImages = typeof row.evidence_images === 'string'
-          ? JSON.parse(row.evidence_images)
-          : row.evidence_images;
-      } catch { evidenceImages = undefined; }
-    }
+        return typeof raw === 'string' ? JSON.parse(raw) : raw;
+      } catch {
+        return undefined;
+      }
+    };
     return {
-      orderReturnId: row.order_return_id,
-      orderId:       row.order_id,
-      requestCode:   row.request_code,
-      requestedBy:   row.requested_by ?? null,
-      status:        row.status,
-      reason:        row.reason,
-      customerNote:  row.customer_note ?? undefined,
-      adminNote:     row.admin_note ?? undefined,
-      evidenceImages,
-      requestedAt:   row.requested_at,
-      approvedAt:    row.approved_at ?? undefined,
-      rejectedAt:    row.rejected_at ?? undefined,
-      receivedAt:    row.received_at ?? undefined,
-      refundedAt:    row.refunded_at ?? undefined,
-      closedAt:      row.closed_at ?? undefined,
-      updatedAt:     row.updated_at,
+      orderReturnId:             row.order_return_id,
+      orderId:                   row.order_id,
+      requestCode:               row.request_code,
+      requestedBy:               row.requested_by ?? null,
+      status:                    row.status,
+      reason:                    row.reason,
+      customerNote:              row.customer_note ?? undefined,
+      adminNote:                 row.admin_note ?? undefined,
+      evidenceImages:            parseJsonImages(row.evidence_images),
+      inspectedBy:               row.inspected_by ?? null,
+      inspectionNote:            row.inspection_note ?? null,
+      inspectionEvidenceImages:  parseJsonImages(row.inspection_evidence_images),
+      refundAmount:              row.refund_amount != null ? Number(row.refund_amount) : null,
+      requestedAt:               row.requested_at,
+      approvedAt:                row.approved_at ?? undefined,
+      rejectedAt:                row.rejected_at ?? undefined,
+      receivedAt:                row.received_at ?? undefined,
+      inspectedAt:               row.inspected_at ?? undefined,
+      refundedAt:                row.refunded_at ?? undefined,
+      closedAt:                  row.closed_at ?? undefined,
+      cancelledAt:               row.cancelled_at ?? undefined,
+      updatedAt:                 row.updated_at,
     };
   }
 
@@ -1675,6 +1775,9 @@ export class OrderRepository implements IOrderRepository {
       quantity:          Number(row.quantity),
       reason:            row.reason ?? undefined,
       restockAction:     row.restock_action ?? 'inspect',
+      inspectionResult:  row.inspection_result ?? null,
+      inspectionNote:    row.inspection_note ?? null,
+      refundAmount:      row.refund_amount != null ? Number(row.refund_amount) : null,
       createdAt:         row.created_at,
     };
   }

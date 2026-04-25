@@ -407,6 +407,51 @@ export class OrderController {
     }
   };
 
+  /** Admin kiểm tra hàng (per-item: tốt / lỗi / khách làm hỏng) */
+  adminInspectReturn = async (req: AuthRequest, res: Response) => {
+    try {
+      const files = ((req.files as Express.Multer.File[] | undefined) ?? []).map(
+        (f) => `/images/returns/${f.filename}`,
+      );
+
+      let items = req.body.items;
+      if (typeof items === 'string') {
+        try {
+          items = JSON.parse(items);
+        } catch {
+          return res.status(400).json({ message: 'Trường items không hợp lệ' });
+        }
+      }
+      if (!Array.isArray(items)) {
+        return res.status(400).json({ message: 'Trường items không hợp lệ' });
+      }
+
+      const result = await this.orderUseCase.inspectReturn(
+        Number(req.params.id),
+        Number(req.params.returnId),
+        req.user.userId,
+        req.user.role,
+        {
+          inspectionNote: req.body.inspectionNote,
+          inspectionEvidenceImages: files.length > 0 ? files : undefined,
+          items: items.map((it: any) => ({
+            orderReturnItemId: Number(it.orderReturnItemId),
+            inspectionResult: it.inspectionResult,
+            inspectionNote: it.inspectionNote,
+            refundAmount: it.refundAmount != null ? Number(it.refundAmount) : undefined,
+          })),
+        },
+      );
+      if (!result)
+        return res
+          .status(404)
+          .json({ message: 'Không tìm thấy yêu cầu hoàn trả' });
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  };
+
   /** Admin xác nhận đã hoàn tiền */
   adminRefundReturn = async (req: AuthRequest, res: Response) => {
     try {

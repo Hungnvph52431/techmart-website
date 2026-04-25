@@ -16,11 +16,14 @@ export type ReturnStatus =
   | 'approved'
   | 'rejected'
   | 'received'
+  | 'inspected'
   | 'refunded'
   | 'closed'
   | 'cancelled';
 
 export type ReturnRestockAction = 'restock' | 'inspect' | 'discard';
+
+export type ReturnInspectionResult = 'good' | 'defective' | 'damaged_by_customer';
 
 export interface OrderCustomerInfo {
   userId?: number;
@@ -106,9 +109,14 @@ export interface OrderReturnItemView {
   productName?: string;
   variantName?: string;
   sku?: string;
+  productImage?: string;
+  price?: number;
   quantity: number;
   reason?: string;
   restockAction: ReturnRestockAction;
+  inspectionResult?: ReturnInspectionResult | null;
+  inspectionNote?: string | null;
+  refundAmount?: number | null;
   createdAt: string;
 }
 
@@ -122,10 +130,15 @@ export interface OrderReturnView {
   customerNote?: string;
   adminNote?: string;
   evidenceImages?: string[];
+  inspectedBy?: number | null;
+  inspectionNote?: string | null;
+  inspectionEvidenceImages?: string[];
+  refundAmount?: number | null;
   requestedAt: string;
   approvedAt?: string;
   rejectedAt?: string;
   receivedAt?: string;
+  inspectedAt?: string;
   refundedAt?: string;
   closedAt?: string;
   cancelledAt?: string;

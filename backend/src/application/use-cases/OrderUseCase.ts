@@ -702,12 +702,61 @@ export class OrderUseCase {
     }
   }
 
-  // Fix #3: Validate status trước khi refund
-  async refundReturn(orderId: number, orderReturnId: number, actorUserId: number, actorRole: OrderActorRole, adminNote?: string) {
+  async inspectReturn(
+    orderId: number,
+    orderReturnId: number,
+    actorUserId: number,
+    actorRole: OrderActorRole,
+    payload: {
+      inspectionNote?: string;
+      inspectionEvidenceImages?: string[];
+      items: Array<{
+        orderReturnItemId: number;
+        inspectionResult: 'good' | 'defective' | 'damaged_by_customer';
+        inspectionNote?: string;
+        refundAmount?: number;
+      }>;
+    },
+  ) {
     const orderReturn = await this.orderRepository.getReturnById(orderId, orderReturnId);
     if (!orderReturn) return null;
     if (orderReturn.status !== 'received') {
-      throw new Error('Chỉ có thể hoàn tiền khi đã nhận lại hàng (received)');
+      throw new Error('Chỉ có thể kiểm tra hàng khi đã nhận lại hàng (received)');
+    }
+    if (!payload.items || payload.items.length === 0) {
+      throw new Error('Phải kiểm tra ít nhất 1 sản phẩm');
+    }
+    const expectedIds = new Set((orderReturn.items ?? []).map((it) => it.orderReturnItemId));
+    for (const it of payload.items) {
+      if (!expectedIds.has(it.orderReturnItemId)) {
+        throw new Error(`Sản phẩm ${it.orderReturnItemId} không thuộc phiếu hoàn này`);
+      }
+      if (!['good', 'defective', 'damaged_by_customer'].includes(it.inspectionResult)) {
+        throw new Error('Kết quả kiểm tra không hợp lệ');
+      }
+      if (it.refundAmount != null && it.refundAmount < 0) {
+        throw new Error('Số tiền hoàn không được âm');
+      }
+    }
+    if (payload.items.length !== expectedIds.size) {
+      throw new Error('Phải kiểm tra đầy đủ tất cả sản phẩm trong phiếu hoàn');
+    }
+    return this.orderRepository.inspectReturn({
+      orderId,
+      orderReturnId,
+      actorUserId,
+      actorRole,
+      inspectionNote: payload.inspectionNote,
+      inspectionEvidenceImages: payload.inspectionEvidenceImages,
+      items: payload.items,
+    });
+  }
+
+  async refundReturn(orderId: number, orderReturnId: number, actorUserId: number, actorRole: OrderActorRole, adminNote?: string) {
+    const orderReturn = await this.orderRepository.getReturnById(orderId, orderReturnId);
+    if (!orderReturn) return null;
+    if (orderReturn.status !== 'inspected') {
+      throw new Error('Chỉ có thể hoàn tiền khi đã kiểm tra hàng (inspected)');
     }
     return this.orderRepository.refundReturn({ orderId, orderReturnId, actorUserId, actorRole, adminNote });
   }

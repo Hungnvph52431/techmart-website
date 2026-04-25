@@ -255,6 +255,53 @@ export class AdminOrderController {
     }
   };
 
+  inspectReturn = async (req: any, res: Response) => {
+    try {
+      // Multipart từ multer: file ảnh + JSON body field
+      const files = ((req.files as Express.Multer.File[] | undefined) ?? []).map(
+        (f) => `/images/returns/${f.filename}`,
+      );
+
+      // items được gửi dưới dạng JSON string (do form-data) — parse lại nếu cần
+      let items = req.body.items;
+      if (typeof items === 'string') {
+        try {
+          items = JSON.parse(items);
+        } catch {
+          return res.status(400).json({ message: 'Trường items không hợp lệ' });
+        }
+      }
+      if (!Array.isArray(items)) {
+        return res.status(400).json({ message: 'Trường items không hợp lệ' });
+      }
+
+      const orderReturn = await this.orderUseCase.inspectReturn(
+        Number(req.params.id),
+        Number(req.params.returnId),
+        req.user.userId,
+        req.user.role,
+        {
+          inspectionNote: req.body.inspectionNote,
+          inspectionEvidenceImages: files.length > 0 ? files : undefined,
+          items: items.map((it: any) => ({
+            orderReturnItemId: Number(it.orderReturnItemId),
+            inspectionResult: it.inspectionResult,
+            inspectionNote: it.inspectionNote,
+            refundAmount: it.refundAmount != null ? Number(it.refundAmount) : undefined,
+          })),
+        },
+      );
+
+      if (!orderReturn) {
+        return res.status(404).json({ message: 'Return request not found' });
+      }
+
+      res.json(orderReturn);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  };
+
   refundReturn = async (req: any, res: Response) => {
     try {
       const orderReturn = await this.orderUseCase.refundReturn(

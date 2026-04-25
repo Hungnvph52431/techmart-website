@@ -23,6 +23,7 @@ export type OrderEventType =
   | 'return_approved'
   | 'return_rejected'
   | 'return_received'
+  | 'return_inspected'
   | 'return_refunded'
   | 'return_closed'
   | 'return_cancelled';
@@ -32,11 +33,14 @@ export type ReturnStatus =
   | 'approved'
   | 'rejected'
   | 'received'
+  | 'inspected'
   | 'refunded'
   | 'closed'
   | 'cancelled';
 
 export type ReturnRestockAction = 'restock' | 'inspect' | 'discard';
+
+export type ReturnInspectionResult = 'good' | 'defective' | 'damaged_by_customer';
 
 // --- 2. CÁC THỰC THỂ CHÍNH (ENTITIES) ---
 export interface Order {
@@ -136,6 +140,9 @@ export interface OrderReturnItem {
   quantity: number;
   reason?: string;
   restockAction: ReturnRestockAction;
+  inspectionResult?: ReturnInspectionResult | null;
+  inspectionNote?: string | null;
+  refundAmount?: number | null;
   createdAt: Date;
 }
 
@@ -149,12 +156,18 @@ export interface OrderReturn {
   customerNote?: string;
   adminNote?: string;
   evidenceImages?: string[];
+  inspectedBy?: number | null;
+  inspectionNote?: string | null;
+  inspectionEvidenceImages?: string[];
+  refundAmount?: number | null;
   requestedAt: Date;
   approvedAt?: Date;
   rejectedAt?: Date;
   receivedAt?: Date;
+  inspectedAt?: Date;
   refundedAt?: Date;
   closedAt?: Date;
+  cancelledAt?: Date;
   updatedAt: Date;
   items?: OrderReturnItem[];
 }
@@ -277,6 +290,21 @@ export interface ReceiveOrderReturnDTO {
   actorUserId: number;
   actorRole: OrderActorRole;
   adminNote?: string;
+}
+
+export interface InspectOrderReturnDTO {
+  orderId: number;
+  orderReturnId: number;
+  actorUserId: number;
+  actorRole: OrderActorRole;
+  inspectionNote?: string;
+  inspectionEvidenceImages?: string[];
+  items: Array<{
+    orderReturnItemId: number;
+    inspectionResult: ReturnInspectionResult;
+    inspectionNote?: string;
+    refundAmount?: number;
+  }>;
 }
 
 export interface RefundOrderReturnDTO {

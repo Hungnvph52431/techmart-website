@@ -37,6 +37,13 @@ export const createOrderRoutes = (orderController: OrderController) => {
   router.get('/admin/returns', authMiddleware, staffMiddleware, orderController.adminListAllReturns);
   router.patch('/:id/returns/:returnId/review', authMiddleware, staffMiddleware, orderController.adminReviewReturn);
   router.patch('/:id/returns/:returnId/receive', authMiddleware, staffMiddleware, orderController.adminReceiveReturn);
+  router.patch(
+    '/:id/returns/:returnId/inspect',
+    authMiddleware,
+    staffMiddleware,
+    uploadReturnEvidence.array('inspectionEvidenceImages', 5),
+    orderController.adminInspectReturn,
+  );
   router.patch('/:id/returns/:returnId/refund', authMiddleware, staffMiddleware, orderController.adminRefundReturn);
 
   // --- 2. ROUTES DÀNH CHO KHÁCH HÀNG (Yêu cầu Đăng nhập) ---

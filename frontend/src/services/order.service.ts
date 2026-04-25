@@ -226,6 +226,38 @@ export const orderService = {
     return response.data;
   },
 
+  adminInspectReturn: async (
+    orderId: number,
+    returnId: number,
+    payload: {
+      inspectionNote?: string;
+      inspectionEvidenceImages?: File[];
+      items: Array<{
+        orderReturnItemId: number;
+        inspectionResult: 'good' | 'defective' | 'damaged_by_customer';
+        inspectionNote?: string;
+        refundAmount?: number;
+      }>;
+    },
+  ): Promise<OrderReturnView> => {
+    const formData = new FormData();
+    if (payload.inspectionNote) {
+      formData.append('inspectionNote', payload.inspectionNote);
+    }
+    formData.append('items', JSON.stringify(payload.items));
+    if (payload.inspectionEvidenceImages) {
+      for (const file of payload.inspectionEvidenceImages) {
+        formData.append('inspectionEvidenceImages', file);
+      }
+    }
+    const response = await api.patch(
+      `/orders/${orderId}/returns/${returnId}/inspect`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data;
+  },
+
   adminRefundReturn: async (orderId: number, returnId: number, adminNote?: string): Promise<OrderReturnView> => {
     const response = await api.patch(`/orders/${orderId}/returns/${returnId}/refund`, { adminNote });
     return response.data;
