@@ -692,20 +692,48 @@ const allowedPayments = (() => {
 
                     {ret.items?.length > 0 && (
                       <div className="space-y-2">
-                        {ret.items.map((item: any) => (
-                          <div key={item.orderReturnItemId} className="text-xs text-gray-600 bg-gray-50 rounded-xl px-3 py-2">
-                            <span className="font-bold">{item.productName || `SP #${item.productId}`}</span>
-                            {' '} — SL: {item.quantity}
-                            {item.reason && ` | ${item.reason}`}
-                          </div>
-                        ))}
+                        {ret.items.map((item: any) => {
+                          const ins = item.inspectionResult as
+                            | 'good' | 'defective' | 'damaged_by_customer' | null | undefined;
+                          const insBadge = ins
+                            ? {
+                                good: { label: '🟢 Tốt', cls: 'bg-emerald-100 text-emerald-700' },
+                                defective: { label: '🟡 Lỗi do shop', cls: 'bg-amber-100 text-amber-700' },
+                                damaged_by_customer: { label: '🔴 Khách làm hỏng', cls: 'bg-rose-100 text-rose-700' },
+                              }[ins]
+                            : null;
+                          return (
+                            <div key={item.orderReturnItemId} className="bg-gray-50 rounded-xl px-3 py-2 space-y-1">
+                              <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                                <span className="font-bold text-gray-800">{item.productName || `SP #${item.productId}`}</span>
+                                <span>— SL: {item.quantity}</span>
+                                {item.reason && <span className="text-gray-500">| {item.reason}</span>}
+                                {insBadge && (
+                                  <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${insBadge.cls}`}>
+                                    {insBadge.label}
+                                  </span>
+                                )}
+                                {item.refundAmount != null && ins && (
+                                  <span className={`ml-auto text-xs font-black ${
+                                    Number(item.refundAmount) > 0 ? 'text-blue-600' : 'text-gray-400'
+                                  }`}>
+                                    Hoàn: {Number(item.refundAmount).toLocaleString('vi-VN')}đ
+                                  </span>
+                                )}
+                              </div>
+                              {item.inspectionNote && (
+                                <p className="text-[11px] text-gray-500 italic pl-1">"{item.inspectionNote}"</p>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
 
                     {/* Ảnh bằng chứng từ khách hàng */}
                     {ret.evidenceImages?.length > 0 && (
                       <div>
-                        <p className="text-xs font-bold text-gray-500 mb-1.5">Ảnh bằng chứng ({ret.evidenceImages.length}):</p>
+                        <p className="text-xs font-bold text-gray-500 mb-1.5">Ảnh khách gửi ({ret.evidenceImages.length}):</p>
                         <div className="flex flex-wrap gap-2">
                           {ret.evidenceImages.map((img: string, idx: number) => (
                             <a key={idx} href={getImageUrl(img)} target="_blank" rel="noopener noreferrer"
@@ -714,6 +742,53 @@ const allowedPayments = (() => {
                             </a>
                           ))}
                         </div>
+                      </div>
+                    )}
+
+                    {/* Block KẾT QUẢ KIỂM TRA của admin */}
+                    {(ret.inspectedAt || ret.inspectionNote || ret.inspectionEvidenceImages?.length > 0) && (
+                      <div className="rounded-xl border-2 border-indigo-100 bg-indigo-50/40 p-3 space-y-2">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <p className="text-xs font-black text-indigo-700 uppercase tracking-wide">
+                            🔍 Kết quả kiểm tra (admin)
+                          </p>
+                          {ret.inspectedAt && (
+                            <p className="text-[10px] text-indigo-500 font-medium">
+                              {fmtDate(ret.inspectedAt)}
+                            </p>
+                          )}
+                        </div>
+                        {ret.inspectionNote && (
+                          <p className="text-xs text-gray-700 italic">"{ret.inspectionNote}"</p>
+                        )}
+                        {ret.inspectionEvidenceImages?.length > 0 && (
+                          <div>
+                            <p className="text-[10px] font-bold text-indigo-600 mb-1">
+                              Ảnh test ({ret.inspectionEvidenceImages.length}):
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {ret.inspectionEvidenceImages.map((img: string, idx: number) => (
+                                <a key={idx} href={getImageUrl(img)} target="_blank" rel="noopener noreferrer"
+                                  className="block w-16 h-16 rounded-lg overflow-hidden border-2 border-indigo-200 hover:border-indigo-400 transition-colors">
+                                  <img src={getImageUrl(img)} alt={`inspect-${idx}`} className="w-full h-full object-cover" />
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {ret.refundAmount != null && (
+                          <p className="text-xs text-gray-600">
+                            <span className="font-bold">Tổng tiền hoàn:</span>{' '}
+                            <span className={Number(ret.refundAmount) > 0 ? 'text-blue-600 font-black' : 'text-rose-600 font-black'}>
+                              {Number(ret.refundAmount).toLocaleString('vi-VN')}đ
+                            </span>
+                            {Number(ret.refundAmount) === 0 && (
+                              <span className="ml-2 text-[10px] uppercase font-bold text-rose-500">
+                                (Không hoàn — khách làm hỏng)
+                              </span>
+                            )}
+                          </p>
+                        )}
                       </div>
                     )}
 
