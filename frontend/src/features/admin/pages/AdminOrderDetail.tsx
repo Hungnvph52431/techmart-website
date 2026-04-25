@@ -673,19 +673,22 @@ const allowedPayments = (() => {
                   <RotateCcw size={16} className="text-rose-500" /> Yêu cầu hoàn/trả hàng
                 </h2>
               </div>
-              <div className="divide-y divide-gray-50">
+              <div className="p-5 space-y-5">
                 {returns.map((ret: any) => (
-                  <div key={ret.orderReturnId} className="p-6 space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div key={ret.orderReturnId} className="rounded-2xl border-2 border-gray-200 shadow-sm overflow-hidden">
+                    {/* Header strip */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-slate-50 to-white px-5 py-3 border-b border-gray-100">
                       <div>
-                        <p className="font-black text-gray-800">{ret.requestCode}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">Yêu cầu lúc {fmtDate(ret.requestedAt)}</p>
+                        <p className="font-black text-gray-900 tracking-tight">#{ret.requestCode}</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">Yêu cầu lúc {fmtDate(ret.requestedAt)}</p>
                       </div>
                       <span className={`px-3 py-1 rounded-full text-xs font-black uppercase ${RETURN_STATUS_STYLES[ret.status]}`}>
                         {RETURN_STATUS_LABELS[ret.status]}
                       </span>
                     </div>
 
+                    {/* Body */}
+                    <div className="px-5 py-4 space-y-4">
                     <p className="text-sm text-gray-600">
                       <span className="font-bold text-gray-800">Lý do:</span> {ret.reason}
                     </p>
@@ -860,6 +863,7 @@ const allowedPayments = (() => {
                           <AlertCircle size={13} /> Đóng yêu cầu
                         </button>
                       )}
+                    </div>
                     </div>
                   </div>
                 ))}
