@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
+import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/authStore';
 import {
   assignConversationToMe,
@@ -182,7 +183,7 @@ export default function SupportChatAdminPage() {
       (ack: { ok: boolean; error?: string; data?: SupportMessage }) => {
         setSending(false);
         if (!ack?.ok) {
-          alert(ack?.error || 'Gửi thất bại');
+          toast.error(ack?.error || 'Gửi thất bại');
           return;
         }
         setInput('');
@@ -210,23 +211,31 @@ export default function SupportChatAdminPage() {
       await assignConversationToMe(token, selectedId);
       await reloadList();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Lỗi không xác định');
+      toast.error(err instanceof Error ? err.message : 'Lỗi không xác định');
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleClose = async () => {
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+
+  const handleClose = () => {
     if (!selectedId || !token || actionLoading) return;
-    if (!confirm('Đóng cuộc hội thoại này?')) return;
+    setConfirmCloseOpen(true);
+  };
+
+  const confirmClose = async () => {
+    if (!selectedId || !token) return;
+    setConfirmCloseOpen(false);
     try {
       setActionLoading(true);
       await closeConversationAsStaff(token, selectedId);
       setSelectedId(null);
       setMessages([]);
       await reloadList();
+      toast.success('Đã đóng cuộc hội thoại');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Lỗi không xác định');
+      toast.error(err instanceof Error ? err.message : 'Lỗi không xác định');
     } finally {
       setActionLoading(false);
     }
@@ -447,6 +456,42 @@ export default function SupportChatAdminPage() {
           )}
         </section>
       </div>
+
+      {/* Confirm modal: đóng hội thoại */}
+      {confirmCloseOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="px-6 pt-6 pb-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center flex-shrink-0">
+                  <XCircle size={20} className="text-rose-600" />
+                </div>
+                <h3 className="text-base font-bold text-gray-900">
+                  Đóng cuộc hội thoại?
+                </h3>
+              </div>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                Cuộc hội thoại sẽ được chuyển sang trạng thái "Đã đóng". Khách
+                hàng cần tạo yêu cầu mới để liên hệ tiếp.
+              </p>
+            </div>
+            <div className="flex gap-3 px-6 pb-6">
+              <button
+                onClick={() => setConfirmCloseOpen(false)}
+                className="flex-1 py-2.5 rounded-xl border-2 border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-all"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={confirmClose}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 text-white font-bold text-sm hover:bg-rose-700 transition-all"
+              >
+                Đóng hội thoại
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
