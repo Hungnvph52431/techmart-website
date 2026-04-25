@@ -569,6 +569,82 @@ export const GuestOrderDetailPage = () => {
                                   "{returnItem.inspectionNote}"
                                 </p>
                               )}
+                              {returnItem.inspectionEvidenceImages &&
+                                returnItem.inspectionEvidenceImages.length >
+                                  0 && (
+                                  <div>
+                                    <p className="mb-1 text-[10px] font-bold text-indigo-600">
+                                      Ảnh shop chụp lúc kiểm tra:
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                      {returnItem.inspectionEvidenceImages.map(
+                                        (img, idx) => (
+                                          <a
+                                            key={idx}
+                                            href={getImageUrl(img)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="block h-16 w-16 overflow-hidden rounded-lg border-2 border-indigo-200 transition-colors hover:border-indigo-400"
+                                          >
+                                            <img
+                                              src={getImageUrl(img)}
+                                              alt={`inspect-${idx}`}
+                                              className="h-full w-full object-cover"
+                                            />
+                                          </a>
+                                        ),
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              {/* Per-item inspection results (chi tiết từng sp) */}
+                              {returnItem.items?.some(
+                                (it) => it.inspectionResult,
+                              ) && (
+                                <div className="space-y-1 pt-1 border-t border-indigo-100">
+                                  <p className="text-[10px] font-bold text-indigo-600">
+                                    Kết quả từng sản phẩm:
+                                  </p>
+                                  {returnItem.items.map((it) => {
+                                    if (!it.inspectionResult) return null;
+                                    const map = {
+                                      good: {
+                                        label: "🟢 Tốt",
+                                        cls: "bg-emerald-100 text-emerald-700",
+                                      },
+                                      defective: {
+                                        label: "🟡 Lỗi do shop",
+                                        cls: "bg-amber-100 text-amber-700",
+                                      },
+                                      damaged_by_customer: {
+                                        label: "🔴 Hỏng do khách",
+                                        cls: "bg-rose-100 text-rose-700",
+                                      },
+                                    }[it.inspectionResult];
+                                    return (
+                                      <div
+                                        key={it.orderReturnItemId}
+                                        className="flex flex-wrap items-center gap-2 text-[11px] text-gray-700"
+                                      >
+                                        <span className="font-bold">
+                                          {it.productName ||
+                                            `SP #${it.productId}`}
+                                        </span>
+                                        <span
+                                          className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${map.cls}`}
+                                        >
+                                          {map.label}
+                                        </span>
+                                        {it.inspectionNote && (
+                                          <span className="italic text-gray-500">
+                                            "{it.inspectionNote}"
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
                               {returnItem.refundAmount != null && (
                                 <p className="text-xs text-gray-600">
                                   <span className="font-bold">
