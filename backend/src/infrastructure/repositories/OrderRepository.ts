@@ -25,6 +25,7 @@ import {
   TransitionOrderStatusDTO,
   UpdatePaymentStatusDTO,
 } from '../../domain/entities/Order';
+import { applyPointsChange, calculatePointsFromSubtotal } from '../../application/services/LoyaltyService';
 
 type SqlExecutor = {
   execute: <T extends RowDataPacket[] | ResultSetHeader>(
@@ -495,7 +496,7 @@ export class OrderRepository implements IOrderRepository {
         }
       }
 
-      // Cập nhật sold_quantity khi đơn hoàn thành
+      // Cập nhật sold_quantity + cộng điểm thưởng khi đơn hoàn thành
       if (input.nextStatus === 'completed') {
         const details = await this.getOrderDetailsWithExecutor(connection, input.orderId);
         for (const d of details) {
@@ -503,6 +504,21 @@ export class OrderRepository implements IOrderRepository {
             'UPDATE products SET sold_quantity = sold_quantity + ? WHERE product_id = ?',
             [d.quantity, d.productId]
           );
+        }
+
+        // Cộng điểm tích lũy cho khách (1 điểm / 1.000đ subtotal). Bỏ qua đơn guest.
+        if (order.userId) {
+          const subtotal = Number(order.subtotal ?? 0);
+          const points = calculatePointsFromSubtotal(subtotal);
+          if (points > 0) {
+            await applyPointsChange(connection, {
+              userId: order.userId,
+              change: points,
+              reason: 'order_completed',
+              orderId: input.orderId,
+              note: `Cộng điểm khi hoàn thành đơn #${input.orderId}`,
+            });
+          }
         }
       }
 
@@ -1266,6 +1282,21 @@ export class OrderRepository implements IOrderRepository {
         `UPDATE orders SET status = 'returned', payment_status = ?, updated_at = ? WHERE order_id = ?`,
         [newPaymentStatus, now, input.orderId]
       );
+
+      // Trừ điểm tích lũy đã cộng cho đơn này (tính dựa trên refundAmount để
+      // refund 1 phần thì trừ 1 phần). Bỏ qua đơn guest hoặc khi refund=0.
+      if (userId && refundAmount > 0) {
+        const pointsToDeduct = calculatePointsFromSubtotal(refundAmount);
+        if (pointsToDeduct > 0) {
+          await applyPointsChange(connection, {
+            userId: Number(userId),
+            change: -pointsToDeduct,
+            reason: 'order_refunded',
+            orderId: input.orderId,
+            note: `Trừ điểm do hoàn tiền đơn #${input.orderId}`,
+          });
+        }
+      }
 
       await this.appendEventWithConnection(connection, {
         orderId: input.orderId,

@@ -990,6 +990,23 @@ export const ProfilePage = () => {
   const membership = MEMBERSHIP[(u.membershipLevel as keyof typeof MEMBERSHIP)] || MEMBERSHIP.bronze;
   const initials = displayName.split(' ').map((w: string) => w[0]).slice(-2).join('').toUpperCase();
 
+  // Tính progress lên level kế tiếp (đồng bộ với LoyaltyService backend)
+  const LEVEL_THRESHOLDS = [
+    { level: 'bronze', label: 'Đồng', min: 0 },
+    { level: 'silver', label: 'Bạc', min: 10000 },
+    { level: 'gold', label: 'Vàng', min: 50000 },
+    { level: 'platinum', label: 'Bạch kim', min: 200000 },
+  ];
+  const currentLevelIdx = LEVEL_THRESHOLDS.findIndex(t => t.level === u.membershipLevel);
+  const nextTier = currentLevelIdx >= 0 && currentLevelIdx < LEVEL_THRESHOLDS.length - 1
+    ? LEVEL_THRESHOLDS[currentLevelIdx + 1]
+    : null;
+  const currentTierMin = currentLevelIdx >= 0 ? LEVEL_THRESHOLDS[currentLevelIdx].min : 0;
+  const progressPct = nextTier
+    ? Math.min(100, Math.round(((userPoints - currentTierMin) / (nextTier.min - currentTierMin)) * 100))
+    : 100;
+  const pointsToNext = nextTier ? Math.max(0, nextTier.min - userPoints) : 0;
+
   const updateField = async (field: string, value: string) => {
     try {
       const fieldMap: Record<string, string> = { name: 'fullName', email: 'email', phone: 'phone' };
@@ -1130,6 +1147,54 @@ export const ProfilePage = () => {
                 )}
               </div>
               <p className="text-[10px] text-slate-300 mt-2">Di chuột vào ảnh bìa hoặc avatar để thay đổi</p>
+            </div>
+          </div>
+
+          {/* ── Điểm thưởng & Hạng thành viên ── */}
+          <div className="bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 rounded-3xl border-2 border-amber-200 shadow-sm overflow-hidden">
+            <div className="px-6 py-5">
+              <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-amber-700">Điểm tích lũy</p>
+                  <p className="text-3xl font-black text-amber-600 mt-1 flex items-center gap-2">
+                    <Star size={24} className="fill-current" />
+                    {userPoints.toLocaleString('vi-VN')}
+                  </p>
+                </div>
+                <div className={`flex items-center gap-1.5 px-4 py-2 rounded-xl border-2 text-sm font-bold ${membership.bg} ${membership.color} ${membership.border}`}>
+                  {membership.icon} Hạng {membership.label}
+                </div>
+              </div>
+
+              {nextTier ? (
+                <>
+                  <div className="flex justify-between items-center text-xs mb-1.5">
+                    <span className="font-bold text-slate-600">
+                      {currentTierMin.toLocaleString('vi-VN')}
+                    </span>
+                    <span className="font-bold text-amber-700">
+                      Còn {pointsToNext.toLocaleString('vi-VN')} điểm để lên hạng <span className="uppercase">{nextTier.label}</span>
+                    </span>
+                    <span className="font-bold text-slate-600">
+                      {nextTier.min.toLocaleString('vi-VN')}
+                    </span>
+                  </div>
+                  <div className="h-3 bg-white rounded-full overflow-hidden border border-amber-200">
+                    <div
+                      className="h-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all duration-500"
+                      style={{ width: `${progressPct}%` }}
+                    />
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-amber-700 font-bold flex items-center gap-2">
+                  <Crown size={16} /> Bạn đã đạt hạng cao nhất — cảm ơn vì đã ủng hộ TechMart!
+                </p>
+              )}
+
+              <p className="text-[11px] text-slate-500 mt-3">
+                Mỗi 1.000đ chi tiêu (không tính phí ship) = 1 điểm. Điểm cộng khi đơn hoàn thành, trừ khi hoàn tiền.
+              </p>
             </div>
           </div>
 

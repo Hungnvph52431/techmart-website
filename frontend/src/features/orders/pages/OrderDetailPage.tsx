@@ -409,6 +409,14 @@ export const OrderDetailPage = () => {
               </div>
             )}
 
+            {/* Điểm thưởng đã được cộng (1.000đ subtotal = 1 điểm) */}
+            {alreadyReceived && Math.floor(subtotal / 1000) > 0 && (
+              <div className="inline-flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-4 py-2 text-sm font-semibold text-amber-700">
+                <Star size={16} className="fill-current" />
+                +{Math.floor(subtotal / 1000).toLocaleString("vi-VN")} điểm thưởng
+              </div>
+            )}
+
             {/* Nút yêu cầu hoàn/trả hàng */}
             {canRequestReturn && (
               <button
