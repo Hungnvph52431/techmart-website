@@ -158,8 +158,12 @@ export class OrderUseCase {
   ) {
     const orderReturn = await this.orderRepository.getReturnById(orderId, orderReturnId);
     if (!orderReturn) return null;
-    if (!['refunded', 'rejected'].includes(orderReturn.status)) {
-      throw new Error('Chỉ có thể đóng yêu cầu đã hoàn tiền hoặc đã từ chối');
+    // Cho phép đóng từ:
+    // - 'refunded': đã hoàn tiền (luồng chuẩn)
+    // - 'rejected': bị từ chối (auto-reject sau inspect hoặc admin từ chối)
+    // - 'inspected' + COD chưa thanh toán: không có gì để refund → đóng luôn
+    if (!['refunded', 'rejected', 'inspected'].includes(orderReturn.status)) {
+      throw new Error('Chỉ có thể đóng yêu cầu đã kiểm tra, đã hoàn tiền hoặc đã từ chối');
     }
 
     return this.orderRepository.closeReturn({
