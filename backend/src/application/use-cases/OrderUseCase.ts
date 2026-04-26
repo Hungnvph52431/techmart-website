@@ -704,19 +704,30 @@ export class OrderUseCase {
     if (!payload.items || payload.items.length === 0) {
       throw new Error('Phải kiểm tra ít nhất 1 sản phẩm');
     }
-    const expectedIds = new Set((orderReturn.items ?? []).map((it) => it.orderReturnItemId));
+    const itemMap = new Map(
+      (orderReturn.items ?? []).map((it) => [it.orderReturnItemId, it]),
+    );
     for (const it of payload.items) {
-      if (!expectedIds.has(it.orderReturnItemId)) {
+      const expected = itemMap.get(it.orderReturnItemId);
+      if (!expected) {
         throw new Error(`Sản phẩm ${it.orderReturnItemId} không thuộc phiếu hoàn này`);
       }
       if (!['good', 'defective', 'damaged_by_customer'].includes(it.inspectionResult)) {
         throw new Error('Kết quả kiểm tra không hợp lệ');
       }
-      if (it.refundAmount != null && it.refundAmount < 0) {
-        throw new Error('Số tiền hoàn không được âm');
+      if (it.refundAmount != null) {
+        if (it.refundAmount < 0) {
+          throw new Error('Số tiền hoàn không được âm');
+        }
+        const maxRefund = Number(expected.price ?? 0) * expected.quantity;
+        if (it.refundAmount > maxRefund) {
+          throw new Error(
+            `Số tiền hoàn (${it.refundAmount.toLocaleString('vi-VN')}đ) không được vượt quá giá gốc (${maxRefund.toLocaleString('vi-VN')}đ)`,
+          );
+        }
       }
     }
-    if (payload.items.length !== expectedIds.size) {
+    if (payload.items.length !== itemMap.size) {
       throw new Error('Phải kiểm tra đầy đủ tất cả sản phẩm trong phiếu hoàn');
     }
     return this.orderRepository.inspectReturn({

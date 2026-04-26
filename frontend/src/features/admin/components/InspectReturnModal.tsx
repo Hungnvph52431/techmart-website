@@ -122,9 +122,13 @@ export const InspectReturnModal = ({
   };
 
   const setItemRefund = (id: number, amount: number) => {
+    const item = items.find((it) => it.orderReturnItemId === id);
+    const fullPrice = (item?.price ?? 0) * (item?.quantity ?? 1);
+    // Clamp về [0, fullPrice] — không cho hoàn nhiều hơn giá gốc
+    const clamped = Math.min(Math.max(0, amount), fullPrice);
     setStates((prev) => ({
       ...prev,
-      [id]: { ...prev[id], refundAmount: Math.max(0, amount) },
+      [id]: { ...prev[id], refundAmount: clamped },
     }));
   };
 

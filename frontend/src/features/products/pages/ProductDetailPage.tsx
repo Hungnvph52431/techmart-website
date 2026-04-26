@@ -110,9 +110,7 @@ export const ProductDetailPage = () => {
     (v: any) => (v.variantId ?? v.id) === selectedVariantId,
   );
 
-  const baseOriginalPrice = Number(
-    product?.originalPrice ?? product?.price ?? 0,
-  );
+  const baseOriginalPrice = Number(product?.price ?? 0);
   const baseSalePrice = Number(product?.salePrice ?? product?.price ?? 0);
   const variantPriceDelta = selectedVariant
     ? selectedVariant.priceAdjustment != null &&

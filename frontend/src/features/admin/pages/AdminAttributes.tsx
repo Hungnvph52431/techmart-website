@@ -7,6 +7,7 @@ import {
   AdminCategory, CategoryAttributeAssignment,
 } from '@/features/admin/types/catalog';
 import { Plus, Pencil, Trash2, X, Check, Tag, Link2, ChevronDown, ChevronUp } from 'lucide-react';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 const INPUT_TYPES: AdminAttributeInputType[] = ['text', 'textarea', 'number', 'boolean', 'select', 'multi_select', 'color'];
 
@@ -275,10 +276,18 @@ export const AdminAttributes = () => {
     finally { setSubmitting(false); }
   };
 
-  const handleDelete = async (attributeId: number, name: string) => {
-    if (!confirm(`Xóa thuộc tính "${name}"?`)) return;
+  const [confirmDelete, setConfirmDelete] = useState<{ id: number; name: string } | null>(null);
+
+  const handleDelete = (attributeId: number, name: string) => {
+    setConfirmDelete({ id: attributeId, name });
+  };
+
+  const doDelete = async () => {
+    if (!confirmDelete) return;
+    const { id, name } = confirmDelete;
+    setConfirmDelete(null);
     try {
-      await adminAttributeService.remove(attributeId);
+      await adminAttributeService.remove(id);
       toast.success(`Đã xóa "${name}"`); fetchInitialData();
     } catch (error: any) { toast.error(error.response?.data?.message || 'Không thể xóa'); }
   };
@@ -511,6 +520,20 @@ export const AdminAttributes = () => {
           </table>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmDelete != null}
+        title="Xóa thuộc tính?"
+        message={
+          confirmDelete
+            ? `Thuộc tính "${confirmDelete.name}" sẽ bị xóa vĩnh viễn.`
+            : ""
+        }
+        confirmLabel="Xóa"
+        variant="danger"
+        onConfirm={doDelete}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 };

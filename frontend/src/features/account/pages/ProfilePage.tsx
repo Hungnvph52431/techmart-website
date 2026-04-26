@@ -8,6 +8,7 @@ import { addressService, type Address } from '@/services/address.service';
 import { FavoriteProductsSection } from '@/features/account/components/FavoriteProductsSection';
 import api from '@/services/api';
 import toast from 'react-hot-toast';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import {
   User, Mail, Phone, MapPin, Shield, LogOut, Pencil, Check, X,
   Navigation, Star, Loader2, Crown, Award,
@@ -1038,8 +1039,16 @@ export const ProfilePage = () => {
     }
   };
 
-  const handleDeleteAddress = async (id: number) => {
-    if (!confirm('Xóa địa chỉ này?')) return;
+  const [confirmDeleteAddrId, setConfirmDeleteAddrId] = useState<number | null>(null);
+
+  const handleDeleteAddress = (id: number) => {
+    setConfirmDeleteAddrId(id);
+  };
+
+  const doDeleteAddress = async () => {
+    if (!confirmDeleteAddrId) return;
+    const id = confirmDeleteAddrId;
+    setConfirmDeleteAddrId(null);
     try { await addressService.delete(id); setAddresses(prev => prev.filter(a => a.addressId !== id)); toast.success('Đã xóa'); }
     catch { toast.error('Không thể xóa'); }
   };
@@ -1207,6 +1216,16 @@ export const ProfilePage = () => {
 
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmDeleteAddrId != null}
+        title="Xóa địa chỉ?"
+        message="Địa chỉ giao hàng này sẽ bị xóa vĩnh viễn."
+        confirmLabel="Xóa"
+        variant="danger"
+        onConfirm={doDeleteAddress}
+        onCancel={() => setConfirmDeleteAddrId(null)}
+      />
     </Layout>
   );
 };

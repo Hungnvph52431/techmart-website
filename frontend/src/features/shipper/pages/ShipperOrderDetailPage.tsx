@@ -330,7 +330,7 @@ export const ShipperOrderDetailPage = () => {
                   Xác nhận đã trả hàng về kho?
                 </div>
                 <div style={{ fontSize: 12, color: '#757575', marginBottom: 14 }}>
-                  Sau khi xác nhận, Admin sẽ kiểm tra và nhập kho. Hành động này không thể hoàn tác.
+                  Sau khi xác nhận, đơn sẽ được chuyển về cho admin xử lý. Hành động này không thể hoàn tác.
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button

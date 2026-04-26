@@ -106,7 +106,7 @@ export const AdminVoucher = () => {
       await voucherService.create(payloadToSubmit);
       setIsModalOpen(false);
       loadData();
-      alert("Tạo mã Voucher thành công!");
+      toast.success("Tạo mã Voucher thành công!");
       
       setFormData({
         code: '', description: '', discount_type: 'fixed_amount', discount_value: 0,

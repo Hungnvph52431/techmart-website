@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { brandService, Brand } from '@/services/brand.service';
 import toast from 'react-hot-toast';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 export const AdminBrands = () => {
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -101,11 +102,16 @@ export const AdminBrands = () => {
     }
   };
 
-  const handleDelete = async (id: number, name: string) => {
-    if (!confirm(`Bạn có chắc muốn xóa thương hiệu "${name}"?`)) {
-      return;
-    }
+  const [confirmDelete, setConfirmDelete] = useState<{ id: number; name: string } | null>(null);
 
+  const handleDelete = (id: number, name: string) => {
+    setConfirmDelete({ id, name });
+  };
+
+  const doDelete = async () => {
+    if (!confirmDelete) return;
+    const { id } = confirmDelete;
+    setConfirmDelete(null);
     try {
       setDeleteLoading(id);
       await brandService.delete(id);
@@ -288,6 +294,20 @@ export const AdminBrands = () => {
           </table>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmDelete != null}
+        title="Xóa thương hiệu?"
+        message={
+          confirmDelete
+            ? `Thương hiệu "${confirmDelete.name}" sẽ bị xóa vĩnh viễn. Hành động này không thể hoàn tác.`
+            : ""
+        }
+        confirmLabel="Xóa"
+        variant="danger"
+        onConfirm={doDelete}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 };

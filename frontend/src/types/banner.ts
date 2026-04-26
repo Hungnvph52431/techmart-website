@@ -1,11 +1,3 @@
-export interface Banner {
-  id: string;
-  bannerId?: string;
-  title: string;
-  imageUrl: string;
-  link?: string;
-  linkUrl?: string;
-  isActive: boolean;
-  order?: number;
-  type?: string;
-}
+// Re-export canonical Banner type. File này tồn tại để giữ tương thích với
+// các import cũ; type chuẩn nằm ở banner.type.ts.
+export type { Banner, BannerPosition } from "./banner.type";
