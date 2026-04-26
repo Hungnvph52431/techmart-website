@@ -8,6 +8,7 @@ import {
   X,
 } from "lucide-react";
 import { orderService } from "@/services/order.service";
+import { useEscapeKey } from "@/hooks/useEscapeKey";
 import {
   formatCurrency,
   formatOrderItemVariantSummary,
@@ -35,6 +36,7 @@ export const ReturnModal = ({
   onClose,
   onSubmitted,
 }: Props) => {
+  useEscapeKey(onClose);
   const [reason, setReason] = useState("");
   const [customReason, setCustomReason] = useState("");
   const [customerNote, setCustomerNote] = useState("");

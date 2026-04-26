@@ -5,6 +5,7 @@ import {
   reviewService,
   type OrderReviewItemSummary,
 } from "@/services/review.service";
+import { useEscapeKey } from "@/hooks/useEscapeKey";
 import { formatOrderItemVariantSummary } from "../lib/orderFormatters";
 import { RATING_LABELS } from "../lib/orderLabels";
 
@@ -16,6 +17,7 @@ type Props = {
 };
 
 export const ReviewModal = ({ items, orderId, onClose, onSubmitted }: Props) => {
+  useEscapeKey(onClose);
   const actionableItems = items.filter(
     (item) => item.canCreateReview || item.canEditReview,
   );

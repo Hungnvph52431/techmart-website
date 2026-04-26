@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import { Camera, ImageIcon, RotateCcw, Trash2, X } from "lucide-react";
 import { orderService } from "@/services/order.service";
 import type { OrderDetailView } from "@/types/order";
+import { useEscapeKey } from "@/hooks/useEscapeKey";
 import { formatCurrency } from "../lib/orderFormatters";
 
 const BACKEND_URL =
@@ -56,6 +57,7 @@ export const GuestReturnModal = ({
   onClose,
   onSubmitted,
 }: Props) => {
+  useEscapeKey(onClose);
   const [reason, setReason] = useState("");
   const [customReason, setCustomReason] = useState("");
   const [customerNote, setCustomerNote] = useState("");

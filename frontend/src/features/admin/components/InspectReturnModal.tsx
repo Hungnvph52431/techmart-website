@@ -10,6 +10,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { adminOrderService } from "@/services/admin/order.service";
+import { useEscapeKey } from "@/hooks/useEscapeKey";
 
 const BACKEND_URL =
   (import.meta.env.VITE_API_URL as string)?.replace("/api", "") ||
@@ -88,6 +89,7 @@ export const InspectReturnModal = ({
   onClose,
   onDone,
 }: Props) => {
+  useEscapeKey(onClose);
   const [states, setStates] = useState<Record<number, ItemState>>(() =>
     Object.fromEntries(
       items.map((it) => [

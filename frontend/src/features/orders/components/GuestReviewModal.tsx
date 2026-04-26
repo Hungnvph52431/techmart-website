@@ -5,6 +5,7 @@ import {
   reviewService,
   type OrderReviewItemSummary,
 } from "@/services/review.service";
+import { useEscapeKey } from "@/hooks/useEscapeKey";
 
 const BACKEND_URL =
   (import.meta.env.VITE_API_URL as string)?.replace("/api", "") ||
@@ -49,6 +50,7 @@ export const GuestReviewModal = ({
   onClose,
   onSubmitted,
 }: Props) => {
+  useEscapeKey(onClose);
   const actionableItems = items.filter(
     (item) => item.canCreateReview || item.canEditReview,
   );

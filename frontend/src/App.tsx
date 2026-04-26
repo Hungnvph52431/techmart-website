@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from '@/store/authStore';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 // --- PAGES CÔNG KHAI ---
 import { HomePage } from '@/pages/HomePage';
@@ -66,6 +67,7 @@ const CartRoute = () => {
 
 function App() {
   return (
+    <ErrorBoundary>
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Toaster position="top-right" />
       <Routes>
@@ -136,6 +138,7 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
+    </ErrorBoundary>
   );
 }
 

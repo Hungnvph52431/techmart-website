@@ -171,6 +171,7 @@ export const ProductCard = ({ product }: ProductCardProps) => {
               <img
                 src={getImageUrl(product.mainImage || (product as any).images?.[0]?.imageUrl)}
                 alt={product.name}
+                loading="lazy"
                 className="absolute inset-0 h-full w-full object-contain p-4 transition-transform duration-500 group-hover:scale-110"
                 onError={(e) => { const el = e.target as HTMLImageElement; el.onerror = null; el.src = '/placeholder.jpg'; }}
               />
