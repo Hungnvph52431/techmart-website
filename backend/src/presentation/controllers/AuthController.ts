@@ -1,3 +1,7 @@
+// FEATURE: Xác thực — endpoints HTTP
+// Routes: /api/auth/* (register, login, logout, forgot-password, reset, verify-otp)
+// Xem chi tiết: MAP.md mục #1
+
 import { Request, Response } from "express";
 import { AuthUseCase } from "../../application/use-cases/AuthUseCase";
 

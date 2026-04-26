@@ -1,3 +1,8 @@
+// FEATURE: Gửi email thông báo (Nodemailer + Gmail SMTP)
+// Sử dụng: đặt đơn, đổi trạng thái, yêu cầu hoàn, hoàn tiền, OTP
+// Lưu ý: lazy init transporter để dotenv.config() chạy trước
+// Xem chi tiết: MAP.md mục #15
+
 import nodemailer from "nodemailer";
 import type { Transporter } from "nodemailer";
 

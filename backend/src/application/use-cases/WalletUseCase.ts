@@ -1,3 +1,11 @@
+// FEATURE: Ví TechMart — nạp tiền (VNPay) + rút tiền (thủ công)
+// Nạp: tạo VNPay URL → user thanh toán → callback cộng số dư
+// Rút: user gửi yêu cầu kèm STK → admin chuyển khoản tay → đánh dấu xong
+//      (KHÔNG có API ngân hàng — chỉ mô phỏng nghiệp vụ)
+// Admin: AdminWalletTopups.tsx, AdminWalletWithdrawals.tsx
+// Migration: 2026-04-10-add-wallet-bank-and-withdrawals.sql
+// Xem chi tiết: MAP.md mục #5
+
 import pool from '../../infrastructure/database/connection';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { PoolConnection } from 'mysql2/promise';

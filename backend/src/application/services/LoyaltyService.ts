@@ -1,3 +1,10 @@
+// FEATURE: Tích điểm & xếp hạng thành viên (Loyalty)
+// Liên quan: OrderRepository.transitionStatus (cộng điểm khi completed),
+//            OrderRepository.refundReturn (trừ điểm khi hoàn tiền)
+// UI: ProfilePage.tsx (hiển thị điểm + tiến độ lên hạng)
+// Migration: 2026-04-26-add-user-points-log.sql
+// Xem chi tiết: MAP.md mục #7
+
 import { PoolConnection, RowDataPacket } from 'mysql2/promise';
 
 /**

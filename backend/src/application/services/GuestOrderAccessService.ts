@@ -1,3 +1,8 @@
+// FEATURE: Khách vãng lai (Guest) tra cứu đơn hàng
+// Cơ chế: tạo JWT 30 ngày, gắn vào URL email → guest mở link xem đơn
+// Liên quan: GuestOrderDetailPage.tsx, guest-order.middleware
+// Xem chi tiết: MAP.md mục #13
+
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';

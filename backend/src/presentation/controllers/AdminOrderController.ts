@@ -1,3 +1,8 @@
+// FEATURE: Admin quản lý đơn hàng + phiếu hoàn
+// Routes: /api/admin/orders/* (xem, cập nhật trạng thái, gán shipper, xử lý return)
+// UI: AdminOrders.tsx, AdminOrderDetail.tsx, AdminReturns.tsx
+// Xem chi tiết: MAP.md mục #14
+
 import { Request, Response } from 'express';
 import { OrderUseCase } from '../../application/use-cases/OrderUseCase';
 import { toOrderDetail, toOrderListItem, toOrderTimeline } from '../../application/mappers/OrderPresenter';

@@ -1,3 +1,8 @@
+// FEATURE: Sản phẩm — CRUD, biến thể (RAM/màu), ảnh, lọc/tìm kiếm
+// Filter: category, brand, RAM, storage, chip, giá, on-sale, featured, new, bestseller
+// Liên quan: ProductController, ProductRepository, ProductPresenter (mapper)
+// Xem chi tiết: MAP.md mục #2
+
 import { IProductRepository, ProductFilters } from '../../domain/repositories/IProductRepository';
 import {
   CreateProductDTO,

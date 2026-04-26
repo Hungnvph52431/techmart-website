@@ -1,3 +1,8 @@
+// FEATURE: Trang tài khoản — thông tin cá nhân, địa chỉ, đổi MK, điểm tích lũy
+// Hiển thị: hạng thành viên (bronze/silver/gold/platinum) + progress bar lên hạng
+// Liên quan: LoyaltyService (backend), UserController (CRUD profile)
+// Xem chi tiết: MAP.md mục #1 + #7
+
 import { useState, useEffect, useRef } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { useAuthStore } from '@/store/authStore';

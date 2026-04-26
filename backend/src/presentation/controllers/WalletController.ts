@@ -1,3 +1,7 @@
+// FEATURE: Ví TechMart — endpoints user + admin
+// Routes: /api/wallet/* (user: nạp/rút/lịch sử), /api/admin/wallet/* (duyệt)
+// Xem chi tiết: MAP.md mục #5
+
 import { Response } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { WalletUseCase } from '../../application/use-cases/WalletUseCase';

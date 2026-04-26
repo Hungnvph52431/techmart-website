@@ -1,3 +1,10 @@
+// FEATURE: Cổng thanh toán VNPay (sandbox)
+// Dùng cho: thanh toán đơn hàng, nạp tiền vào ví TechMart
+// Bảo mật: HMAC SHA512 verify callback URL từ VNPay
+// Liên quan: PaymentController (orders), WalletUseCase.topup (ví)
+// Lưu ý: lazy init để dotenv.config() chạy trước
+// Xem chi tiết: MAP.md mục #4
+
 import { VNPay, ProductCode, VnpLocale, ignoreLogger, HashAlgorithm } from 'vnpay';
 import type { VerifyReturnUrl, ReturnQueryFromVNPay } from 'vnpay';
 

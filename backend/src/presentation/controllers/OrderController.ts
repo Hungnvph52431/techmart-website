@@ -1,3 +1,8 @@
+// FEATURE: Đơn hàng (user + guest) — endpoints HTTP
+// Routes: /api/orders/* (tạo đơn, xem đơn, hủy, yêu cầu hoàn, đánh giá)
+// Hỗ trợ cả user đã login và guest (qua token tra cứu)
+// Xem chi tiết: MAP.md mục #3 + #6 + #13
+
 import { Request, Response } from "express";
 import { OrderUseCase } from "../../application/use-cases/OrderUseCase";
 import { AuthRequest } from "../middlewares/auth.middleware";

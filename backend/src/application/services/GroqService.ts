@@ -1,3 +1,9 @@
+// FEATURE: Chatbot AI (Groq Llama)
+// Endpoint: /api/chat (sync) + /api/chat/stream (SSE streaming)
+// Tool calling: ChatToolsService — bot tự tra cứu sản phẩm/đơn của user
+// Rate limit: trả 429 khi quá hạn quota
+// Xem chi tiết: MAP.md mục #11
+
 import Groq from "groq-sdk";
 import { ChatToolsService } from "./ChatToolsService";
 

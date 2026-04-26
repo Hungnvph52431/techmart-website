@@ -1,3 +1,11 @@
+// FEATURE: Modal kiểm tra hàng hoàn (admin/staff)
+// Mỗi item: chọn good / defective / damaged_by_customer
+// - good       → hoàn đủ tiền, restock
+// - defective  → hoàn đủ tiền, KHÔNG restock (cần bảo hành)
+// - damaged_by_customer → KHÔNG hoàn, trả lại khách
+// Backend: OrderUseCase.inspectReturn → OrderRepository.inspectReturn
+// Xem chi tiết: MAP.md mục #6
+
 import { type ChangeEvent, useState } from "react";
 import toast from "react-hot-toast";
 import {

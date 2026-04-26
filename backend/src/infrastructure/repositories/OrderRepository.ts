@@ -1,3 +1,12 @@
+// FEATURE: Đơn hàng + Hoàn hàng — Data layer (file lớn nhất, ~1800 dòng)
+// Chứa: SQL queries cho orders, order_items, order_returns, order_return_items,
+//       order_events. Quản lý stock (deduct/restock), loyalty points,
+//       state transition đơn hàng và phiếu hoàn.
+// Hàm quan trọng: createOrder, transitionStatus (+ tích điểm),
+//                 inspectReturn (per-item good/defective/damaged_by_customer),
+//                 refundReturn (restock + cộng ví + trừ điểm)
+// Xem chi tiết: MAP.md mục #6 (state machine)
+
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { PoolConnection } from 'mysql2/promise';
 import pool from '../database/connection';

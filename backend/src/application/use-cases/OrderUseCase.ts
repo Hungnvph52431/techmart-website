@@ -1,3 +1,10 @@
+// FEATURE: Đơn hàng + Hoàn hàng + Kiểm tra hàng (nghiệp vụ chính)
+// Hàm chính: createOrder, transitionStatus, requestReturn, approveReturn,
+//            markReturnReceived, inspectReturn, refundReturn, closeReturn
+// Liên quan: OrderRepository (data), LoyaltyService (tích điểm), EmailService (notify)
+// UI: OrderDetailPage.tsx (user), AdminOrderDetail.tsx (admin)
+// Xem chi tiết: MAP.md mục #3 + #6
+
 import {
   AdminOrderListFilters,
   CreateOrderDTO,

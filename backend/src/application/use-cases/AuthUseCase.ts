@@ -1,3 +1,8 @@
+// FEATURE: Xác thực — đăng ký/đăng nhập/quên mật khẩu/OTP
+// Bảo mật: bcrypt hash password, JWT token, crypto random reset token
+// Liên quan: AuthController (route), authMiddleware (verify JWT), EmailService (OTP)
+// Xem chi tiết: MAP.md mục #1
+
 import { IUserRepository } from "../../domain/repositories/IUserRepository";
 import { UserLoginDTO } from "../../domain/entities/User";
 import bcrypt from "bcryptjs";
