@@ -93,18 +93,15 @@ getAll = async (req: Request, res: Response) => {
 
   getBySlug = async (req: Request, res: Response) => {
     try {
-      // Giữ lại log để Khanh dễ debug lỗi 404
-      console.log(">>> Backend đang tìm sản phẩm với Slug:", req.params.slug);
       const product = await this.productUseCase.getProductBySlug(req.params.slug);
 
       if (!product) {
-        console.log("!!! KHÔNG TÌM THẤY sản phẩm trong DB với slug này");
         return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
       }
 
       res.json(toStorefrontProduct(product));
     } catch (error: any) {
-      console.error("LỖI TẠI CONTROLLER getBySlug:", error);
+      console.error('[ProductController.getBySlug]', error);
       res.status(500).json({ message: error.message });
     }
   };

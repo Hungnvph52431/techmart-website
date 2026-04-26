@@ -117,12 +117,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '../public')));
 
 
-// Logger "tự chế" của Khanh để soi Log Docker
-app.use((req, _res, next) => {
-  console.log(`>>> [${new Date().toLocaleTimeString()}] ${req.method} ${req.url}`);
-  next();
-});
-
 // --- DEPENDENCY INJECTION ---
 // Repositories
 const userRepository = new UserRepository();

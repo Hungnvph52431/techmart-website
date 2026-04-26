@@ -475,11 +475,10 @@ export class OrderController {
   /** Lấy tất cả đơn hàng (Admin) */
   getAll = async (req: Request, res: Response) => {
     try {
-      console.log(">>> Đã nhận yêu cầu lấy danh sách đơn hàng Admin"); // Thêm dòng này
       const orders = await this.orderUseCase.getAdminOrders(req.query as any);
       res.json(orders);
     } catch (error: any) {
-      console.error("!!! LỖI NGHIÊM TRỌNG TẠI CONTROLLER:", error); // Đảm bảo có dòng này để Docker hiện chữ đỏ
+      console.error('[OrderController.getAll]', error);
       res.status(500).json({ message: error.message });
     }
   };

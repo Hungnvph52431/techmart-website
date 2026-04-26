@@ -26,10 +26,6 @@ export class ChatController {
 
       const response = await groqService.chat(message.trim(), conversationHistory);
 
-      if (response.toolCalls && response.toolCalls.length > 0) {
-        console.log(`[Chat] Tools used: ${response.toolCalls.join(", ")}`);
-      }
-
       res.status(200).json({
         reply: response.reply,
         timestamp: response.timestamp,
@@ -80,9 +76,6 @@ export class ChatController {
         conversationHistory
       )) {
         write(event);
-        if (event.type === "done" && event.toolCalls.length > 0) {
-          console.log(`[Chat stream] Tools used: ${event.toolCalls.join(", ")}`);
-        }
       }
     } catch (error) {
       console.error("[ChatController.stream] Error:", error);
