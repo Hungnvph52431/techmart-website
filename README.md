@@ -99,8 +99,22 @@ npm run dev             # http://localhost:5001
 # Frontend
 cd frontend
 npm install
+cp .env.example .env   # (tùy chọn — nếu chạy ngoài Docker)
 npm run dev             # http://localhost:5173
 ```
+
+### 4. Lỗi thường gặp khi clone về máy mới
+
+| Triệu chứng | Nguyên nhân | Cách khắc phục |
+|---|---|---|
+| **Mọi tài khoản đều "Email/mật khẩu sai"** dù DB đúng | `frontend/.env` đang trỏ URL ngrok cũ (đã chết) | Xóa `frontend/.env` hoặc đổi về `VITE_API_URL=http://localhost:5001/api` rồi restart frontend |
+| Backend container exit ngay sau khi `up` | Thiếu biến `JWT_SECRET` | Kiểm tra `docker-compose.yml` có dòng `JWT_SECRET=...` không. Backend chủ ý throw lỗi khi thiếu (chống fallback "secret" không an toàn) |
+| Frontend trắng tinh, console báo CORS | `CORS_ORIGIN` trong backend env không chứa URL frontend | Thêm `http://localhost:5173` vào `CORS_ORIGIN` (cách nhau dấu phẩy) |
+| Không kết nối được MySQL | DB chưa healthy | `docker compose logs mysql`, đợi healthcheck pass (~10s) rồi `docker compose up backend frontend` |
+| Login OK nhưng vào trang trắng | Cache JWT cũ trong localStorage | F12 → Application → Local Storage → xóa hết → login lại |
+| `docker compose up` chậm lần đầu | Đang build image + npm install | Đợi ~3-5 phút lần đầu, các lần sau dùng cache |
+
+> **Tip:** Sau khi pull code mới có đổi env, chạy `docker compose down && docker compose up -d --build` để force rebuild.
 
 ---
 
