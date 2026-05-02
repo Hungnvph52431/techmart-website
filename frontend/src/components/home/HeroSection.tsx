@@ -76,6 +76,7 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 export function HeroSection() {
   const containerRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
+  const lastProgressRef = useRef(0);
   const [progress, setProgress] = useState(0);
 
   const update = useCallback(() => {
@@ -87,6 +88,10 @@ export function HeroSection() {
     if (total <= 0) return;
     const scrolled = Math.max(0, -rect.top);
     const p = Math.max(0, Math.min(1, scrolled / total));
+    // Chỉ trigger React re-render khi đổi đủ ~0.3% — tránh re-render tốn từ
+    // hàng trăm setState xuống vài chục mỗi cuộn 1 màn hình. Vẫn smooth.
+    if (Math.abs(p - lastProgressRef.current) < 0.003 && p !== 0 && p !== 1) return;
+    lastProgressRef.current = p;
     setProgress(p);
   }, []);
 
