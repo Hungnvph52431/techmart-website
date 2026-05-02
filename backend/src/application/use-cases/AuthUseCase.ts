@@ -11,7 +11,10 @@ import crypto from "crypto";
 import { sendForgotPasswordOtpEmail } from "../../application/services/EmailService";
 import { validatePasswordPolicy } from "./UserUseCase";
 
-const JWT_SECRET: string = process.env.JWT_SECRET || "secret";
+if (!process.env.JWT_SECRET) {
+  throw new Error("JWT_SECRET chưa được cấu hình trong .env — không thể khởi động ứng dụng an toàn");
+}
+const JWT_SECRET: string = process.env.JWT_SECRET;
 const JWT_EXPIRES = (process.env.JWT_EXPIRES_IN || "7d") as any;
 
 const OTP_EXPIRY_MINUTES = 10;
@@ -78,16 +81,30 @@ export class AuthUseCase {
 
   async forgotPassword(email: string) {
     const user = await this.userRepository.findByEmail(email);
+    // Chống enumeration: luôn trả về cùng response dù email có tồn tại hay không.
+    // Chỉ thực sự gửi mail + sinh tempToken khi user tồn tại.
     if (!user) {
-      throw new Error("Email không tồn tại hoặc yêu cầu không hợp lệ");
+      // Vẫn trả tempToken giả để FE flow không lộ thông tin
+      const dummyToken = jwt.sign(
+        { purpose: "forgot-password-otp-dummy" },
+        JWT_SECRET,
+        { expiresIn: `${OTP_EXPIRY_MINUTES}m` },
+      );
+      return {
+        message: "Nếu email tồn tại, OTP đã được gửi đến hộp thư của bạn",
+        tempToken: dummyToken,
+      };
     }
 
     const otp = crypto.randomInt(100000, 999999).toString();
+    // QUAN TRỌNG: KHÔNG bỏ OTP raw vào JWT (JWT chỉ ký, không mã hoá → client decode đọc được).
+    // Hash OTP rồi nhúng hash vào JWT; verify bằng bcrypt.compare.
+    const otpHash = await bcrypt.hash(otp, 10);
 
     const tempPayload = {
       userId: user.userId,
       email: user.email,
-      otp: otp,
+      otpHash,
       purpose: "forgot-password-otp",
     };
 
@@ -103,8 +120,8 @@ export class AuthUseCase {
     });
 
     return {
-      message: "OTP đã được gửi đến email của bạn",
-      tempToken, 
+      message: "Nếu email tồn tại, OTP đã được gửi đến hộp thư của bạn",
+      tempToken,
     };
   }
 
@@ -121,7 +138,10 @@ export class AuthUseCase {
       );
     }
 
-    if (decoded.otp !== enteredOtp) {
+    const matched = decoded.otpHash
+      ? await bcrypt.compare(enteredOtp, decoded.otpHash)
+      : false;
+    if (!matched) {
       throw new Error("OTP không chính xác");
     }
 

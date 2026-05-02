@@ -126,6 +126,21 @@ export class ReviewRepository implements IReviewRepository {
     try {
       await connection.beginTransaction();
 
+      // Lock order_details row + recheck existing review trong cùng transaction để
+      // chặn race condition (2 request đồng thời cùng tạo 2 review cho 1 orderDetailId).
+      await connection.execute<RowDataPacket[]>(
+        'SELECT order_detail_id FROM order_details WHERE order_detail_id = ? FOR UPDATE',
+        [input.orderDetailId]
+      );
+      const [existingRows] = await connection.execute<RowDataPacket[]>(
+        'SELECT review_id FROM reviews WHERE order_detail_id = ? LIMIT 1',
+        [input.orderDetailId]
+      );
+      if (existingRows.length > 0) {
+        await connection.rollback();
+        throw new Error('Product review already submitted');
+      }
+
       const [result] = await connection.execute<ResultSetHeader>(
         `INSERT INTO reviews (
           product_id, user_id, order_id, order_detail_id, rating, title, comment, images,

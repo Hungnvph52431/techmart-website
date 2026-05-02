@@ -237,7 +237,7 @@ export class OrderRepository implements IOrderRepository {
                     JOIN orders o ON o.order_id = od.order_id
                     WHERE od.product_id = p.product_id
                       AND o.deleted_at IS NULL
-                      AND o.status IN ('pending','confirmed','processing','shipping')
+                      AND o.status IN ('pending','confirmed','shipping')
                   ), 0) AS reserved
            FROM products p
            WHERE p.product_id = ? AND p.deleted_at IS NULL
@@ -258,7 +258,7 @@ export class OrderRepository implements IOrderRepository {
                       JOIN orders o ON o.order_id = od.order_id
                       WHERE od.variant_id = pv.variant_id
                         AND o.deleted_at IS NULL
-                        AND o.status IN ('pending','confirmed','processing','shipping')
+                        AND o.status IN ('pending','confirmed','shipping')
                     ), 0) AS reserved
              FROM product_variants pv
              WHERE pv.variant_id = ? AND pv.product_id = ?
@@ -689,6 +689,14 @@ export class OrderRepository implements IOrderRepository {
         await connection.execute(
           "UPDATE orders SET status = 'cancelled', cancel_reason = ?, cancelled_at = ?, updated_at = ? WHERE order_id = ?",
           [input.reason, now, now, input.orderId]
+        );
+      }
+
+      // Hoàn lại lượt dùng coupon nếu đơn có coupon (used_count đã được tăng khi tạo đơn)
+      if ((order as any).couponId) {
+        await connection.execute(
+          'UPDATE coupons SET used_count = GREATEST(used_count - 1, 0) WHERE coupon_id = ?',
+          [(order as any).couponId]
         );
       }
 

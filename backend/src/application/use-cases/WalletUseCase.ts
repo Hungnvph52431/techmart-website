@@ -455,6 +455,12 @@ export class WalletUseCase {
     if (!Number.isFinite(input.amount) || input.amount <= 0) {
       throw new Error('Số tiền rút không hợp lệ');
     }
+    if (input.amount < 50000) {
+      throw new Error('Số tiền rút tối thiểu là 50.000đ');
+    }
+    if (input.amount > 50000000) {
+      throw new Error('Số tiền rút tối đa mỗi lần là 50.000.000đ');
+    }
 
     const amount = Math.round(input.amount);
     const connection = await pool.getConnection();
@@ -846,6 +852,16 @@ export class WalletUseCase {
     return { requestId: result.insertId, referenceCode, paymentUrl };
   }
 
+  // Lấy amount đã đăng ký để controller verify trước khi credit
+  async getTopupAmountByReference(referenceCode: string): Promise<number | null> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      "SELECT amount FROM wallet_topup_requests WHERE reference_code = ? AND status = 'pending'",
+      [referenceCode]
+    );
+    if (!rows.length) return null;
+    return Number((rows as RowDataPacket[])[0].amount);
+  }
+
   // VNPay callback auto-credit wallet
   async completeVNPayTopup(referenceCode: string, txnNo: string): Promise<void> {
     const connection = await pool.getConnection();
@@ -853,7 +869,7 @@ export class WalletUseCase {
       await connection.beginTransaction();
 
       const [rawRows] = await connection.execute(
-        "SELECT * FROM wallet_topup_requests WHERE reference_code = ? AND status = 'pending'",
+        "SELECT * FROM wallet_topup_requests WHERE reference_code = ? AND status = 'pending' AND (expires_at IS NULL OR expires_at >= NOW())",
         [referenceCode]
       );
       const rows = rawRows as RowDataPacket[];

@@ -80,14 +80,14 @@ export class OrderUseCase {
     if (updated && paymentStatus === 'paid') {
       this.sendPaymentEmail(orderId).catch(() => {});
 
-      // VNPay/Bank Transfer: khi payment confirm → auto-transition to shipping (skip pending/confirmed)
+      // VNPay/Bank Transfer: khi payment confirm → auto-confirm đơn để admin chuẩn bị giao.
+      // KHÔNG tự chuyển sang 'shipping' vì transition này yêu cầu shipperId — admin sẽ
+      // gán shipper qua confirmAndAssignShipper.
       if (['vnpay', 'bank_transfer'].includes(order.paymentMethod)) {
         try {
           const updatedOrder = await this.orderRepository.findById(orderId);
           if (updatedOrder && updatedOrder.status === 'pending') {
-            // Skip confirmed → go directly to shipping
             await this.transitionOrderStatus(orderId, 'confirmed', actorUserId || 0, 'system', 'Tự động xác nhận do thanh toán online');
-            await this.transitionOrderStatus(orderId, 'shipping', actorUserId || 0, 'system', 'Tự động bắt đầu giao do thanh toán online');
           }
         } catch (err) {
           console.error('[OrderUseCase] Auto-transition for vnpay/bank_transfer failed:', err);
@@ -301,14 +301,11 @@ export class OrderUseCase {
       this.sendOrderCreatedEmailNotification(newOrder.orderId).catch(() => {});
     }
 
-    // Wallet: thanh toán ngay → tự động chuyển sang shipping
+    // Wallet: thanh toán ngay → tự động xác nhận đơn (KHÔNG tự sang shipping vì cần shipperId).
     if (orderData.paymentMethod === 'wallet' && newOrder && orderData.userId) {
       try {
-        // Mark as paid
         await this.updateOrderPaymentStatus(newOrder.orderId, 'paid', orderData.userId, 'customer', 'Thanh toán qua ví TechMart');
-        // Transition to shipping (skip pending → confirmed → shipping)
         await this.transitionOrderStatus(newOrder.orderId, 'confirmed', orderData.userId, 'customer', 'Tự động xác nhận do thanh toán ví');
-        await this.transitionOrderStatus(newOrder.orderId, 'shipping', orderData.userId, 'system', 'Tự động bắt đầu giao do thanh toán ví');
       } catch (err) {
         console.error('[OrderUseCase] Auto-transition for wallet failed:', err);
       }
