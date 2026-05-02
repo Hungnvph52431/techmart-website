@@ -63,6 +63,26 @@ const productSchema = z.object({
   if (data.salePrice && data.salePrice >= data.price) return false;
   return true;
 }, { message: 'Giá khuyến mãi phải nhỏ hơn giá niêm yết', path: ['salePrice'] })
+// REFINE 2: Bắt buộc có ít nhất 1 biến thể (vì tồn kho chỉ nhập qua biến thể).
+// Và trong số đó, ít nhất 1 phải đang kích hoạt (tránh ẩn hết kho).
+.superRefine((data, ctx) => {
+  const variants = data.variants ?? [];
+  if (variants.length === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['variants'],
+      message: 'Sản phẩm phải có ít nhất 1 biến thể (để có tồn kho)',
+    });
+    return;
+  }
+  if (!variants.some(v => v.isActive)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['variants'],
+      message: 'Phải có ít nhất 1 biến thể đang kích hoạt',
+    });
+  }
+})
 .superRefine((data, ctx) => {
   const variants = data.variants ?? [];
   if (variants.length < 2) return;
@@ -140,6 +160,10 @@ const getImageUrl = (url: string): string => {
   if (url.startsWith('http')) return url;
   return `${BACKEND_URL}${url}`;
 };
+
+// Format VND có dấu chấm ngàn — dùng cho helper text bên dưới ô input
+const formatVND = (n?: number | null) =>
+  n != null && n > 0 ? `${Number(n).toLocaleString('vi-VN')} ₫` : '';
 
 // ─── Image Input ─────────────────────────────────────────────────────────────
 const ImageInput = ({
@@ -295,6 +319,16 @@ export const AdminProductFormPage = () => {
       setAssignments([]);
     }
   }, [watchedCategoryId]);
+
+  // Auto-sync tồn kho sản phẩm = tổng tồn kho các biến thể đang kích hoạt
+  // Chạy cho cả trang Thêm mới và Sửa, bất cứ khi nào variants thay đổi
+  useEffect(() => {
+    if (!watchedVariants || watchedVariants.length === 0) return;
+    const total = watchedVariants
+      .filter(v => v.isActive)
+      .reduce((sum, v) => sum + (Number(v.stockQuantity) || 0), 0);
+    setValue('stockQuantity', total, { shouldValidate: false });
+  }, [watchedVariants, setValue]);
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -673,21 +707,22 @@ export const AdminProductFormPage = () => {
         </Section>
 
         {/* ── Giá & tồn kho ── */}
-        <Section title="Giá và tồn kho">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <Section title="Giá và tồn kho" subtitle="Nhập giá niêm yết trước. Có thể nhập % giảm giá để hệ thống tự tính giá khuyến mãi.">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Giá niêm yết */}
             <div className="space-y-1">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Giá niêm yết *</label>
               <Controller name="price" control={control}
                 render={({ field }) => (
-                  <input type="number" min="0"
+                  <input type="number" min="0" step="1000"
                     value={field.value ?? ''}
                     onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
-                    placeholder="0"
+                    placeholder="VD: 29990000"
                     className={`w-full border-2 rounded-xl px-4 py-2.5 text-sm font-medium focus:outline-none transition-colors ${
                       errors.price ? 'border-red-300' : 'border-slate-200 focus:border-blue-400'
                     }`} />
                 )} />
+              <p className="text-xs text-slate-500 font-semibold min-h-[16px]">{formatVND(watch('price'))}</p>
               <FieldError message={errors.price?.message} />
             </div>
 
@@ -712,10 +747,11 @@ export const AdminProductFormPage = () => {
                       setValue('salePrice', newSale, { shouldValidate: true });
                     }
                   }}
-                  placeholder="0"
+                  placeholder="VD: 10"
                   className="w-full border-2 rounded-xl px-4 py-2.5 pr-10 text-sm font-medium focus:outline-none transition-colors border-slate-200 focus:border-blue-400" />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">%</span>
               </div>
+              <p className="text-xs text-slate-400 min-h-[16px]">Hệ thống tự tính giá KM bên phải</p>
             </div>
 
             {/* Giá khuyến mãi (auto từ %) */}
@@ -723,57 +759,56 @@ export const AdminProductFormPage = () => {
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Giá khuyến mãi</label>
               <Controller name="salePrice" control={control}
                 render={({ field }) => (
-                  <input type="number" min="0"
+                  <input type="number" min="0" step="1000"
                     value={field.value ?? ''}
                     onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
-                    placeholder="Tự tính từ %"
+                    placeholder="Tự tính từ % hoặc nhập tay"
                     className={`w-full border-2 rounded-xl px-4 py-2.5 text-sm font-medium focus:outline-none transition-colors ${
                       errors.salePrice ? 'border-red-300' : 'border-slate-200 focus:border-blue-400'
                     }`} />
                 )} />
-              {watch('salePrice') && watch('price') && watch('salePrice')! < watch('price') && (
-                <p className="text-xs text-red-500 font-bold">
-                  Giảm {Math.round(((watch('price') - watch('salePrice')!) / watch('price')) * 100)}% → {watch('salePrice')!.toLocaleString('vi-VN')}₫
-                </p>
-              )}
+              <p className="text-xs text-slate-500 font-semibold min-h-[16px]">{formatVND(watch('salePrice'))}</p>
               <FieldError message={errors.salePrice?.message} />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {/* Giá vốn */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Giá vốn (nội bộ)</label>
-              <Controller name="costPrice" control={control}
-                render={({ field }) => (
-                  <input type="number" min="0"
-                    value={field.value ?? ''}
-                    onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
-                    placeholder="0"
-                    className="w-full border-2 rounded-xl px-4 py-2.5 text-sm font-medium focus:outline-none transition-colors border-slate-200 focus:border-blue-400" />
-                )} />
+          {/* Banner tóm tắt giá bán cuối */}
+          {watch('price') > 0 && (
+            <div className="bg-gradient-to-r from-blue-50 to-emerald-50 border-2 border-blue-100 rounded-xl px-4 py-3 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Giá khách thấy trên web</p>
+                {watch('salePrice') && watch('salePrice')! < watch('price') ? (
+                  <div className="flex items-baseline gap-3 mt-1">
+                    <span className="text-xl font-bold text-red-600">{formatVND(watch('salePrice'))}</span>
+                    <span className="text-sm text-slate-400 line-through">{formatVND(watch('price'))}</span>
+                    <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
+                      -{Math.round(((watch('price') - watch('salePrice')!) / watch('price')) * 100)}%
+                    </span>
+                  </div>
+                ) : (
+                  <p className="text-xl font-bold text-slate-700 mt-1">{formatVND(watch('price'))}</p>
+                )}
+              </div>
             </div>
+          )}
 
-            {/* Tồn kho */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Tồn kho</label>
-              <Controller name="stockQuantity" control={control}
-                render={({ field }) => (
-                  <input type="number" min="0"
-                    value={field.value ?? ''}
-                    onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
-                    placeholder="0"
-                    disabled={watchedVariants.length > 0}
-                    className="w-full border-2 rounded-xl px-4 py-2.5 text-sm font-medium focus:outline-none transition-colors disabled:bg-slate-50 disabled:text-slate-400 border-slate-200 focus:border-blue-400" />
-                )} />
-            </div>
+          {/* Giá vốn — chỉ còn 1 ô, full width */}
+          <div className="space-y-1 max-w-md">
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Giá vốn (nội bộ)</label>
+            <Controller name="costPrice" control={control}
+              render={({ field }) => (
+                <input type="number" min="0" step="1000"
+                  value={field.value ?? ''}
+                  onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                  placeholder="Giá nhập, không hiển thị cho khách"
+                  className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:border-blue-400 focus:outline-none" />
+              )} />
+            <p className="text-xs text-slate-500 font-semibold min-h-[16px]">{formatVND(watch('costPrice'))}</p>
           </div>
 
-          {watchedVariants.length > 0 && (
-            <p className="text-xs text-slate-400 bg-slate-50 px-3 py-2 rounded-lg">
-              Tồn kho đang được tính tự động từ tổng các biến thể đang kích hoạt.
-            </p>
-          )}
+          <p className="text-xs text-slate-500 bg-blue-50 border border-blue-100 px-3 py-2 rounded-lg">
+            <span className="font-semibold text-blue-700">Lưu ý:</span> Tồn kho được nhập trong phần <span className="font-semibold">Biến thể sản phẩm</span> bên dưới. Hệ thống tự cộng tổng từ các biến thể đang kích hoạt.
+          </p>
         </Section>
 
         {/* ── Hình ảnh ── */}
@@ -843,15 +878,20 @@ export const AdminProductFormPage = () => {
         )}
 
         {/* ── Biến thể ── */}
-        <Section title="Biến thể sản phẩm" subtitle="Thêm các phiên bản khác nhau (màu sắc, dung lượng...)">
+        <Section title="Biến thể sản phẩm *" subtitle="Mỗi sản phẩm phải có ít nhất 1 biến thể. Tồn kho được tính từ tổng các biến thể đang kích hoạt.">
           {variantFields.length === 0 ? (
-            <div className="text-center py-8 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
-              <p className="text-sm text-slate-400 font-medium mb-3">Chưa có biến thể. Khi không dùng biến thể, tồn kho lấy từ sản phẩm chính.</p>
+            <div className="text-center py-8 bg-amber-50 rounded-xl border-2 border-dashed border-amber-300">
+              <AlertCircle size={24} className="mx-auto text-amber-500 mb-2" />
+              <p className="text-sm text-amber-700 font-semibold mb-1">Chưa có biến thể nào</p>
+              <p className="text-xs text-amber-600 mb-4">Sản phẩm cần ít nhất 1 biến thể để có tồn kho và bán được</p>
               <button type="button"
                 onClick={() => appendVariant({ variantName: '', sku: '', attributes: {}, priceAdjustment: 0, stockQuantity: 0, imageUrl: '', isActive: true })}
-                className="flex items-center gap-2 mx-auto bg-white border-2 border-slate-200 text-slate-600 px-4 py-2 rounded-xl font-semibold text-sm hover:border-blue-300 hover:text-blue-600 transition-colors">
+                className="flex items-center gap-2 mx-auto bg-amber-500 text-white px-4 py-2 rounded-xl font-semibold text-sm hover:bg-amber-600 transition-colors">
                 <Plus size={14} /> Thêm biến thể đầu tiên
               </button>
+              {typeof errors.variants?.message === 'string' && (
+                <p className="text-xs text-red-500 font-semibold mt-3">⚠ {errors.variants.message}</p>
+              )}
             </div>
           ) : (
             <div className="space-y-4">
@@ -882,11 +922,21 @@ export const AdminProductFormPage = () => {
                       <label className="text-xs font-semibold text-slate-500">Giá chênh lệch (₫)</label>
                       <Controller name={`variants.${index}.priceAdjustment`} control={control}
                         render={({ field: f }) => (
-                          <input type="number" value={f.value} onChange={(e) => f.onChange(Number(e.target.value))}
-                            placeholder="0 = giá gốc, +2000000 = đắt hơn 2tr"
+                          <input type="number" step="1000" value={f.value} onChange={(e) => f.onChange(Number(e.target.value))}
+                            placeholder="0"
                             className="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
                         )} />
-                      <p className="text-[10px] text-slate-400">So với giá niêm yết sản phẩm</p>
+                      {(() => {
+                        const basePrice = watch('salePrice') && watch('salePrice')! < watch('price') ? watch('salePrice')! : watch('price');
+                        const adj = watchedVariants[index]?.priceAdjustment ?? 0;
+                        const finalPrice = (basePrice ?? 0) + Number(adj);
+                        if (!basePrice) return <p className="text-[10px] text-slate-400">Nhập giá sản phẩm trước</p>;
+                        return (
+                          <p className="text-[10px] font-semibold text-blue-600">
+                            Giá bán biến thể: {formatVND(finalPrice)}
+                          </p>
+                        );
+                      })()}
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-slate-500">Tồn kho *</label>
