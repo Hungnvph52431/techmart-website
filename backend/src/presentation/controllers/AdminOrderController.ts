@@ -16,6 +16,7 @@ export class AdminOrderController {
         search: req.query.search as string | undefined,
         status: (req.query.status as any) || 'all',
         paymentStatus: (req.query.paymentStatus as any) || 'all',
+        paymentMethod: (req.query.paymentMethod as any) || 'all',
         userId: req.query.userId ? Number(req.query.userId) : undefined,
         shipperId: req.user?.role === 'shipper' ? req.user.userId : undefined,
         dateFrom: req.query.dateFrom as string | undefined,

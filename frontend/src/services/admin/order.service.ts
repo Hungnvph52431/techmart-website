@@ -1,7 +1,7 @@
 import api from '../api';
 
 export const adminOrderService = {
-  getAll: async (params?: { search?: string; status?: string; paymentStatus?: string; page?: number; limit?: number }) => {
+  getAll: async (params?: { search?: string; status?: string; paymentStatus?: string; paymentMethod?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }) => {
     const response = await api.get('/admin/orders', { params });
     return response.data;
   },
