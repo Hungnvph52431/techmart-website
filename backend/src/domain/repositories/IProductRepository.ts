@@ -50,17 +50,30 @@ export interface ProductStats {
   inactiveProducts: number;
   outOfStockCount: number;
   lowStockCount: number;
+  totalStockUnits: number;
+  totalInventoryValue: number;
+  totalSoldUnits: number;
   topSellingProducts: Array<{
     productId: number;
     name: string;
     soldQuantity: number;
     stockQuantity: number;
     mainImage: string | null;
+    price: number;
+    revenue: number;
+    orderCount: number;
+    avgSellingPrice: number;
   }>;
   lowStockProducts: Array<{
     productId: number;
     name: string;
     stockQuantity: number;
+    mainImage?: string | null;
+  }>;
+  categoryBreakdown: Array<{
+    categoryName: string;
+    productCount: number;
+    totalSold: number;
   }>;
 }
 

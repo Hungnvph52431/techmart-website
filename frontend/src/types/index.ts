@@ -179,11 +179,15 @@ export interface ProductStats {
     stockQuantity: number;
     mainImage: string | null;
     price: number;
+    revenue: number;
+    orderCount: number;
+    avgSellingPrice: number;
   }>;
   lowStockProducts: Array<{
     productId: number;
     name: string;
     stockQuantity: number;
+    mainImage?: string | null;
   }>;
   categoryBreakdown: Array<{
     categoryName: string;

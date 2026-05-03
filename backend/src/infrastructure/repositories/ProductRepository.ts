@@ -520,12 +520,26 @@ async delete(id: number): Promise<boolean> {
       FROM products WHERE deleted_at IS NULL
     `);
 
-    // 2. Top sản phẩm bán chạy
+    // 2. Top sản phẩm bán chạy theo doanh thu thực tế từ đơn hoàn thành
     const [topSelling]: any = await this.pool.execute(`
-      SELECT product_id, name, sold_quantity, stock_quantity, main_image, price
-      FROM products
-      WHERE deleted_at IS NULL AND sold_quantity > 0
-      ORDER BY sold_quantity DESC
+      SELECT
+        p.product_id,
+        p.name,
+        p.stock_quantity,
+        p.main_image,
+        p.price,
+        COALESCE(SUM(od.quantity), 0) AS sold_quantity,
+        COALESCE(SUM(od.subtotal), 0) AS revenue,
+        COUNT(DISTINCT od.order_id) AS order_count,
+        COALESCE(SUM(od.subtotal) / NULLIF(SUM(od.quantity), 0), 0) AS avg_selling_price
+      FROM products p
+      JOIN order_details od ON od.product_id = p.product_id
+      JOIN orders o ON o.order_id = od.order_id
+      WHERE p.deleted_at IS NULL
+        AND o.deleted_at IS NULL
+        AND o.status = 'completed'
+      GROUP BY p.product_id, p.name, p.stock_quantity, p.main_image, p.price
+      ORDER BY revenue DESC, sold_quantity DESC
       LIMIT 10
     `);
 
@@ -558,10 +572,13 @@ async delete(id: number): Promise<boolean> {
       topSellingProducts: topSelling.map((r: any) => ({
         productId: r.product_id,
         name: r.name,
-        soldQuantity: r.sold_quantity,
-        stockQuantity: r.stock_quantity,
+        soldQuantity: Number(r.sold_quantity),
+        stockQuantity: Number(r.stock_quantity),
         mainImage: r.main_image || null,
         price: parseFloat(r.price),
+        revenue: parseFloat(r.revenue),
+        orderCount: Number(r.order_count),
+        avgSellingPrice: parseFloat(r.avg_selling_price),
       })),
       lowStockProducts: lowStock.map((r: any) => ({
         productId: r.product_id,

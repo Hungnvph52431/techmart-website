@@ -54,6 +54,8 @@ const formatShort = (value: number) => {
   return value.toLocaleString('vi-VN') + 'đ';
 };
 
+const formatUnits = (value: number) => `${value.toLocaleString('vi-VN')} SP`;
+
 const ORDER_STATUS_LABELS: Record<string, string> = {
   pending: 'Chờ xử lý', confirmed: 'Đã xác nhận', shipping: 'Đang giao',
   delivered: 'Đã giao', completed: 'Hoàn thành', cancelled: 'Đã hủy', returned: 'Hoàn trả',
@@ -563,20 +565,34 @@ export const AdminDashboard = () => {
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
             <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
               <TrendingUp size={14} className="text-green-500" />
-              Top bán chạy
+              Top mặt hàng bán chạy
             </h3>
             {(p.topSellingProducts?.length || 0) > 0 ? (
               <div className="space-y-2">
+                <div className="grid grid-cols-[28px_minmax(0,1fr)_78px_88px] gap-2 px-1 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                  <span>#</span>
+                  <span>Mặt hàng</span>
+                  <span className="text-right">Đã bán</span>
+                  <span className="text-right">Doanh thu</span>
+                </div>
                 {p.topSellingProducts.slice(0, 5).map((prod, i) => (
-                  <div key={prod.productId} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50">
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black text-white ${i === 0 ? 'bg-yellow-500' : i === 1 ? 'bg-gray-400' : i === 2 ? 'bg-amber-600' : 'bg-gray-300'}`}>
-                      {i + 1}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-xs text-gray-700 font-medium truncate block">{prod.name}</span>
-                      <span className="text-[10px] text-gray-400">{formatShort(prod.price || 0)}</span>
+                  <div key={prod.productId} className="rounded-xl border border-gray-100 p-3 hover:bg-gray-50 transition-colors">
+                    <div className="grid grid-cols-[28px_minmax(0,1fr)_78px_88px] gap-2 items-start">
+                      <span className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black text-white ${i === 0 ? 'bg-yellow-500' : i === 1 ? 'bg-gray-400' : i === 2 ? 'bg-amber-600' : 'bg-gray-300'}`}>
+                        {i + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-xs text-gray-800 font-semibold truncate">{prod.name}</p>
+                        <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-[10px] text-gray-400">
+                          <span>Giá niêm yết: {formatShort(prod.price || 0)}</span>
+                          <span>Giá bán TB: {formatShort(prod.avgSellingPrice || 0)}</span>
+                          <span>{prod.orderCount} đơn</span>
+                          <span>Tồn: {formatUnits(prod.stockQuantity || 0)}</span>
+                        </div>
+                      </div>
+                      <span className="text-right text-xs font-bold text-blue-600 whitespace-nowrap">{formatUnits(prod.soldQuantity)}</span>
+                      <span className="text-right text-xs font-bold text-emerald-600 whitespace-nowrap">{formatShort(prod.revenue || 0)}</span>
                     </div>
-                    <span className="text-xs font-bold text-blue-600 whitespace-nowrap">{prod.soldQuantity} sold</span>
                   </div>
                 ))}
               </div>
