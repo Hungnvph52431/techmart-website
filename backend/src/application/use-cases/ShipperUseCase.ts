@@ -98,10 +98,12 @@ export class ShipperUseCase {
       ? { paymentStatus: 'paid', paymentDate: now }
       : {};
 
-    // Cảnh báo đơn non-COD chưa được thanh toán
+    // Đơn non-COD (VNPay/momo/bank) BẮT BUỘC đã thanh toán trước khi giao xong.
+    // Nếu chưa paid mà cho mark DELIVERED → state inconsistent (giao rồi nhưng chưa thu tiền).
     if (!isCOD && order.paymentStatus !== 'paid') {
-      warning = `Đơn hàng chưa được thanh toán online (${order.paymentMethod}). Đã ghi nhận và thông báo Admin kiểm tra.`;
-      console.warn(`[WARN] Order ${orderId}: giao thành công nhưng payment_status=${order.paymentStatus} (${order.paymentMethod})`);
+      throw new Error(
+        `Đơn ${order.paymentMethod.toUpperCase()} chưa thanh toán (status=${order.paymentStatus}). Vui lòng liên hệ Admin để xử lý trước khi xác nhận giao thành công.`
+      );
     }
 
     await this.shipperRepository.updateDeliveryStatus(orderId, {

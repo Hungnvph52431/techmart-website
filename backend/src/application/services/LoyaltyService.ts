@@ -101,7 +101,18 @@ export async function applyPointsChange(
     };
   }
 
-  const newLevel = computeMembershipLevel(newBalance);
+  // Hạng KHÔNG bị hạ khi trừ điểm (refund). Chỉ nâng hạng khi điểm tăng vượt ngưỡng.
+  // Đọc hạng hiện tại để giữ nguyên nếu newBalance không đủ lên hạng mới.
+  const [levelRows] = await connection.execute<RowDataPacket[]>(
+    'SELECT membership_level FROM users WHERE user_id = ?',
+    [userId],
+  );
+  const currentLevel = (levelRows[0]?.membership_level ?? 'bronze') as
+    | 'bronze' | 'silver' | 'gold' | 'platinum';
+  const computedLevel = computeMembershipLevel(newBalance);
+  const levelOrder: Record<string, number> = { bronze: 0, silver: 1, gold: 2, platinum: 3 };
+  const newLevel =
+    levelOrder[computedLevel] > levelOrder[currentLevel] ? computedLevel : currentLevel;
 
   await connection.execute(
     'UPDATE users SET points = ?, membership_level = ? WHERE user_id = ?',

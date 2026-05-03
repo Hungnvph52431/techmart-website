@@ -237,7 +237,7 @@ export class OrderRepository implements IOrderRepository {
                     JOIN orders o ON o.order_id = od.order_id
                     WHERE od.product_id = p.product_id
                       AND o.deleted_at IS NULL
-                      AND o.status IN ('pending','confirmed','processing','shipping')
+                      AND o.status IN ('pending','confirmed','shipping')
                   ), 0) AS reserved
            FROM products p
            WHERE p.product_id = ? AND p.deleted_at IS NULL
@@ -258,7 +258,7 @@ export class OrderRepository implements IOrderRepository {
                       JOIN orders o ON o.order_id = od.order_id
                       WHERE od.variant_id = pv.variant_id
                         AND o.deleted_at IS NULL
-                        AND o.status IN ('pending','confirmed','processing','shipping')
+                        AND o.status IN ('pending','confirmed','shipping')
                     ), 0) AS reserved
              FROM product_variants pv
              WHERE pv.variant_id = ? AND pv.product_id = ?
@@ -692,6 +692,14 @@ export class OrderRepository implements IOrderRepository {
         );
       }
 
+      // Hoàn lại lượt dùng coupon nếu đơn có coupon (used_count đã được tăng khi tạo đơn)
+      if ((order as any).couponId) {
+        await connection.execute(
+          'UPDATE coupons SET used_count = GREATEST(used_count - 1, 0) WHERE coupon_id = ?',
+          [(order as any).couponId]
+        );
+      }
+
       if (input.actorRole !== 'customer' && order.userId) {
         await this.createNotificationWithConnection(connection, {
           userId: order.userId,
@@ -719,14 +727,19 @@ export class OrderRepository implements IOrderRepository {
   // --- STATS ---
   async getStats(startDate?: string, endDate?: string): Promise<OrderStats> {
     // 1. Tổng quan + So sánh tháng trước
+    // QUY ƯỚC NGHIỆP VỤ:
+    //   - Doanh thu (revenue) = chỉ tính đơn status='completed' (đã hoàn thành thật,
+    //     đồng bộ với loyalty service cộng điểm). Loại trừ đơn pending/cancelled/returned.
+    //   - Số lượng đơn (orders_today/this_month/last_month) = đếm tất cả đơn không
+    //     bị xóa, để admin theo dõi traffic. cancelled_orders đếm riêng.
     const [[summary]] = await pool.execute<RowDataPacket[]>(
       `SELECT
         COUNT(*) AS total_orders,
-        COALESCE(SUM(total), 0) AS total_revenue,
-        COALESCE(SUM(CASE WHEN MONTH(order_date) = MONTH(NOW()) AND YEAR(order_date) = YEAR(NOW()) THEN total ELSE 0 END), 0) AS revenue_this_month,
-        COALESCE(SUM(CASE WHEN MONTH(order_date) = MONTH(DATE_SUB(NOW(), INTERVAL 1 MONTH)) AND YEAR(order_date) = YEAR(DATE_SUB(NOW(), INTERVAL 1 MONTH)) THEN total ELSE 0 END), 0) AS revenue_last_month,
-        COALESCE(SUM(CASE WHEN DATE(order_date) = CURDATE() THEN total ELSE 0 END), 0) AS revenue_today,
-        COALESCE(SUM(CASE WHEN DATE(order_date) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) THEN total ELSE 0 END), 0) AS revenue_yesterday,
+        COALESCE(SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END), 0) AS total_revenue,
+        COALESCE(SUM(CASE WHEN status = 'completed' AND MONTH(order_date) = MONTH(NOW()) AND YEAR(order_date) = YEAR(NOW()) THEN total ELSE 0 END), 0) AS revenue_this_month,
+        COALESCE(SUM(CASE WHEN status = 'completed' AND MONTH(order_date) = MONTH(DATE_SUB(NOW(), INTERVAL 1 MONTH)) AND YEAR(order_date) = YEAR(DATE_SUB(NOW(), INTERVAL 1 MONTH)) THEN total ELSE 0 END), 0) AS revenue_last_month,
+        COALESCE(SUM(CASE WHEN status = 'completed' AND DATE(order_date) = CURDATE() THEN total ELSE 0 END), 0) AS revenue_today,
+        COALESCE(SUM(CASE WHEN status = 'completed' AND DATE(order_date) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) THEN total ELSE 0 END), 0) AS revenue_yesterday,
         SUM(CASE WHEN DATE(order_date) = CURDATE() THEN 1 ELSE 0 END) AS orders_today,
         SUM(CASE WHEN MONTH(order_date) = MONTH(NOW()) AND YEAR(order_date) = YEAR(NOW()) THEN 1 ELSE 0 END) AS orders_this_month,
         SUM(CASE WHEN MONTH(order_date) = MONTH(DATE_SUB(NOW(), INTERVAL 1 MONTH)) AND YEAR(order_date) = YEAR(DATE_SUB(NOW(), INTERVAL 1 MONTH)) THEN 1 ELSE 0 END) AS orders_last_month,
@@ -747,8 +760,12 @@ export class OrderRepository implements IOrderRepository {
     }
 
     // 3. Đếm theo payment method + doanh thu theo phương thức
+    // Doanh thu chỉ tính đơn completed; số đơn vẫn đếm tất cả (trừ cancelled) để
+    // admin biết phương thức nào đang được ưa chuộng.
     const [pmRows] = await pool.execute<RowDataPacket[]>(
-      `SELECT payment_method, COUNT(*) AS cnt, COALESCE(SUM(total), 0) AS revenue
+      `SELECT payment_method,
+              SUM(CASE WHEN status <> 'cancelled' THEN 1 ELSE 0 END) AS cnt,
+              COALESCE(SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END), 0) AS revenue
        FROM orders WHERE deleted_at IS NULL GROUP BY payment_method`
     );
     const paymentMethodStats: Record<string, number> = {};
@@ -783,8 +800,11 @@ export class OrderRepository implements IOrderRepository {
       : `AND order_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)`;
     const dateParams = startDate && endDate ? [startDate, endDate] : [];
 
+    // Biểu đồ doanh thu theo ngày: chỉ tính đơn completed (đồng bộ với revenue tổng)
     const [dailyRows] = await pool.execute<RowDataPacket[]>(
-      `SELECT DATE(order_date) AS date, COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS order_count
+      `SELECT DATE(order_date) AS date,
+              COALESCE(SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END), 0) AS revenue,
+              SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS order_count
        FROM orders WHERE deleted_at IS NULL ${dateFilter}
        GROUP BY DATE(order_date) ORDER BY date ASC`,
       dateParams
@@ -804,13 +824,13 @@ export class OrderRepository implements IOrderRepository {
        FROM order_returns`
     );
 
-    // 7. Top khách hàng theo doanh thu tháng này
+    // 7. Top khách hàng theo doanh thu tháng này — chỉ tính đơn đã hoàn thành
     const [topCustomerRows] = await pool.execute<RowDataPacket[]>(
       `SELECT u.name, u.email, COUNT(o.order_id) AS order_count, COALESCE(SUM(o.total), 0) AS total_spent
        FROM orders o JOIN users u ON u.user_id = o.user_id
        WHERE o.deleted_at IS NULL
          AND MONTH(o.order_date) = MONTH(NOW()) AND YEAR(o.order_date) = YEAR(NOW())
-         AND o.status NOT IN ('cancelled')
+         AND o.status = 'completed'
        GROUP BY o.user_id, u.name, u.email
        ORDER BY total_spent DESC LIMIT 5`
     );
@@ -1657,7 +1677,10 @@ export class OrderRepository implements IOrderRepository {
     }
     if (filters?.status && filters.status !== 'all') { whereClause += ' AND o.status = ?'; params.push(filters.status); }
     if (filters?.paymentStatus && filters.paymentStatus !== 'all') { whereClause += ' AND o.payment_status = ?'; params.push(filters.paymentStatus); }
+    if (filters?.paymentMethod && filters.paymentMethod !== 'all') { whereClause += ' AND o.payment_method = ?'; params.push(filters.paymentMethod); }
     if (filters?.shipperId) { whereClause += ' AND o.shipper_id = ?'; params.push(filters.shipperId); }
+    if (filters?.dateFrom) { whereClause += ' AND DATE(o.order_date) >= ?'; params.push(filters.dateFrom); }
+    if (filters?.dateTo) { whereClause += ' AND DATE(o.order_date) <= ?'; params.push(filters.dateTo); }
     return { whereClause, params };
   }
 

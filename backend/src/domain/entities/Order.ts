@@ -223,6 +223,7 @@ export interface AdminOrderListFilters {
   search?: string;
   status?: OrderStatus | 'all';
   paymentStatus?: PaymentStatus | 'all';
+  paymentMethod?: PaymentMethod | 'all';
   userId?: number;
   shipperId?: number;
   dateFrom?: string;

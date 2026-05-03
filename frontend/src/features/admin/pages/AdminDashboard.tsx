@@ -175,6 +175,16 @@ export const AdminDashboard = () => {
   const p = productStats!;
   const u = userStats!;
 
+  // Helpers tạo URL drill-down sang trang Đơn hàng (lọc sẵn theo điều kiện card)
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const firstDayThisMonth = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+  })();
+  const drillRevenueToday = `/admin/orders?status=completed&dateFrom=${todayISO}&dateTo=${todayISO}`;
+  const drillRevenueThisMonth = `/admin/orders?status=completed&dateFrom=${firstDayThisMonth}&dateTo=${todayISO}`;
+  const drillCompleted = `/admin/orders?status=completed`;
+
   const pendingCount = o.ordersByStatus?.pending || 0;
   const statusEntries = Object.entries(o.ordersByStatus || {}).filter(([, v]) => v > 0);
 
@@ -269,6 +279,7 @@ export const AdminDashboard = () => {
             trend={<TrendBadge current={o.revenueToday} previous={o.revenueYesterday} suffix=" vs hôm qua" />}
             icon={<DollarSign size={18} />}
             iconColor="text-emerald-600" iconBg="bg-emerald-50"
+            linkTo={drillRevenueToday}
           />
           <KpiCard
             label="Doanh thu tháng này"
@@ -276,6 +287,7 @@ export const AdminDashboard = () => {
             trend={<TrendBadge current={o.revenueThisMonth} previous={o.revenueLastMonth} suffix=" vs tháng trước" />}
             icon={<TrendingUp size={18} />}
             iconColor="text-blue-600" iconBg="bg-blue-50"
+            linkTo={drillRevenueThisMonth}
           />
           <KpiCard
             label="Giá trị đơn TB"
@@ -283,6 +295,7 @@ export const AdminDashboard = () => {
             trend={<span className="text-[10px] text-gray-400">trên {o.totalOrders} đơn</span>}
             icon={<BarChart3 size={18} />}
             iconColor="text-violet-600" iconBg="bg-violet-50"
+            linkTo={drillCompleted}
           />
           <KpiCard
             label="Tổng doanh thu"
@@ -290,6 +303,7 @@ export const AdminDashboard = () => {
             trend={<span className="text-[10px] text-gray-400">tất cả thời gian</span>}
             icon={<Crown size={18} />}
             iconColor="text-amber-600" iconBg="bg-amber-50"
+            linkTo={drillCompleted}
           />
         </div>
 
@@ -350,16 +364,20 @@ export const AdminDashboard = () => {
                 const revenue = o.paymentMethodRevenue?.[method] || 0;
                 const pct = o.totalOrders > 0 ? Math.round((count / o.totalOrders) * 100) : 0;
                 return (
-                  <div key={method} className="group">
+                  <Link
+                    key={method}
+                    to={`/admin/orders?paymentMethod=${method}`}
+                    className="block group rounded-lg p-1 -m-1 hover:bg-gray-50 transition-colors"
+                  >
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-bold text-gray-700">{PAYMENT_LABELS[method] || method}</span>
+                      <span className="text-xs font-bold text-gray-700 group-hover:text-blue-600">{PAYMENT_LABELS[method] || method}</span>
                       <span className="text-[10px] text-gray-400">{count} đơn ({pct}%)</span>
                     </div>
                     <div className="w-full bg-gray-100 rounded-full h-2">
                       <div className="bg-blue-500 h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
                     </div>
                     <p className="text-[10px] text-gray-400 mt-0.5">{formatShort(revenue)}</p>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
@@ -381,6 +399,7 @@ export const AdminDashboard = () => {
             trend={<span className="text-[10px] text-gray-400">tháng này: {o.ordersThisMonth}</span>}
             icon={<ShoppingCart size={18} />}
             iconColor="text-violet-600" iconBg="bg-violet-50"
+            linkTo={`/admin/orders?dateFrom=${todayISO}&dateTo=${todayISO}`}
           />
           <KpiCard
             label="Đang giao hàng"
@@ -388,6 +407,7 @@ export const AdminDashboard = () => {
             trend={<span className="text-[10px] text-cyan-600 font-bold">đang vận chuyển</span>}
             icon={<Truck size={18} />}
             iconColor="text-cyan-600" iconBg="bg-cyan-50"
+            linkTo="/admin/orders?status=shipping"
           />
           <KpiCard
             label="Tỷ lệ hoàn thành"
@@ -395,6 +415,7 @@ export const AdminDashboard = () => {
             trend={<span className="text-[10px] text-gray-400">hủy: {o.cancellationRate != null ? o.cancellationRate : 0}%</span>}
             icon={<CheckCircle size={18} />}
             iconColor="text-green-600" iconBg="bg-green-50"
+            linkTo="/admin/orders?status=completed"
           />
           <KpiCard
             label="Hoàn trả"
@@ -406,6 +427,7 @@ export const AdminDashboard = () => {
             }
             icon={<RotateCcw size={18} />}
             iconColor="text-orange-600" iconBg="bg-orange-50"
+            linkTo="/admin/returns"
           />
         </div>
 
@@ -729,23 +751,44 @@ const SectionTitle = ({ icon, title, color }: { icon: React.ReactNode; title: st
   </div>
 );
 
-const KpiCard = ({ label, value, trend, icon, iconColor, iconBg, alert }: {
+const KpiCard = ({ label, value, trend, icon, iconColor, iconBg, alert, linkTo }: {
   label: string; value: string | number; trend: React.ReactNode;
   icon: React.ReactNode; iconColor: string; iconBg: string; alert?: string;
-}) => (
-  <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-    <div className="flex items-center justify-between mb-2">
-      <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">{label}</p>
-      <div className={`p-1.5 ${iconBg} rounded-xl`}>
-        <span className={iconColor}>{icon}</span>
+  linkTo?: string;
+}) => {
+  const inner = (
+    <>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">{label}</p>
+        <div className={`p-1.5 ${iconBg} rounded-xl`}>
+          <span className={iconColor}>{icon}</span>
+        </div>
       </div>
+      <p className="text-xl font-black text-gray-800">{value}</p>
+      <div className="mt-1">{trend}</div>
+      {alert && (
+        <p className="text-[10px] text-red-500 font-bold mt-1.5 flex items-center gap-1">
+          <XCircle size={10} /> {alert}
+        </p>
+      )}
+      {linkTo && (
+        <p className="text-[10px] text-blue-600 font-bold mt-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          Xem chi tiết <ArrowRight size={10} />
+        </p>
+      )}
+    </>
+  );
+
+  if (linkTo) {
+    return (
+      <Link to={linkTo} className="group bg-white p-4 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-200 transition-all block">
+        {inner}
+      </Link>
+    );
+  }
+  return (
+    <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+      {inner}
     </div>
-    <p className="text-xl font-black text-gray-800">{value}</p>
-    <div className="mt-1">{trend}</div>
-    {alert && (
-      <p className="text-[10px] text-red-500 font-bold mt-1.5 flex items-center gap-1">
-        <XCircle size={10} /> {alert}
-      </p>
-    )}
-  </div>
-);
+  );
+};

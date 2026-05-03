@@ -117,6 +117,14 @@ export class PaymentController {
       try {
         const verify2 = verifyReturnUrl(query);
         if (verify2.isVerified && verify2.isSuccess && this.walletUseCase) {
+          // Defense-in-depth: so khớp số tiền VNPay trả với amount đã đăng ký trong DB
+          const vnpAmount = Number((req.query as any)["vnp_Amount"]) / 100;
+          const expectedAmount = await this.walletUseCase.getTopupAmountByReference(orderCode);
+          if (expectedAmount == null || Math.abs(expectedAmount - vnpAmount) > 1) {
+            console.warn(`[Payment] Wallet topup amount mismatch: expected=${expectedAmount}, vnp=${vnpAmount}`);
+            await this.walletUseCase.failVNPayTopup(orderCode);
+            return res.redirect(`${FRONTEND_URL}/wallet?topup=failed`);
+          }
           await this.walletUseCase.completeVNPayTopup(
             orderCode,
             vnpTransactionNo,
@@ -232,6 +240,13 @@ export class PaymentController {
       if (orderCode && orderCode.startsWith("WLT-")) {
         try {
           if (verify.isSuccess && this.walletUseCase) {
+            // Defense-in-depth: so khớp số tiền
+            const vnpAmount = Number((req.query as any)["vnp_Amount"]) / 100;
+            const expectedAmount = await this.walletUseCase.getTopupAmountByReference(orderCode);
+            if (expectedAmount == null || Math.abs(expectedAmount - vnpAmount) > 1) {
+              await this.walletUseCase.failVNPayTopup(orderCode);
+              return res.json({ RspCode: "04", Message: "Invalid amount" });
+            }
             await this.walletUseCase.completeVNPayTopup(
               orderCode,
               vnpTransactionNo,

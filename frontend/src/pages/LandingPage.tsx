@@ -12,8 +12,8 @@ export function LandingPage() {
         }
       `}</style>
 
-      {/* Navbar */}
-      <header className="fixed inset-x-0 top-0 z-50 backdrop-blur-md bg-black/40 border-b border-white/5">
+      {/* Navbar — dùng bg đặc thay backdrop-blur để tránh lag GPU khi scroll */}
+      <header className="fixed inset-x-0 top-0 z-50 bg-black/85 border-b border-white/5">
         <nav className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <button
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}

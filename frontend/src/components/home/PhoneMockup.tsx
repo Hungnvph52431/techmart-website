@@ -41,9 +41,10 @@ export function PhoneMockup({ rotateX, rotateY, scale }: Props) {
         width: 260,
         height: 540,
         transform: `rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(${scale})`,
-        transition: 'transform 0.1s ease-out',
+        // Bỏ transition để tránh chồng lên animation theo scroll (gây giật).
+        // Bỏ filter: drop-shadow (repaint cực tốn GPU) — thay bằng box-shadow
+        // ở metallic frame bên dưới (rẻ hơn nhiều, vẫn ra hiệu ứng tương tự).
         willChange: 'transform',
-        filter: 'drop-shadow(0 25px 80px rgba(0,0,0,0.6))',
       }}
     >
       {/* Metallic frame */}
@@ -54,7 +55,7 @@ export function PhoneMockup({ rotateX, rotateY, scale }: Props) {
             'linear-gradient(145deg, #2b2b30 0%, #101013 50%, #1f1f23 100%)',
           border: '3px solid #444',
           boxShadow:
-            '0 0 120px rgba(59,130,246,0.12), inset 0 1px 0 rgba(255,255,255,0.1), inset 0 -2px 4px rgba(0,0,0,0.5)',
+            '0 25px 60px rgba(0,0,0,0.55), 0 0 120px rgba(59,130,246,0.12), inset 0 1px 0 rgba(255,255,255,0.1), inset 0 -2px 4px rgba(0,0,0,0.5)',
         }}
       />
 

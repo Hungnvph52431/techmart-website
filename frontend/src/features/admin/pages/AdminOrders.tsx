@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { adminOrderService } from '@/services/admin/order.service';
 // Đã xóa toàn bộ import từ '@/types' vì không được sử dụng trong component này
-import { 
-  Search, 
-  RefreshCw, 
+import {
+  Search,
+  RefreshCw,
   Package,
   Phone,
   CreditCard,
+  X,
 } from 'lucide-react';
 interface OrderResponse {
   items: any[];    // Danh sách đơn hàng
@@ -63,18 +64,54 @@ const PAYMENT_STATUS_LABELS: Record<string, string> = {
   refunded: 'Đã hoàn',
 };
 
+// Cho phép dashboard drill-down sang đây (vd: ?paymentMethod=cod để lọc đơn COD).
+const PAYMENT_METHOD_LABELS_FILTER: Record<string, string> = {
+  cod: 'COD',
+  vnpay: 'VNPay',
+  bank_transfer: 'Chuyển khoản',
+  momo: 'MoMo',
+  wallet: 'Ví TechMart',
+  deposit: 'Đặt cọc',
+};
+
+const formatVNDate = (s?: string | null) => {
+  if (!s) return '';
+  // Hỗ trợ 'YYYY-MM-DD'
+  const [y, m, d] = s.split('-');
+  return d && m && y ? `${d}/${m}/${y}` : s;
+};
+
 export const AdminOrders = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<string>('all');
+  const [filter, setFilter] = useState<string>(searchParams.get('status') || 'all');
   const [searchText, setSearchText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [totalOrders, setTotalOrders] = useState(0);
 
+  // Filter từ URL — dashboard drill-down truyền vào, không có UI riêng
+  const paymentMethodFilter = searchParams.get('paymentMethod') || undefined;
+  const dateFromFilter = searchParams.get('dateFrom') || undefined;
+  const dateToFilter = searchParams.get('dateTo') || undefined;
+  const hasUrlFilters = Boolean(paymentMethodFilter || dateFromFilter || dateToFilter);
+
+  // Khi user bấm tab status, đồng bộ vào URL để chia sẻ link được
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (filter && filter !== 'all') next.set('status', filter);
+    else next.delete('status');
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter]);
+
   useEffect(() => {
     loadOrders();
-  }, [filter, searchQuery]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, searchQuery, paymentMethodFilter, dateFromFilter, dateToFilter]);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearchQuery(searchText), 400);
@@ -87,6 +124,9 @@ export const AdminOrders = () => {
     const response = await adminOrderService.getAll({
       search: searchQuery || undefined,
       status: filter !== 'all' ? filter : undefined,
+      paymentMethod: paymentMethodFilter,
+      dateFrom: dateFromFilter,
+      dateTo: dateToFilter,
     }) as unknown as OrderResponse;
 
     const orderList = response.items || [];
@@ -100,6 +140,12 @@ export const AdminOrders = () => {
     setLoading(false);
   }
 };
+
+  const clearUrlFilter = (key: 'paymentMethod' | 'dateFrom' | 'dateTo') => {
+    const next = new URLSearchParams(searchParams);
+    next.delete(key);
+    setSearchParams(next, { replace: true });
+  };
 
   const filteredOrders = orders;
 
@@ -150,6 +196,44 @@ export const AdminOrders = () => {
           </button>
         ))}
       </div>
+
+      {/* CHIP FILTER TỪ URL — hiển thị khi drill-down từ Dashboard */}
+      {hasUrlFilters && (
+        <div className="flex flex-wrap items-center gap-2 px-1">
+          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Đang lọc:</span>
+          {paymentMethodFilter && (
+            <button
+              type="button"
+              onClick={() => clearUrlFilter('paymentMethod')}
+              className="flex items-center gap-1.5 bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold hover:bg-blue-200 transition-colors"
+            >
+              <CreditCard size={12} />
+              {PAYMENT_METHOD_LABELS_FILTER[paymentMethodFilter] || paymentMethodFilter}
+              <X size={12} />
+            </button>
+          )}
+          {dateFromFilter && (
+            <button
+              type="button"
+              onClick={() => clearUrlFilter('dateFrom')}
+              className="flex items-center gap-1.5 bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold hover:bg-emerald-200 transition-colors"
+            >
+              Từ {formatVNDate(dateFromFilter)}
+              <X size={12} />
+            </button>
+          )}
+          {dateToFilter && (
+            <button
+              type="button"
+              onClick={() => clearUrlFilter('dateTo')}
+              className="flex items-center gap-1.5 bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold hover:bg-emerald-200 transition-colors"
+            >
+              Đến {formatVNDate(dateToFilter)}
+              <X size={12} />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* MAIN CONTENT: 1 CỘT - click vào row để vào trang detail */}
       <div className="bg-white rounded-[24px] shadow-sm border border-gray-100 overflow-hidden">
