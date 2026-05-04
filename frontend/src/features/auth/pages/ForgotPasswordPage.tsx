@@ -121,6 +121,13 @@ export const ForgotPasswordPage = () => {
     }
   };
 
+  // Inline style ép input nền sáng (chống global !important trong index.css)
+  const lightInputStyle = {
+    backgroundColor: '#f9fafb',
+    color: '#111827',
+    colorScheme: 'light' as const,
+  };
+
   return (
     <Layout>
       <div className="container mx-auto px-4 py-12">
@@ -153,7 +160,7 @@ export const ForgotPasswordPage = () => {
                 </label>
                 <div className="relative mt-1">
                   <Mail
-                    className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400"
+                    className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 z-10"
                     size={20}
                   />
                   <input
@@ -162,6 +169,7 @@ export const ForgotPasswordPage = () => {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="khanh@example.com"
                     required
+                    style={lightInputStyle}
                     className="w-full pl-12 pr-5 py-4 bg-gray-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 </div>
@@ -195,6 +203,7 @@ export const ForgotPasswordPage = () => {
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
                   placeholder="123456"
                   required
+                  style={lightInputStyle}
                   className="w-full mt-1 px-5 py-4 bg-gray-50 border-none rounded-2xl text-2xl tracking-widest text-center focus:ring-2 focus:ring-blue-500 outline-none"
                 />
               </div>
@@ -229,7 +238,7 @@ export const ForgotPasswordPage = () => {
                 </label>
                 <div className="relative mt-1">
                   <Lock
-                    className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400"
+                    className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 z-10"
                     size={20}
                   />
                   <input
@@ -238,6 +247,7 @@ export const ForgotPasswordPage = () => {
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="••••••••"
                     required
+                    style={lightInputStyle}
                     className="w-full pl-12 pr-12 py-4 bg-gray-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                   <button
@@ -267,7 +277,7 @@ export const ForgotPasswordPage = () => {
                 </label>
                 <div className="relative mt-1">
                   <Lock
-                    className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400"
+                    className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 z-10"
                     size={20}
                   />
                   <input
@@ -276,6 +286,7 @@ export const ForgotPasswordPage = () => {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••"
                     required
+                    style={lightInputStyle}
                     className="w-full pl-12 pr-5 py-4 bg-gray-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 </div>

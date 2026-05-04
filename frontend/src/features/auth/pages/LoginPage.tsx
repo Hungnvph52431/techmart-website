@@ -37,7 +37,8 @@ export const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex">
+    // min-h 111vh để bù zoom:0.9 trên body (xem index.css), tránh lộ dải trắng dưới.
+    <div className="flex bg-[#0b1220]" style={{ minHeight: '111vh' }}>
       {/* ── LEFT PANEL ── */}
       <div className="hidden lg:flex lg:w-[52%] relative flex-col justify-between overflow-hidden bg-[#0f172a] px-16 py-12">
         {/* Gradient orbs */}
@@ -58,12 +59,12 @@ export const LoginPage = () => {
         />
 
         {/* Logo */}
-        <div className="relative z-10 flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-600 shadow-lg shadow-blue-600/40">
+        <Link to="/home" className="relative z-10 flex items-center gap-3 group">
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-600 shadow-lg shadow-blue-600/40 group-hover:brightness-110 transition">
             <Cpu size={20} className="text-white" />
           </div>
-          <span className="text-white font-black text-2xl tracking-tight">TechMart</span>
-        </div>
+          <span className="text-white font-black text-2xl tracking-tight group-hover:text-blue-300 transition">TechMart</span>
+        </Link>
 
         {/* Hero */}
         <div className="relative z-10 space-y-10">
@@ -102,28 +103,34 @@ export const LoginPage = () => {
         </div>
       </div>
 
-      {/* ── RIGHT PANEL ── */}
-      <div className="flex-1 flex items-center justify-center bg-gray-50 px-6 py-12">
-        <div className="w-full max-w-[420px]">
+      {/* ── RIGHT PANEL ── đồng bộ tone dark với panel trái */}
+      <div className="flex-1 flex items-center justify-center bg-[#0b1220] relative overflow-hidden px-6 py-12">
+        {/* Ambient orb để khớp với panel trái */}
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute top-1/3 -right-32 w-[420px] h-[420px] rounded-full bg-blue-600/15 blur-3xl" />
+          <div className="absolute -bottom-32 -left-32 w-[360px] h-[360px] rounded-full bg-indigo-600/15 blur-3xl" />
+        </div>
+
+        <div className="relative z-10 w-full max-w-[420px]">
           {/* Mobile logo */}
-          <div className="flex lg:hidden items-center gap-2 justify-center mb-10">
-            <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center shadow-md shadow-blue-200">
+          <Link to="/home" className="flex lg:hidden items-center gap-2 justify-center mb-10 group">
+            <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center shadow-md shadow-blue-600/40 group-hover:brightness-110 transition">
               <Cpu size={18} className="text-white" />
             </div>
-            <span className="text-gray-900 font-black text-xl tracking-tight">TechMart</span>
-          </div>
+            <span className="text-white font-black text-xl tracking-tight group-hover:text-blue-300 transition">TechMart</span>
+          </Link>
 
           {/* Card */}
-          <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/60 border border-gray-100 px-10 py-10">
+          <div className="bg-white/[0.04] backdrop-blur-sm rounded-3xl shadow-2xl shadow-black/40 border border-white/10 px-10 py-10">
             <div className="mb-8">
-              <h1 className="text-3xl font-black text-gray-900 tracking-tight">Đăng nhập</h1>
-              <p className="text-gray-400 text-sm mt-1.5">Nhập thông tin tài khoản của bạn để tiếp tục</p>
+              <h1 className="text-3xl font-black text-white tracking-tight">Đăng nhập</h1>
+              <p className="text-slate-400 text-sm mt-1.5">Nhập thông tin tài khoản của bạn để tiếp tục</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Email */}
               <div className="space-y-1.5">
-                <label htmlFor="email" className="block text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                <label htmlFor="email" className="block text-xs font-semibold text-slate-300 uppercase tracking-wide">
                   Email
                 </label>
                 <input
@@ -134,17 +141,23 @@ export const LoginPage = () => {
                   autoComplete="username"
                   required
                   placeholder="email@example.com"
-                  className="w-full px-4 py-3.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                  // Inline !important để thắng global rule trong index.css ép input bg trắng
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.06)',
+                    color: '#fff',
+                    colorScheme: 'dark',
+                  }}
+                  className="w-full px-4 py-3.5 rounded-xl border border-white/10 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow [&]:!bg-white/[0.06] [&]:!text-white"
                 />
               </div>
 
               {/* Password */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label htmlFor="password" className="block text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  <label htmlFor="password" className="block text-xs font-semibold text-slate-300 uppercase tracking-wide">
                     Mật khẩu
                   </label>
-                  <Link to="/forgot-password" className="text-xs font-medium text-blue-500 hover:text-blue-600 transition-colors">
+                  <Link to="/forgot-password" className="text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors">
                     Quên mật khẩu?
                   </Link>
                 </div>
@@ -157,12 +170,17 @@ export const LoginPage = () => {
                     autoComplete="current-password"
                     required
                     placeholder="••••••••"
-                    className="w-full px-4 py-3.5 pr-11 rounded-xl border border-gray-200 bg-white text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                    style={{
+                      backgroundColor: 'rgba(255,255,255,0.06)',
+                      color: '#fff',
+                      colorScheme: 'dark',
+                    }}
+                    className="w-full px-4 py-3.5 pr-11 rounded-xl border border-white/10 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow [&]:!bg-white/[0.06] [&]:!text-white"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(v => !v)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
                   >
                     {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                   </button>
@@ -173,7 +191,7 @@ export const LoginPage = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full mt-1 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold shadow-md shadow-blue-200 hover:shadow-blue-300 transition-all active:scale-[0.98] disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed"
+                className="w-full mt-1 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold shadow-lg shadow-blue-600/30 transition-all active:scale-[0.98] disabled:bg-slate-700 disabled:shadow-none disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -184,19 +202,19 @@ export const LoginPage = () => {
               </button>
             </form>
 
-            <div className="mt-7 pt-6 border-t border-gray-100 text-center">
-              <p className="text-gray-500 text-sm">
+            <div className="mt-7 pt-6 border-t border-white/10 text-center">
+              <p className="text-slate-400 text-sm">
                 Chưa có tài khoản?{' '}
-                <Link to="/register" className="text-blue-600 hover:text-blue-700 font-semibold transition-colors">
+                <Link to="/register" className="text-blue-400 hover:text-blue-300 font-semibold transition-colors">
                   Tạo tài khoản mới
                 </Link>
               </p>
             </div>
           </div>
 
-          <p className="text-center text-xs text-gray-400 mt-6">
+          <p className="text-center text-xs text-slate-500 mt-6">
             Bằng cách đăng nhập, bạn đồng ý với{' '}
-            <Link to="/policy" className="underline hover:text-gray-600 transition-colors">Điều khoản sử dụng</Link>
+            <Link to="/policy" className="underline hover:text-slate-300 transition-colors">Điều khoản sử dụng</Link>
             {' '}của TechMart.
           </p>
         </div>

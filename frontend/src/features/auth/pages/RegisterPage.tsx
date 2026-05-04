@@ -62,15 +62,22 @@ export const RegisterPage = () => {
     }
   };
 
+  // Dark theme cho inputs — dùng [&]:! để thắng global !important trong index.css
   const inputCls = (field: string) =>
-    `w-full px-4 py-3.5 rounded-xl border text-sm text-gray-800 placeholder-gray-300 outline-none transition-shadow ${
+    `w-full px-4 py-3.5 rounded-xl border text-sm placeholder-slate-500 outline-none transition-shadow [&]:!bg-white/[0.06] [&]:!text-white ${
       errors[field as keyof typeof errors]
-        ? 'border-red-300 bg-red-50/40 focus:ring-2 focus:ring-red-200'
-        : 'border-gray-200 bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+        ? 'border-red-400/60 focus:ring-2 focus:ring-red-400/40'
+        : 'border-white/10 focus:ring-2 focus:ring-blue-500 focus:border-transparent'
     }`;
+  const darkInputStyle = {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    color: '#fff',
+    colorScheme: 'dark' as const,
+  };
 
   return (
-    <div className="min-h-screen flex">
+    // 111vh để bù zoom:0.9 trên body trong index.css
+    <div className="flex bg-[#0b1220]" style={{ minHeight: '111vh' }}>
       {/* ── LEFT PANEL ── */}
       <div className="hidden lg:flex lg:w-[46%] relative flex-col justify-between overflow-hidden bg-[#0f172a] px-14 py-12">
         {/* Gradient orbs */}
@@ -133,73 +140,82 @@ export const RegisterPage = () => {
         </div>
       </div>
 
-      {/* ── RIGHT PANEL ── */}
-      <div className="flex-1 flex items-center justify-center bg-gray-50 px-6 py-10 overflow-y-auto">
-        <div className="w-full max-w-[440px]">
+      {/* ── RIGHT PANEL ── đồng bộ tone dark */}
+      <div className="flex-1 flex items-center justify-center bg-[#0b1220] relative overflow-hidden px-6 py-10">
+        {/* Ambient orbs */}
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute top-1/3 -right-32 w-[420px] h-[420px] rounded-full bg-blue-600/15 blur-3xl" />
+          <div className="absolute -bottom-32 -left-32 w-[360px] h-[360px] rounded-full bg-indigo-600/15 blur-3xl" />
+        </div>
+
+        <div className="relative z-10 w-full max-w-[440px]">
           {/* Mobile logo */}
           <div className="flex lg:hidden items-center gap-2 justify-center mb-8">
-            <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center shadow-md shadow-blue-200">
+            <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center shadow-md shadow-blue-600/40">
               <Cpu size={18} className="text-white" />
             </div>
-            <span className="text-gray-900 font-black text-xl tracking-tight">TechMart</span>
+            <span className="text-white font-black text-xl tracking-tight">TechMart</span>
           </div>
 
-          {/* Card */}
-          <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/60 border border-gray-100 px-10 py-10">
+          {/* Card glassmorphism */}
+          <div className="bg-white/[0.04] backdrop-blur-sm rounded-3xl shadow-2xl shadow-black/40 border border-white/10 px-10 py-10">
             <div className="mb-7">
-              <h1 className="text-3xl font-black text-gray-900 tracking-tight">Tạo tài khoản</h1>
-              <p className="text-gray-400 text-sm mt-1.5">Điền thông tin bên dưới để bắt đầu</p>
+              <h1 className="text-3xl font-black text-white tracking-tight">Tạo tài khoản</h1>
+              <p className="text-slate-400 text-sm mt-1.5">Điền thông tin bên dưới để bắt đầu</p>
             </div>
 
             <form onSubmit={handleSubmit} noValidate className="space-y-4">
               {/* Họ và tên */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wide">
                   Họ và Tên <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.fullName}
                   onChange={e => set('fullName', e.target.value)}
+                  style={darkInputStyle}
                   className={inputCls('fullName')}
                   placeholder="Nguyễn Văn A"
                 />
-                {errors.fullName && <p className="text-xs text-red-500">{errors.fullName}</p>}
+                {errors.fullName && <p className="text-xs text-red-400">{errors.fullName}</p>}
               </div>
 
               {/* Email */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wide">
                   Email <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="email"
                   value={formData.email}
                   onChange={e => set('email', e.target.value)}
+                  style={darkInputStyle}
                   className={inputCls('email')}
                   placeholder="email@example.com"
                 />
-                {errors.email && <p className="text-xs text-red-500">{errors.email}</p>}
+                {errors.email && <p className="text-xs text-red-400">{errors.email}</p>}
               </div>
 
               {/* Số điện thoại */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wide">
                   Số điện thoại <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="tel"
                   value={formData.phone}
                   onChange={e => set('phone', e.target.value)}
+                  style={darkInputStyle}
                   className={inputCls('phone')}
                   placeholder="09xx xxx xxx"
                 />
-                {errors.phone && <p className="text-xs text-red-500">{errors.phone}</p>}
+                {errors.phone && <p className="text-xs text-red-400">{errors.phone}</p>}
               </div>
 
               {/* Mật khẩu */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wide">
                   Mật khẩu <span className="text-red-400">*</span>
                 </label>
                 <div className="relative">
@@ -207,11 +223,12 @@ export const RegisterPage = () => {
                     type={showPassword ? 'text' : 'password'}
                     value={formData.password}
                     onChange={e => set('password', e.target.value)}
+                    style={darkInputStyle}
                     className={`${inputCls('password')} pr-11`}
                     placeholder="••••••••"
                   />
                   <button type="button" onClick={() => setShowPassword(v => !v)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors">
                     {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                   </button>
                 </div>
@@ -222,11 +239,11 @@ export const RegisterPage = () => {
                     const show = touched.password || !!formData.password;
                     return (
                       <li key={rule.label} className={`flex items-center gap-1.5 text-xs transition-colors ${
-                        !show ? 'text-gray-300' : passes ? 'text-emerald-600' : 'text-red-400'
+                        !show ? 'text-slate-500' : passes ? 'text-emerald-400' : 'text-red-400'
                       }`}>
                         {passes && show
                           ? <Check size={11} strokeWidth={3} />
-                          : <X size={11} strokeWidth={3} className={!show ? 'opacity-30' : ''} />}
+                          : <X size={11} strokeWidth={3} className={!show ? 'opacity-40' : ''} />}
                         {rule.label}
                       </li>
                     );
@@ -236,7 +253,7 @@ export const RegisterPage = () => {
 
               {/* Xác nhận mật khẩu */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wide">
                   Xác nhận mật khẩu <span className="text-red-400">*</span>
                 </label>
                 <div className="relative">
@@ -244,17 +261,18 @@ export const RegisterPage = () => {
                     type={showConfirmPassword ? 'text' : 'password'}
                     value={formData.confirmPassword}
                     onChange={e => set('confirmPassword', e.target.value)}
+                    style={darkInputStyle}
                     className={`${inputCls('confirmPassword')} pr-11`}
                     placeholder="••••••••"
                   />
                   <button type="button" onClick={() => setShowConfirmPassword(v => !v)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors">
                     {showConfirmPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                   </button>
                 </div>
-                {errors.confirmPassword && <p className="text-xs text-red-500">{errors.confirmPassword}</p>}
+                {errors.confirmPassword && <p className="text-xs text-red-400">{errors.confirmPassword}</p>}
                 {touched.confirmPassword && passwordMatch && formData.confirmPassword && (
-                  <p className="text-xs text-emerald-600 flex items-center gap-1">
+                  <p className="text-xs text-emerald-400 flex items-center gap-1">
                     <Check size={11} strokeWidth={3} /> Mật khẩu khớp
                   </p>
                 )}
@@ -263,7 +281,7 @@ export const RegisterPage = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full mt-1 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold shadow-md shadow-blue-200 hover:shadow-blue-300 transition-all active:scale-[0.98] disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed"
+                className="w-full mt-1 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold shadow-lg shadow-blue-600/30 transition-all active:scale-[0.98] disabled:bg-slate-700 disabled:shadow-none disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -274,19 +292,19 @@ export const RegisterPage = () => {
               </button>
             </form>
 
-            <div className="mt-6 pt-6 border-t border-gray-100 text-center">
-              <p className="text-gray-500 text-sm">
+            <div className="mt-6 pt-6 border-t border-white/10 text-center">
+              <p className="text-slate-400 text-sm">
                 Đã có tài khoản?{' '}
-                <Link to="/login" className="text-blue-600 hover:text-blue-700 font-semibold transition-colors">
+                <Link to="/login" className="text-blue-400 hover:text-blue-300 font-semibold transition-colors">
                   Đăng nhập
                 </Link>
               </p>
             </div>
           </div>
 
-          <p className="text-center text-xs text-gray-400 mt-6">
+          <p className="text-center text-xs text-slate-500 mt-6">
             Bằng cách đăng ký, bạn đồng ý với{' '}
-            <Link to="/policy" className="underline hover:text-gray-600 transition-colors">Điều khoản sử dụng</Link>
+            <Link to="/policy" className="underline hover:text-slate-300 transition-colors">Điều khoản sử dụng</Link>
             {' '}của TechMart.
           </p>
         </div>

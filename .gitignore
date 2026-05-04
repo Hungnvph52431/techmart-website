@@ -150,6 +150,7 @@ Thumbs.db
 
 # Claude Code config
 .claude/
+CLAUDE.md
 
 # Binaries
 *.exe

@@ -19,51 +19,51 @@ type SectionDef = {
 const SECTIONS: SectionDef[] = [
   {
     title: 'TECHMART',
-    subtitle: 'Trải nghiệm công nghệ\nđỉnh cao',
+    subtitle: 'Điểm đến công nghệ\ntin cậy số 1',
     rotateX: -20,
     rotateY: -30,
     scale: 0.8,
     feature: null,
   },
   {
-    title: 'Thiết kế\nhoàn hảo',
-    subtitle: 'Màn hình Super Retina XDR\n6.7 inch — sắc nét đến từng pixel',
-    detail: 'Công nghệ ProMotion 120Hz',
+    title: 'Chính hãng\n100%',
+    subtitle: 'Toàn bộ sản phẩm có tem chính hãng\nNguồn gốc rõ ràng, minh bạch hoàn toàn',
+    detail: 'Tem nhập khẩu chính ngạch · Hóa đơn VAT',
     rotateX: 0,
     rotateY: 0,
     scale: 1.1,
-    feature: { label: 'Dynamic Island', top: '7%', left: '50%' },
+    feature: { label: '10.000+ sản phẩm', top: '22%', left: '88%' },
   },
   {
-    title: 'Hiệu năng\nvượt trội',
-    subtitle: 'Chip A17 Pro — Nhanh hơn.\nMạnh hơn. Thông minh hơn.',
-    detail: 'GPU 6 nhân · Neural Engine 16 nhân',
+    title: 'Giá tốt\nnhất thị trường',
+    subtitle: 'Cam kết giá cạnh tranh nhất\nTrả góp 0% · Không phụ phí ẩn',
+    detail: 'Giá thấp hơn — hoàn tiền 110%',
     rotateX: 10,
     rotateY: 25,
     scale: 1.0,
-    feature: { label: 'Chip A17 Pro', top: '50%', left: '92%' },
+    feature: { label: 'Trả góp 0%', top: '55%', left: '90%' },
   },
   {
-    title: 'Camera\nchuyên nghiệp',
-    subtitle: 'Hệ thống 3 camera 48MP\nChụp đêm vượt trội',
-    detail: 'Zoom quang học 5x · ProRAW · ProRes',
+    title: 'Dịch vụ\nvượt trội',
+    subtitle: 'Hỗ trợ khách hàng 24/7\nĐổi trả dễ dàng trong 30 ngày',
+    detail: 'Bảo hành tận nhà · Hotline 24/7',
     rotateX: -5,
     rotateY: -20,
     scale: 1.05,
-    feature: { label: 'Camera 48MP', top: '15%', left: '12%' },
+    feature: { label: 'Hoàn tiền 30 ngày', top: '18%', left: '14%' },
   },
   {
-    title: 'Pin cả ngày\ndùng thoải mái',
-    subtitle: 'Lên đến 29 giờ xem video\nSạc nhanh USB-C',
-    detail: 'Sạc 50% trong 30 phút',
+    title: 'Giao hàng\nsiêu tốc',
+    subtitle: 'Freeship toàn quốc cho mọi đơn hàng\nGiao trong 2 giờ khu vực nội thành',
+    detail: 'Đóng gói an toàn · Theo dõi realtime',
     rotateX: 5,
     rotateY: 15,
     scale: 0.95,
-    feature: { label: 'USB-C', top: '96%', left: '50%' },
+    feature: { label: 'Giao trong 2h', top: '75%', left: '12%' },
   },
   {
     title: 'Mua ngay\ntại Techmart',
-    subtitle: 'Giá chỉ từ 34.990.000₫\nTrả góp 0% — Freeship toàn quốc',
+    subtitle: 'Hàng nghìn sản phẩm chính hãng\nTrả góp 0% — Freeship toàn quốc',
     rotateX: 0,
     rotateY: 0,
     scale: 1.0,
@@ -71,7 +71,23 @@ const SECTIONS: SectionDef[] = [
   },
 ];
 
+// Per-section: gradient color for last title line
+const SECTION_GRAD_START = ['#60a5fa', '#22d3ee', '#a78bfa', '#34d399', '#fbbf24', '#60a5fa'];
+const SECTION_GRAD_END   = ['#a78bfa', '#60a5fa', '#818cf8', '#2dd4bf', '#fb923c', '#a78bfa'];
+
+// Label shown above title (sections 1+)
+const SECTION_LABELS = ['', 'Chính hãng', 'Giá tốt', 'Dịch vụ', 'Giao hàng', 'Đặt hàng'];
+
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+const SECTION_AMBIENTS = [
+  { color: 'rgba(59,130,246,0.14)',  x: '28%', y: '52%' },
+  { color: 'rgba(34,211,238,0.11)',  x: '72%', y: '35%' },
+  { color: 'rgba(139,92,246,0.13)', x: '22%', y: '60%' },
+  { color: 'rgba(16,185,129,0.11)', x: '65%', y: '42%' },
+  { color: 'rgba(245,158,11,0.10)', x: '40%', y: '68%' },
+  { color: 'rgba(59,130,246,0.13)', x: '50%', y: '50%' },
+];
 
 export function HeroSection() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -88,8 +104,7 @@ export function HeroSection() {
     if (total <= 0) return;
     const scrolled = Math.max(0, -rect.top);
     const p = Math.max(0, Math.min(1, scrolled / total));
-    // Chỉ trigger React re-render khi đổi đủ ~0.3% — tránh re-render tốn từ
-    // hàng trăm setState xuống vài chục mỗi cuộn 1 màn hình. Vẫn smooth.
+    // Chỉ trigger React re-render khi đổi đủ ~0.3%
     if (Math.abs(p - lastProgressRef.current) < 0.003 && p !== 0 && p !== 1) return;
     lastProgressRef.current = p;
     setProgress(p);
@@ -122,29 +137,76 @@ export function HeroSection() {
   const rotateY = lerp(curr.rotateY, next.rotateY, t);
   const scale = lerp(curr.scale, next.scale, t);
 
-  const hintOpacity =
-    activeIdx === 0 ? Math.max(0, 1 - t * 2.5) : 0;
+  const hintOpacity = activeIdx === 0 ? Math.max(0, 1 - t * 2.5) : 0;
 
   return (
-    <div
-      ref={containerRef}
-      className="relative"
-      style={{ height: '300vh' }}
-    >
+    <div ref={containerRef} className="relative" style={{ height: '300vh' }}>
+      {/* Keyframes */}
+      <style>{`
+        @keyframes heroShimmer {
+          0%   { transform: translateX(-110%); }
+          100% { transform: translateX(110%); }
+        }
+        @keyframes heroDetailPulse {
+          0%, 100% { opacity: 1; box-shadow: 0 0 8px currentColor; }
+          50%       { opacity: 0.6; box-shadow: 0 0 4px currentColor; }
+        }
+      `}</style>
+
       <div className="sticky top-0 h-screen w-full overflow-hidden">
-        {/* Ambient background */}
+
+        {/* ── Top progress bar ── */}
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            height: 2,
+            width: `${progress * 100}%`,
+            background: `linear-gradient(90deg, ${SECTION_GRAD_START[activeIdx]}, ${SECTION_GRAD_END[activeIdx]})`,
+            boxShadow: `0 0 12px ${SECTION_GRAD_START[activeIdx]}`,
+            zIndex: 50,
+            transition: 'background 0.9s ease, box-shadow 0.9s ease',
+          }}
+        />
+
+        {/* ── Ambient background static ── */}
         <div
           aria-hidden
           className="absolute inset-0 pointer-events-none"
           style={{
             background:
-              'radial-gradient(circle at 30% 50%, rgba(59,130,246,0.10), transparent 42%), radial-gradient(circle at 70% 30%, rgba(139,92,246,0.07), transparent 45%), #000000',
+              'radial-gradient(circle at 30% 50%, rgba(59,130,246,0.07), transparent 42%), radial-gradient(circle at 70% 30%, rgba(139,92,246,0.05), transparent 45%), #000000',
           }}
         />
 
-        {/* Main layout */}
+
+        {/* ── Dynamic ambient orbs ── */}
+        {SECTION_AMBIENTS.map((a, i) => (
+          <div
+            key={i}
+            aria-hidden
+            className="absolute pointer-events-none"
+            style={{
+              width: 750,
+              height: 750,
+              borderRadius: '50%',
+              left: a.x,
+              top: a.y,
+              transform: 'translate(-50%, -50%)',
+              background: `radial-gradient(circle, ${a.color}, transparent 65%)`,
+              opacity: i === activeIdx ? 1 : 0,
+              transition: 'opacity 0.9s ease',
+            }}
+          />
+        ))}
+
+
+        {/* ── Main layout ── */}
         <div className="relative h-full w-full max-w-7xl mx-auto px-6 lg:px-10 flex flex-col lg:flex-row items-center justify-center gap-10 lg:gap-20 pt-24 pb-16">
-          {/* Text panel */}
+
+          {/* ── Text panel ── */}
           <div className="relative flex-1 w-full h-full min-h-[320px] z-10">
             {SECTIONS.map((s, i) => {
               const isActive = i === activeIdx;
@@ -154,37 +216,104 @@ export function HeroSection() {
               const fadeOut = Math.min(1, (1 - t) / 0.15);
               const opacity = !isActive
                 ? 0
-                : Math.min(isFirst ? 1 : fadeIn, isLast ? 1 : fadeOut);
-              const translate = (1 - opacity) * 18;
+                : isLast
+                  ? 1
+                  : Math.min(isFirst ? 1 : fadeIn, fadeOut);
+
+              const titleLines = s.title.split('\n');
+              const lastLineIdx = titleLines.length - 1;
+              const gradStart = SECTION_GRAD_START[i];
+              const gradEnd = SECTION_GRAD_END[i];
+
               return (
                 <div
                   key={i}
                   className="absolute inset-0 flex flex-col justify-center"
                   style={{
                     opacity,
-                    transform: `translateY(${translate}px)`,
-                    transition:
-                      'opacity 0.35s ease, transform 0.45s ease',
                     pointerEvents: opacity > 0.5 ? 'auto' : 'none',
                   }}
                 >
+                  {/* Section label */}
+                  {i > 0 && (
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        marginBottom: 14,
+                        opacity: isActive ? 1 : 0,
+                        transform: isActive ? 'translateX(0)' : 'translateX(-12px)',
+                        transition: 'opacity 0.5s ease, transform 0.5s ease',
+                      }}
+                    >
+                      <div style={{ width: 22, height: 1.5, background: gradStart, borderRadius: 1 }} />
+                      <span style={{
+                        fontSize: 11,
+                        color: gradStart,
+                        fontWeight: 700,
+                        letterSpacing: '0.18em',
+                        textTransform: 'uppercase',
+                        fontFamily: 'Inter, sans-serif',
+                      }}>
+                        {String(i).padStart(2, '0')} — {SECTION_LABELS[i]}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Title — line-by-line reveal */}
                   <h1
-                    className="font-extrabold text-white whitespace-pre-line leading-[1.05]"
+                    className="font-extrabold leading-[1.05]"
                     style={{
                       fontSize: isFirst
-                        ? 'clamp(44px, 7.5vw, 72px)'
-                        : 'clamp(34px, 5.5vw, 56px)',
-                      letterSpacing: '-1px',
+                        ? 'clamp(48px, 8vw, 80px)'
+                        : 'clamp(36px, 5.8vw, 60px)',
+                      letterSpacing: '-1.5px',
                     }}
                   >
-                    {s.title}
+                    {titleLines.map((line, li) => {
+                      const isLastLine = li === lastLineIdx;
+                      return (
+                        <div key={li} style={{ overflow: 'hidden', lineHeight: 1.1 }}>
+                          <span
+                            style={{
+                              display: 'block',
+                              transform: isActive ? 'translateY(0)' : 'translateY(105%)',
+                              transition: `transform 0.75s ${li * 0.12}s cubic-bezier(0.16, 1, 0.3, 1)`,
+                              // Last line gets gradient color
+                              ...(isLastLine ? {
+                                backgroundImage: `linear-gradient(90deg, ${gradStart}, ${gradEnd})`,
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                backgroundClip: 'text',
+                              } : {
+                                color: 'white',
+                              }),
+                            }}
+                          >
+                            {line}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </h1>
-                  <p className="mt-6 text-white/60 whitespace-pre-line leading-relaxed text-base md:text-lg max-w-md">
+
+                  {/* Subtitle */}
+                  <p
+                    className="whitespace-pre-line leading-relaxed text-base md:text-lg max-w-md"
+                    style={{
+                      color: isLast ? 'rgba(255,255,255,0.78)' : 'rgba(255,255,255,0.58)',
+                      marginTop: 20,
+                      opacity: isActive ? 1 : 0,
+                      transform: isActive ? 'translateY(0)' : 'translateY(10px)',
+                      transition: 'opacity 0.6s 0.28s ease, transform 0.6s 0.28s ease',
+                    }}
+                  >
                     {isLast ? (
                       <>
-                        Giá chỉ từ 34.990.000₫{'\n'}
+                        Hàng nghìn sản phẩm chính hãng{'\n'}
                         <Link
-                          to="/checkout"
+                          to="/products"
                           onClick={() => window.scrollTo(0, 0)}
                           className="underline decoration-dotted hover:text-white transition"
                         >
@@ -196,28 +325,79 @@ export function HeroSection() {
                       s.subtitle
                     )}
                   </p>
+
+                  {/* Detail badge */}
                   {s.detail && (
-                    <p
-                      className="mt-4 font-medium text-sm md:text-base"
-                      style={{ color: 'rgba(59,130,246,0.9)' }}
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        marginTop: 16,
+                        alignSelf: 'flex-start',
+                        opacity: isActive ? 1 : 0,
+                        transform: isActive ? 'translateY(0)' : 'translateY(8px)',
+                        transition: 'opacity 0.5s 0.38s ease, transform 0.5s 0.38s ease',
+                      }}
                     >
-                      {s.detail}
-                    </p>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          background: `${gradStart}14`,
+                          border: `1px solid ${gradStart}40`,
+                          borderRadius: 24,
+                          padding: '5px 14px',
+                        }}
+                      >
+                        <div style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          background: gradStart,
+                          boxShadow: `0 0 8px ${gradStart}`,
+                          animation: 'heroDetailPulse 2s ease-in-out infinite',
+                          flexShrink: 0,
+                        }} />
+                        <span style={{ color: gradStart, fontSize: 12.5, fontWeight: 600, letterSpacing: '0.02em' }}>
+                          {s.detail}
+                        </span>
+                      </div>
+                    </div>
                   )}
+
+                  {/* CTA buttons (last section) */}
                   {isLast && (
-                    <div className="mt-10 flex flex-col sm:flex-row gap-4">
+                    <div
+                      className="flex flex-col sm:flex-row gap-4"
+                      style={{
+                        marginTop: 32,
+                        opacity: isActive ? 1 : 0,
+                        transform: isActive ? 'translateY(0)' : 'translateY(14px)',
+                        transition: 'opacity 0.6s 0.42s ease, transform 0.6s 0.42s ease',
+                      }}
+                    >
                       <Link
                         to="/products"
                         onClick={() => window.scrollTo(0, 0)}
-                        className="px-8 py-3.5 rounded-full font-semibold text-white text-center hover:brightness-110 transition"
+                        className="relative overflow-hidden px-8 py-3.5 rounded-full font-semibold text-white text-center"
                         style={{
-                          background:
-                            'linear-gradient(90deg, #3b82f6, #8b5cf6)',
-                          boxShadow:
-                            '0 10px 30px rgba(59,130,246,0.35)',
+                          background: 'linear-gradient(90deg, #3b82f6, #8b5cf6)',
+                          boxShadow: '0 10px 32px rgba(59,130,246,0.4)',
                         }}
                       >
-                        Mua ngay
+                        <span className="relative z-10">Mua ngay</span>
+                        {/* Shimmer sweep */}
+                        <span
+                          aria-hidden
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent)',
+                            animation: 'heroShimmer 2.8s ease-in-out infinite',
+                          }}
+                        />
                       </Link>
                       <Link
                         to="/home"
@@ -233,12 +413,9 @@ export function HeroSection() {
             })}
           </div>
 
-          {/* Phone panel (desktop only) */}
+          {/* ── Phone panel (desktop only) ── */}
           <div className="hidden lg:flex relative flex-1 items-center justify-center">
-            <div
-              className="relative"
-              style={{ perspective: '1200px' }}
-            >
+            <div className="relative" style={{ perspective: '1200px' }}>
               <PhoneMockup
                 rotateX={rotateX}
                 rotateY={rotateY}

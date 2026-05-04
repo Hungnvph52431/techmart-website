@@ -129,7 +129,7 @@ export const Header = () => {
     setIsUserMenuOpen(false);
     clearWishlist();
     clearAuth();
-    navigate('/');
+    navigate('/home');
   };
 
   return (

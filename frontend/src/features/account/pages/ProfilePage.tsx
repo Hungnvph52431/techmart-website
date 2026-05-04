@@ -1083,7 +1083,7 @@ export const ProfilePage = () => {
   const handleLogout = async () => {
     setLoggingOut(true); await new Promise(r => setTimeout(r, 400));
     clearWishlist();
-    clearAuth(); toast.success('Đã đăng xuất'); navigate('/login');
+    clearAuth(); toast.success('Đã đăng xuất'); navigate('/home');
   };
 
   const handleChangePassword = async ({ oldPassword, newPassword }: { oldPassword: string; newPassword: string }) => {
