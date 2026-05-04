@@ -317,7 +317,7 @@ export class OrderUseCase {
           type: 'order_created',
           title: 'Đặt hàng thành công',
           message: `Đơn #${newOrder.orderCode || newOrder.orderId} đã được tạo, đang chờ xác nhận`,
-          link: `/account/orders/${newOrder.orderId}`,
+          link: `/orders/${newOrder.orderId}`,
         });
       }
     }
@@ -434,7 +434,7 @@ export class OrderUseCase {
         type: 'order_status',
         title,
         message: `Đơn #${order.orderCode} — ${title.toLowerCase()}`,
-        link: `/account/orders/${orderId}`,
+        link: `/orders/${orderId}`,
       });
     }
 
@@ -600,7 +600,7 @@ export class OrderUseCase {
           type: 'order_cancelled',
           title: 'Đơn đã bị huỷ',
           message: `Đơn #${order.orderCode} đã bị huỷ. Lý do: ${reason}`,
-          link: `/account/orders/${orderId}`,
+          link: `/orders/${orderId}`,
         });
       }
     }
@@ -743,7 +743,7 @@ export class OrderUseCase {
           type: approved ? 'return_approved' : 'return_rejected',
           title: approved ? 'Yêu cầu hoàn trả được duyệt' : 'Yêu cầu hoàn trả bị từ chối',
           message: adminNote || (approved ? 'Vui lòng gửi hàng theo hướng dẫn' : 'Liên hệ CSKH nếu cần hỗ trợ'),
-          link: `/account/orders/${orderId}`,
+          link: `/orders/${orderId}`,
         });
       }
     }

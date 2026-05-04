@@ -22,16 +22,20 @@ const pool = mysql.createPool({
   multipleStatements: false,
 });
 
-// ✅ Set charset sau khi connect
+// ✅ Set charset + timezone sau khi connect
+// Đồng bộ session TZ với driver option `timezone: '+07:00'` để CURRENT_TIMESTAMP
+// và mọi DATETIME lưu/đọc đều đúng giờ VN, tránh lệch 7h khi format "X phút trước".
 pool.on('connection', (connection: any) => {
   connection.query("SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'");
+  connection.query("SET time_zone = '+07:00'");
 });
 
 export const testConnection = async () => {
   try {
     const connection = await pool.getConnection();
-    // ✅ Set charset cho connection này
+    // ✅ Set charset + timezone cho connection này
     await connection.query("SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'");
+    await connection.query("SET time_zone = '+07:00'");
     console.log('✅ Database connected successfully');
     connection.release();
   } catch (error) {
