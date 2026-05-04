@@ -45,6 +45,7 @@ import { AdminAttributes } from '@/features/admin/pages/AdminAttributes';
 import { AdminVoucher } from '@/features/admin/pages/AdminVouchers';
 import { AdminBrands } from '@/features/admin/pages/AdminBrands';
 import { AdminBanners } from '@/features/admin/pages/AdminBanners';
+import { NotificationsPage } from '@/pages/NotificationsPage';
 import { AdminOrderDetail } from './features/admin/pages/AdminOrderDetail';
 import { AdminReturns } from '@/features/admin/pages/AdminReturns';
 import SupportChatAdminPage from '@/features/admin/pages/SupportChatAdminPage';
@@ -110,6 +111,7 @@ function App() {
           <Route element={<CustomerRouteGuard />}>
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/wallet" element={<WalletPage />} />
+            <Route path="/account/notifications" element={<NotificationsPage />} />
           </Route>
 
           {/* --- 2. ROUTES CHO ADMIN --- */}
@@ -131,6 +133,7 @@ function App() {
             <Route path="support" element={<SupportChatAdminPage />} />
             <Route path="wallet-topups" element={<AdminWalletTopups />} />
             <Route path="wallet-withdrawals" element={<AdminWalletWithdrawals />} />
+            <Route path="notifications" element={<NotificationsPage embedded />} />
           </Route>
         </Route>
 

@@ -21,6 +21,7 @@ import { BrandRepository } from './infrastructure/repositories/BrandRepository';
 import { CouponRepository } from './infrastructure/repositories/CouponRepository'; //
 import { BannerRepository } from './infrastructure/repositories/BannerRepository';
 import { WishlistRepository } from './infrastructure/repositories/WishlistRepository';
+import { NotificationRepository } from './infrastructure/repositories/NotificationRepository';
 
 //------Jobs--------
 import { paymentScheduler } from './infrastructure/jobs/scheduler';
@@ -38,6 +39,7 @@ import { BrandUseCase } from './application/use-cases/BrandUseCase'; //
 import { CouponUseCase } from './application/use-cases/CouponUseCase'; //
 import { BannerUseCase } from './application/use-cases/BannerUseCase';
 import { WishlistUseCase } from './application/use-cases/WishlistUseCase';
+import { NotificationUseCase } from './application/use-cases/NotificationUseCase';
 import { VietnamAdministrativeService } from './application/services/VietnamAdministrativeService';
 
 // --- CONTROLLERS ---
@@ -56,6 +58,7 @@ import { BrandController } from './presentation/controllers/BrandController'; //
 import { CouponController } from './presentation/controllers/CouponController'; //
 import { BannerController } from './presentation/controllers/BannerController';
 import { WishlistController } from './presentation/controllers/WishlistController';
+import { NotificationController } from './presentation/controllers/NotificationController';
 import { PaymentController } from './presentation/controllers/PaymentController';
 import { ReviewController } from './presentation/controllers/Reviewcontroller ';
 import { WalletUseCase } from './application/use-cases/WalletUseCase';
@@ -84,6 +87,7 @@ import { createAdminOrderRoutes } from './presentation/routes/admin/order.routes
 import { createBrandRoutes } from './presentation/routes/brand.routes'; //
 import { createCouponRoutes } from './presentation/routes/coupon.routes'; //
 import { createBannerRoutes, createAdminBannerRoutes } from './presentation/routes/banner.routes';
+import { createNotificationRoutes } from './presentation/routes/notification.routes';
 import { createReviewRoutes, createAdminReviewRoutes } from './presentation/routes/review.routes';
 import { createLocationRoutes } from './presentation/routes/location.routes';
 import { createWishlistRoutes } from './presentation/routes/wishlist.routes';
@@ -131,15 +135,18 @@ const couponRepository = new CouponRepository(); //
 const bannerRepository = new BannerRepository(); // db là pool MySQL của bạn
 const addressRepository = new AddressRepository();
 const wishlistRepository = new WishlistRepository();
+const notificationRepository = new NotificationRepository();
 
 // Use Cases
 const vietnamAdministrativeService = new VietnamAdministrativeService();
 const authUseCase = new AuthUseCase(userRepository);
 const productUseCase = new ProductUseCase(productRepository);
+const notificationUseCase = new NotificationUseCase(notificationRepository);
 const orderUseCase = new OrderUseCase(
   orderRepository,
   productRepository,
-  vietnamAdministrativeService
+  vietnamAdministrativeService,
+  notificationUseCase
 );
 const userUseCase = new UserUseCase(userRepository);
 const voucherUseCase = new VoucherUseCase(voucherRepo);
@@ -166,6 +173,7 @@ const reviewController = new ReviewController(reviewUseCase);
 const brandController = new BrandController(brandUseCase); //
 const couponController = new CouponController(couponUseCase); //
 const bannerController = new BannerController(bannerUseCase);
+const notificationController = new NotificationController(notificationUseCase);
 const walletUseCase = new WalletUseCase();
 const paymentController = new PaymentController(orderUseCase, walletUseCase);
 const addressController = new AddressController(addressRepository);
@@ -194,6 +202,7 @@ app.use('/api/vouchers', createVoucherRoutes(voucherController));
 app.use('/api/brands', createBrandRoutes(brandController)); //
 app.use('/api/coupons', createCouponRoutes(couponController)); //
 app.use('/api/banners', createBannerRoutes(bannerController));
+app.use('/api/notifications', createNotificationRoutes(notificationController));
 app.use('/api/payment', createPaymentRoutes(paymentController));
 app.use('/api/reviews', createReviewRoutes(reviewController));
 app.use('/api/addresses', createAddressRoutes(addressController));

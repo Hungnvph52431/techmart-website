@@ -24,6 +24,7 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import { walletService, type AdminWithdrawalNotification } from '@/services/wallet.service';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 const ALLOWED_ROLES = ['admin', 'staff'];
 
@@ -165,6 +166,8 @@ export const AdminLayout = () => {
           </div>
 
           <div className="flex items-center space-x-6">
+            <NotificationBell variant="light" viewAllHref="/admin/notifications" />
+
             {isAdmin && (
               <div ref={notificationRef} className="relative">
                 <button

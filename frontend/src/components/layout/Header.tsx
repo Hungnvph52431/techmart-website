@@ -8,6 +8,7 @@ import { useWishlistStore } from '@/store/wishlistStore';
 import { productService } from '@/services/product.service';
 import { categoryService, type Category } from '@/services/category.service';
 import type { Product } from '@/types';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 const BACKEND_URL = (import.meta.env.VITE_API_URL as string)?.replace('/api', '') || 'http://localhost:5001';
 const getImageUrl = (url?: string | null) => {
@@ -319,6 +320,8 @@ export const Header = () => {
 
           {/* Actions */}
           <div className="flex items-center gap-2 ml-auto">
+
+            {authenticated && <NotificationBell variant="light" viewAllHref="/account/notifications" />}
 
             {authenticated ? (
               <div className="relative group">

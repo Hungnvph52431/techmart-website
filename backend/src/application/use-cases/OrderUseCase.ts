@@ -25,12 +25,14 @@ import {
 } from '../policies/OrderLifecycle';
 import { sendOrderCancelledEmail, sendPaymentSuccessEmail, sendOrderCreatedEmail, sendReturnReviewEmail } from '../services/EmailService';
 import { VietnamAdministrativeService } from '../services/VietnamAdministrativeService';
+import { NotificationUseCase } from './NotificationUseCase';
 
 export class OrderUseCase {
   constructor(
     private orderRepository: IOrderRepository,
     private productRepository: IProductRepository,
-    private vietnamAdministrativeService: VietnamAdministrativeService
+    private vietnamAdministrativeService: VietnamAdministrativeService,
+    private notificationUseCase?: NotificationUseCase
   ) {}
 
   // --- TRUY VẤN DÀNH CHO ADMIN ---
@@ -301,6 +303,25 @@ export class OrderUseCase {
       this.sendOrderCreatedEmailNotification(newOrder.orderId).catch(() => {});
     }
 
+    // Notification: thông báo cho admin có đơn mới + cho user (nếu có) xác nhận
+    if (newOrder && this.notificationUseCase) {
+      this.notificationUseCase.notifyAdmins({
+        type: 'order_created',
+        title: 'Đơn hàng mới',
+        message: `Đơn #${newOrder.orderCode || newOrder.orderId} vừa được đặt`,
+        link: `/admin/orders/${newOrder.orderId}`,
+      });
+      if (orderData.userId) {
+        this.notificationUseCase.notifyUser({
+          userId: orderData.userId,
+          type: 'order_created',
+          title: 'Đặt hàng thành công',
+          message: `Đơn #${newOrder.orderCode || newOrder.orderId} đã được tạo, đang chờ xác nhận`,
+          link: `/account/orders/${newOrder.orderId}`,
+        });
+      }
+    }
+
     // Wallet: thanh toán ngay → tự động xác nhận đơn (KHÔNG tự sang shipping vì cần shipperId).
     if (orderData.paymentMethod === 'wallet' && newOrder && orderData.userId) {
       try {
@@ -392,6 +413,24 @@ export class OrderUseCase {
       } catch (err) {
         console.error('[OrderUseCase] Auto-pay on complete failed:', err);
       }
+    }
+
+    // Notification: báo cho user khi trạng thái đơn của họ thay đổi (do admin/system)
+    if (result && this.notificationUseCase && order.userId && actorRole !== 'customer') {
+      const labels: Record<string, string> = {
+        confirmed: 'Đơn đã được xác nhận',
+        shipping: 'Đơn đang được giao',
+        delivered: 'Đơn đã giao tới nơi',
+        completed: 'Đơn đã hoàn thành',
+      };
+      const title = labels[status] || `Cập nhật đơn hàng`;
+      this.notificationUseCase.notifyUser({
+        userId: order.userId,
+        type: 'order_status',
+        title,
+        message: `Đơn #${order.orderCode} — ${title.toLowerCase()}`,
+        link: `/account/orders/${orderId}`,
+      });
     }
 
     return result;
@@ -539,6 +578,28 @@ export class OrderUseCase {
       this.sendOrderCancelledEmailNotification(orderId).catch(() => {});
     }
 
+    // Notification: báo trạng thái huỷ
+    if (cancelledOrder && this.notificationUseCase) {
+      if (actorRole === 'customer') {
+        // Khách tự huỷ → báo admin
+        this.notificationUseCase.notifyAdmins({
+          type: 'order_cancelled',
+          title: 'Khách huỷ đơn',
+          message: `Đơn #${order.orderCode} đã bị khách huỷ. Lý do: ${reason}`,
+          link: `/admin/orders/${orderId}`,
+        });
+      } else if (order.userId) {
+        // Admin huỷ → báo user
+        this.notificationUseCase.notifyUser({
+          userId: order.userId,
+          type: 'order_cancelled',
+          title: 'Đơn đã bị huỷ',
+          message: `Đơn #${order.orderCode} đã bị huỷ. Lý do: ${reason}`,
+          link: `/account/orders/${orderId}`,
+        });
+      }
+    }
+
     return cancelledOrder;
   }
 
@@ -570,7 +631,7 @@ export class OrderUseCase {
       throw new Error('Đơn hàng này đã có yêu cầu hoàn trả đang xử lý');
     }
 
-    return this.orderRepository.createReturn({
+    const created = await this.orderRepository.createReturn({
       orderId,
       requestedBy: userId,
       reason: payload.reason.trim(),
@@ -578,6 +639,17 @@ export class OrderUseCase {
       items: payload.items,
       evidenceImages: payload.evidenceImages,
     });
+
+    if (created && this.notificationUseCase) {
+      this.notificationUseCase.notifyAdmins({
+        type: 'return_created',
+        title: 'Yêu cầu hoàn trả mới',
+        message: `Đơn #${aggregate.order.orderCode} có yêu cầu hoàn trả`,
+        link: `/admin/orders/${orderId}`,
+      });
+    }
+
+    return created;
   }
 
   async requestReturnByGuest(
@@ -657,6 +729,18 @@ export class OrderUseCase {
     const result = await this.orderRepository.reviewReturn({ orderId, orderReturnId, actorUserId, actorRole, decision, adminNote });
     if (result) {
       this.sendReturnReviewEmailNotification(orderId, result, decision, adminNote).catch(() => {});
+
+      // Notification: báo cho user khi đơn của họ được duyệt/từ chối hoàn trả
+      if (this.notificationUseCase && orderReturn.requestedBy) {
+        const approved = decision === 'approved';
+        this.notificationUseCase.notifyUser({
+          userId: orderReturn.requestedBy,
+          type: approved ? 'return_approved' : 'return_rejected',
+          title: approved ? 'Yêu cầu hoàn trả được duyệt' : 'Yêu cầu hoàn trả bị từ chối',
+          message: adminNote || (approved ? 'Vui lòng gửi hàng theo hướng dẫn' : 'Liên hệ CSKH nếu cần hỗ trợ'),
+          link: `/account/orders/${orderId}`,
+        });
+      }
     }
     return result;
   }
