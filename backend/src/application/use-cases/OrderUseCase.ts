@@ -325,8 +325,13 @@ export class OrderUseCase {
     // Wallet: thanh toán ngay → tự động xác nhận đơn (KHÔNG tự sang shipping vì cần shipperId).
     if (orderData.paymentMethod === 'wallet' && newOrder && orderData.userId) {
       try {
-        await this.updateOrderPaymentStatus(newOrder.orderId, 'paid', orderData.userId, 'customer', 'Thanh toán qua ví TechMart');
-        await this.transitionOrderStatus(newOrder.orderId, 'confirmed', orderData.userId, 'customer', 'Tự động xác nhận do thanh toán ví');
+        // Repo có thể đã set paymentStatus='paid' khi tạo đơn ví → chỉ update khi còn pending
+        if (newOrder.paymentStatus !== 'paid') {
+          await this.updateOrderPaymentStatus(newOrder.orderId, 'paid', orderData.userId, 'customer', 'Thanh toán qua ví TechMart');
+        }
+        if (newOrder.status === 'pending') {
+          await this.transitionOrderStatus(newOrder.orderId, 'confirmed', orderData.userId, 'customer', 'Tự động xác nhận do thanh toán ví');
+        }
       } catch (err) {
         console.error('[OrderUseCase] Auto-transition for wallet failed:', err);
       }
