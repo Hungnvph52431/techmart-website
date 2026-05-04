@@ -3,10 +3,25 @@
 import { useState, useEffect, useRef } from 'react';
 import { bannerService } from '@/services/banner.service';
 import { Banner, BannerPosition } from '@/types/banner.type';
-import { 
-  Plus, Pencil, Trash2, ToggleLeft, ToggleRight, 
-  ImageIcon, X, Save, Loader2, GripVertical
+import {
+  Plus, Pencil, Trash2, ToggleLeft, ToggleRight,
+  ImageIcon, X, Save, Loader2, GripVertical, AlertTriangle, Clock
 } from 'lucide-react';
+
+type DateStatus = 'expired' | 'pending' | 'ok';
+
+const getDateStatus = (banner: Banner): DateStatus => {
+  const now = Date.now();
+  if (banner.validTo && new Date(banner.validTo).getTime() < now) return 'expired';
+  if (banner.validFrom && new Date(banner.validFrom).getTime() > now) return 'pending';
+  return 'ok';
+};
+
+const formatDate = (iso?: string) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+};
 
 const POSITION_LABELS: Record<BannerPosition, string> = {
   home_slider: 'Slider trang chủ (to)',
@@ -342,7 +357,13 @@ export const AdminBanners = () => {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-black text-gray-800 uppercase italic tracking-tight">Quản lý Banner</h1>
-          <p className="text-gray-400 text-sm font-bold mt-1">{banners.length} banner · {banners.filter(b => b.isActive).length} đang hiển thị</p>
+          <p className="text-gray-400 text-sm font-bold mt-1">
+            {banners.length} banner · {banners.filter(b => b.isActive).length} đang bật
+            {(() => {
+              const expired = banners.filter(b => b.isActive && getDateStatus(b) === 'expired').length;
+              return expired > 0 ? <span className="text-red-500"> · {expired} đã hết hạn</span> : null;
+            })()}
+          </p>
         </div>
         <button
           onClick={() => { setEditingBanner(null); setShowForm(true); }}
@@ -379,11 +400,17 @@ export const AdminBanners = () => {
                 </div>
 
                 <div className="space-y-3">
-                  {items.map((banner: Banner) => (
+                  {items.map((banner: Banner) => {
+                    const dateStatus = getDateStatus(banner);
+                    const isExpired = dateStatus === 'expired';
+                    const isPending = dateStatus === 'pending';
+                    return (
                     <div
                       key={banner.bannerId}
                       className={`bg-white rounded-3xl border p-4 flex items-center gap-5 transition-all hover:shadow-md ${
-                        banner.isActive ? 'border-gray-100' : 'border-gray-100 opacity-60'
+                        isExpired && banner.isActive
+                          ? 'border-red-200 bg-red-50/30'
+                          : banner.isActive ? 'border-gray-100' : 'border-gray-100 opacity-60'
                       }`}
                     >
                       <GripVertical size={20} className="text-gray-200 flex-shrink-0" />
@@ -402,11 +429,30 @@ export const AdminBanners = () => {
 
                       {/* Info */}
                       <div className="flex-1 min-w-0">
-                        <p className="font-black text-gray-800 text-sm uppercase tracking-tight truncate">{banner.title}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-black text-gray-800 text-sm uppercase tracking-tight truncate">{banner.title}</p>
+                          {isExpired && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px] font-black uppercase tracking-wider">
+                              <AlertTriangle size={11} /> Đã hết hạn
+                            </span>
+                          )}
+                          {isPending && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-black uppercase tracking-wider">
+                              <Clock size={11} /> Chưa tới hạn
+                            </span>
+                          )}
+                        </div>
                         {banner.linkUrl && (
                           <p className="text-xs text-blue-500 font-bold mt-0.5 truncate">{banner.linkUrl}</p>
                         )}
-                        <p className="text-xs text-gray-400 font-bold mt-1">Thứ tự: {banner.displayOrder}</p>
+                        <p className="text-xs text-gray-400 font-bold mt-1">
+                          Thứ tự: {banner.displayOrder}
+                          {(banner.validFrom || banner.validTo) && (
+                            <span className={isExpired ? 'text-red-500 ml-2' : isPending ? 'text-amber-600 ml-2' : 'ml-2'}>
+                              · {formatDate(banner.validFrom)} → {formatDate(banner.validTo) || '∞'}
+                            </span>
+                          )}
+                        </p>
                       </div>
 
                       {/* Actions */}
@@ -448,7 +494,8 @@ export const AdminBanners = () => {
                         </button>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             );
